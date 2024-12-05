@@ -14,6 +14,7 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
+from django.contrib import messages
 
 environment = os.environ.get("SERVER_ENV", "dev")
 ENVIRONMENT = environment
@@ -88,10 +89,10 @@ DATABASES = {
         "NAME": os.getenv("DB_NAME"),
         "USER": os.getenv("DB_USER"),
         "PASSWORD": os.getenv("DB_PASSWORD"),
-        # "HOST": os.getenv("DB_HOST"),
-        # "PORT": os.getenv("DB_PORT"),
-        "HOST": "localhost",
-        "PORT": 16311
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
+        #"HOST": "localhost",
+        #"PORT": 16311
     }
 }
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
@@ -153,6 +154,15 @@ LOCALE_PATHS = [
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+MESSAGE_TAGS = {
+    messages.DEBUG: "info",
+    messages.INFO: "info",
+    messages.SUCCESS: "success",
+    messages.WARNING: "warning",
+    messages.ERROR: "error",
+}
+
 
 LOGGING = {
     'version': 1,

@@ -1,0 +1,237 @@
+:root {
+    --dark: #34495E;
+    --light: #ffffff;
+    --success: #0ABF30;
+    --error: #E24D4C;
+    --warning: #E9BD0C;
+}
+
+.notifications {
+    position: fixed;
+    z-index: 9999;
+    top: 20px;
+    right: 20px;
+}
+
+.notice {
+    display: none;
+}
+
+.hid {
+    display: none;
+}
+
+.notifications :where(.tst, .column) {
+    display: flex;
+    align-items: center;
+}
+
+.notifications .tst {
+    width: 400px;
+    position: relative;
+    z-index: 10000;
+    overflow: hidden;
+    list-style: none;
+    border-radius: 4px;
+    box-shadow: 10px 5px 20px rgba(0, 0, 0, 0.2);
+    padding: 16px 17px;
+    margin-bottom: 10px;
+    background: var(--light);
+    justify-content: space-between;
+    animation: show_toast 0.5s ease forwards;
+}
+
+.sidenav{
+    box-shadow: 0 0 5px 0px rgba(0, 0, 0, 0.5) !important;
+}
+@keyframes show_toast {
+    0% {
+        transform: translateX(100%);
+    }
+
+    40% {
+        transform: translateX(-5%);
+    }
+
+    80% {
+        transform: translateX(0%);
+    }
+
+    100% {
+        transform: translateX(-10px);
+    }
+}
+
+.notifications .hide {
+    animation: hide_toast 0.3s ease forwards;
+}
+
+@keyframes hide_toast {
+    0% {
+        transform: translateX(-10px);
+    }
+
+    40% {
+        transform: translateX(0%);
+    }
+
+    80% {
+        transform: translateX(-5%);
+    }
+
+    100% {
+        transform: translateX(calc(100% + 20px));
+    }
+}
+
+.tst::before {
+    position: absolute;
+    content: "";
+    height: 3px;
+    width: 100%;
+    bottom: 0px;
+    left: 0px;
+    animation: progress 5s linear forwards;
+}
+
+@keyframes progress {
+    100% {
+        width: 0%;
+    }
+}
+
+.tst.success::before,
+#success {
+    background: var(--success);
+}
+
+.tst.error::before,
+#error {
+    background: var(--error);
+}
+
+.tst.warning::before,
+#warning {
+    background: var(--warning);
+}
+
+.tst .column i {
+    font-size: 1.75rem !important;
+}
+
+.tst.success .column i {
+    color: var(--success);
+}
+
+.tst.error .column i {
+    color: var(--error);
+}
+
+.tst.warning .column i {
+    color: var(--warning);
+}
+
+.tst .column span {
+    font-size: 1.07rem !important;
+    margin-left: 12px;
+}
+
+.tst i:last-child {
+    color: #aeb0d7;
+    cursor: pointer;
+}
+
+.tst i:last-child:hover {
+    color: var(--dark);
+}
+
+.modal {
+    z-index: 9999 !important;
+}
+
+.modal-backdrop {
+    z-index: 9998 !important;
+}
+
+
+#LoadOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+#LoadOverlay .btn:focus {
+    outline: none;
+}
+#LoadOverlay img{
+    max-height: 900px;
+}
+
+
+#LoadOverlay .load {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /*change these sizes to fit into your project*/
+    width: 100px;
+    height: 100px;
+}
+
+#LoadOverlay .load hr {
+    border: 0;
+    margin: 0;
+    width: 40%;
+    height: 40%;
+    position: absolute;
+    border-radius: 50%;
+    animation: spin 2s ease infinite
+}
+
+#LoadOverlay .load :first-child {
+    background: #24a3da;
+    animation-delay: -1.5s
+}
+
+#LoadOverlay .load :nth-child(2) {
+    background: #6bf3ad;
+    animation-delay: -1s
+}
+
+#LoadOverlay .load :nth-child(3) {
+    background: #f6b060;
+    animation-delay: -0.5s
+}
+
+#LoadOverlay .load :last-child {
+    background: #bc2e02
+}
+
+
+@keyframes spin {
+
+    0%,
+    100% {
+        transform: translate(0)
+    }
+
+    25% {
+        transform: translate(160%)
+    }
+
+    50% {
+        transform: translate(160%, 160%)
+    }
+
+    75% {
+        transform: translate(0, 160%)
+    }
+}

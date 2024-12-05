@@ -53,4 +53,13 @@
 {% endblock content %}
 
 <!-- Specific JS goes HERE -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+    <script>
+        $(document).ready(function () {
+            $('.alert-dismissible').each(function () {
+                createToast($(this).find('.message-tag').text(), $(this).find('.message').text());
+                $(this).remove();
+            });
+        })
+    </script>
+{% endblock javascripts %}

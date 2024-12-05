@@ -20,6 +20,8 @@
     <link rel="stylesheet" href="{% static 'web/vendor/@fortawesome/fontawesome-free/css/all.min.css' %}"
           type="text/css">
     <link rel="stylesheet" href="{% static 'web/css/argon.css' %}" type="text/css">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link  rel="stylesheet" type="text/css" href="{% static 'web/css/toast.css' %}" />
     {% block stylesheets %}{% endblock stylesheets %}
 
 </head>
@@ -36,11 +38,22 @@
 
 </div>
 
+{% for message in messages %}
+    <div class="alert alert-dismissible d-none" role="alert">
+        <div class="message-tag">{{ message.tags }}</div>
+        <div class="message">{{ message }}</div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endfor %}
+
+
+<ul class="notifications"></ul>
+
 {% include "web/includes/scripts.html" %}
 
 <!-- Specific JS goes HERE -->
 {% block javascripts %}{% endblock javascripts %}
-
+<script src="{% static 'web/js/toast.js' %}"></script>
 <script src="{% static 'web/js/argon.js' %}"></script>
 
 </body>
