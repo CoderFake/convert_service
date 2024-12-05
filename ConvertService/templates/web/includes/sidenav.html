@@ -1,0 +1,86 @@
+{% load static %}
+<nav class="sidenav navbar navbar-vertical fixed-left navbar-expand-xs navbar-light bg-white" id="sidenav-main">
+    <div class="scrollbar-inner">
+        <div class="sidenav-header d-flex flex-row align-items-center w-100">
+            <a class="navbar-brand w-100" href="/">
+                <img src="{% static 'web/img/brand/logo.png' %}" class="navbar-brand-img" alt="">
+            </a>
+            <div class="nav-item d-block d-md-none justify-content-end">
+                <div class="pr-3 sidenav-toggler sidenav-toggler-dark" data-action="sidenav-pin"
+                     data-target="#sidenav-main">
+                    <div class="sidenav-toggler-inner">
+                        <i class="sidenav-toggler-line bg-primary"></i>
+                        <i class="sidenav-toggler-line bg-primary"></i>
+                        <i class="sidenav-toggler-line bg-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="navbar-inner">
+            <!-- Collapse -->
+            <div class="collapse navbar-collapse" id="sidenav-collapse-main">
+                <!-- Nav items -->
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'home' in segment %} active {% endif %}" href="/">
+                            <i class="ni ni-tv-2 text-primary"></i>
+                            <span class="nav-link-text">ホームページ</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'icons' in segment %} active {% endif %}" href="">
+                            <i class="ni ni-planet text-orange"></i>
+                            <span class="nav-link-text">せってい</span>
+                        </a>
+                    </li>
+{#                    <li class="nav-item">#}
+{#                        <a class="nav-link {% if 'map' in segment %} active {% endif %}" href="/map.html">#}
+{#                            <i class="ni ni-pin-3 text-primary"></i>#}
+{#                            <span class="nav-link-text">Google</span>#}
+{#                        </a>#}
+{#                    </li>#}
+{#                    <li class="nav-item">#}
+{#                        <a class="nav-link {% if 'profile' in segment %} active {% endif %}" href="/profile.html">#}
+{#                            <i class="ni ni-single-02 text-yellow"></i>#}
+{#                            <span class="nav-link-text">Profile</span>#}
+{#                        </a>#}
+{#                    </li>#}
+{#                    <li class="nav-item">#}
+{#                        <a class="nav-link {% if 'tables' in segment %} active {% endif %}" href="/tables.html">#}
+{#                            <i class="ni ni-bullet-list-67 text-default"></i>#}
+{#                            <span class="nav-link-text">Tables</span>#}
+{#                        </a>#}
+{#                    </li>#}
+{#                    <li class="nav-item">#}
+{#                        <a class="nav-link" href="/register.html">#}
+{#                            <i class="ni ni-circle-08 text-pink"></i>#}
+{#                            <span class="nav-link-text">Register (template)</span>#}
+{#                        </a>#}
+{#                    </li>#}
+                </ul>
+                <!-- Divider -->
+                <hr class="my-3">
+                <!-- Heading -->
+                <h6 class="navbar-heading p-0 text-muted"></h6>
+                <!-- Navigation -->
+                <ul class="navbar-nav mb-md-3">
+                    {% if request.user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'logout' %}">
+                                <i class="ni ni-user-run text-red"></i>
+                                <span class="nav-link-text">ログアウト</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="ni ni-key-25 text-info"></i>
+                                <span class="nav-link-text">ログイン</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
