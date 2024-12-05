@@ -1,0 +1,35 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+*.so
+*.dylib
+
+venv/
+env/
+.venv/
+.virtualenv/
+
+*.log
+*.pot
+*.sqlite3
+db.sqlite3
+staticfiles/
+media/
+locale/
+
+.mypy_cache/
+.dmypy.json
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+/.cadence/
+.cadence
+*.env
+*.env.*
+/ConvertService/.idea/
+/ConvertService/.cadence/
