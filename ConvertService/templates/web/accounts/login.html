@@ -14,31 +14,38 @@
                 <div class="card bg-secondary shadow border-0">
                     <div class="card-header bg-transparent">
                         <div class="text-muted text-center mt-2">
-                            <h1 class="w-100 text-center font-weight-bold"> 予約情報一括変換サービス </h1>
                         </div>
                     </div>
                     <div class="card-body px-lg-5 py-lg-5">
-                        <form method="POST">
-
+                        <form method="POST" id="login-form">
                             {% csrf_token %}
-
                             <div class="form-group mb-3">
-                                <div class="form-check-label text-gray">ユーザーID</div>
+                                <label class="form-check-label text-gray" for="username">ユーザーID</label>
                                 <div class="input-group input-group-alternative">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text"><i class="ni ni-circle-08"></i></span>
-                                    </div>
-                                    {{ form.username }}
+                                    <input class="form-control" type="text" name="username" id="username"
+                                           placeholder="メールアドレスを入力してください">
                                 </div>
                             </div>
                             <div class="form-group">
-                                <div class="form-check-label text-gray">パスワード</div>
+                                <label class="form-check-label text-gray" for="password">パスワード</label>
                                 <div class="input-group input-group-alternative">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text"><i class="ni ni-lock-circle-open"></i></span>
-                                    </div>
-                                    {{ form.password }}
+                                    <input class="form-control" type="password" name="password" id="password"
+                                           placeholder="パスワードを入力してください" autocomplete="password">
                                 </div>
+                            </div>
+                            <div class="custom-control custom-control-alternative custom-checkbox">
+                                <input class="custom-control-input" id="customCheckUsername" name="remember_username"
+                                       type="checkbox">
+                                <label class="custom-control-label" for="customCheckUsername">
+                                    <span class="text-muted">IDを保存</span>
+                                </label>
+                            </div>
+                            <div class="custom-control custom-control-alternative custom-checkbox">
+                                <input class="custom-control-input" id="customCheckPassword" name="remember_password"
+                                       type="checkbox" disabled>
+                                <label class="custom-control-label" for="customCheckPassword">
+                                    <span class="text-muted">パスワードを保存</span>
+                                </label>
                             </div>
                             <div class="text-center">
                                 <button type="submit" class="btn btn-primary my-4 pl-5 pr-5">ログイン</button>
@@ -52,14 +59,104 @@
 
 {% endblock content %}
 
-<!-- Specific JS goes HERE -->
+
 {% block javascripts %}
+
     <script>
         $(document).ready(function () {
-            $('.alert-dismissible').each(function () {
-                createToast($(this).find('.message-tag').text(), $(this).find('.message').text());
-                $(this).remove();
+            function deleteItem(){
+                localStorage.removeItem("password");
+                localStorage.removeItem('password_length');
+                localStorage.removeItem("password_limit_time");
+                localStorage.removeItem("hash_password");
+            }
+            
+            function validateLogin() {
+                const passwordLimitTime = localStorage.getItem("password_limit_time");
+                if (passwordLimitTime) {
+                    const currentTime = Date.now();
+                    const hoursElapsed = (currentTime - passwordLimitTime) / (1000 * 60 * 60);
+
+                    if (hoursElapsed > 12) {
+                        deleteItem();
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            $('form').on('submit', function (e) {
+                e.preventDefault();
+                let re_username = $('#customCheckUsername').is(':checked');
+                let re_password = $('#customCheckPassword').is(':checked');
+                localStorage.setItem('re_password', re_password);
+                localStorage.setItem('re_username', re_username);
+
+                var username = $('#username').val();
+                var password = $('#password').val();
+                
+                let formData = new FormData($('#login-form')[0]);
+                
+                if (localStorage.getItem("hash_password") && validateLogin()) {
+                    formData.append("remember_pass", localStorage.getItem("hash_password"));
+                }
+                
+                if (re_username) {
+                    localStorage.setItem('username', username);
+                } else {
+                    localStorage.removeItem('username');
+                    deleteItem();
+                }
+                if (re_password) {
+                    localStorage.setItem('password_length', password.length);
+                    localStorage.setItem("password_limit_time", Date.now());
+                }
+
+                $.ajax({
+                    url: '{% url "login" %}',
+                    type: 'POST',
+                    contentType: false,
+                    processData: false,
+                    data: formData,
+                    dataType: "json",
+                    success: function (response) {
+                        if (response?.status === "success") {
+                            if (re_password && re_username) {
+                                localStorage.setItem("hash_password", response.hash_password);
+                            }
+                            window.location.href = '/';
+                        } else {
+                            createToast(response.status, response.message);
+                        }
+
+                    },
+                    error: function (xhr, errmsg, err) {
+                        createToast('error', errmsg);
+                    }
+                });
             });
-        })
+        });
+    </script>
+    <script>
+        $(document).ready(function () {
+            if (localStorage.getItem("re_username")) {
+                $('#username').val(localStorage.getItem("username"));
+            }
+            if (localStorage.getItem("re_password") && localStorage.getItem("password_length")) {
+                var passwordLength = localStorage.getItem("password_length");
+                var maskedPassword = "*".repeat(passwordLength);
+                $("#password").val(maskedPassword);
+            }
+
+            $('#customCheckUsername').change(function () {
+                if ($(this).is(':checked')) {
+                    $('#customCheckPassword').prop('disabled', false);
+                } else {
+                    $('#customCheckPassword').prop('disabled', true);
+                    $('#customCheckPassword').prop('checked', false);
+                }
+            });
+        });
     </script>
 {% endblock javascripts %}
