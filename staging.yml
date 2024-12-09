@@ -18,7 +18,7 @@ services:
     volumes:
       - "./ConvertService:/home/ConvertService"
       - "./ConvertService/staticfiles:/home/ConvertService/staticfiles"
-      - "./ConvertService/static:/home/$ConvertService/static"
+      - "./ConvertService/static:/home/ConvertService/static"
     depends_on:
       - db
     restart: always
