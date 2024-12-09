@@ -3308,6 +3308,7 @@ input[type="button"].btn-block {
     pointer-events: none;
     cursor: default; }
 
+
 .nav-tabs {
   border-bottom: 1px solid #dee2e6; }
   .nav-tabs .nav-item {
@@ -3565,7 +3566,7 @@ input[type="button"].btn-block {
 .navbar-light .navbar-nav .active > .nav-link,
 .navbar-light .navbar-nav .nav-link.show,
 .navbar-light .navbar-nav .nav-link.active {
-  color: rgba(0, 0, 0, 0.9); }
+  background-color: var(--primary) !important; }
 
 .navbar-light .navbar-toggler {
   color: rgba(0, 0, 0, 0.6);
@@ -13018,7 +13019,7 @@ textarea[resize="horizontal"] {
     padding: 1.5rem; }
 
 .sidenav-header {
-  height: 78px;
+  height: 45px;
   text-align: center; }
 
 .g-sidenav-show .sidenav .navbar-brand,
@@ -17592,6 +17593,11 @@ input.datetimepicker[data-color="yellow"] + .bootstrap-datetimepicker-widget {
   display: grid !important;
   place-items: start !important;
   justify-content: center;
+}
+
+.navbar-nav .nav-link span{
+  padding-left: 15px;
+  color: var(--light);
 }
 
 .container-fluid .typing-demo {
