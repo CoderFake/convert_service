@@ -18,7 +18,7 @@
     --gray-dark: #32325d;
     --light: #ced4da;
     --lighter: #e9ecef;
-    --primary: #5e72e4;
+    --primary: #007bff;
     --secondary: #f7fafc;
     --success: #2dce89;
     --info: #11cdef;
@@ -22699,6 +22699,11 @@ input.datetimepicker[data-color=yellow] + .bootstrap-datetimepicker-widget butto
   border-right: 3px solid;
   font-family: monospace;
   font-size: 4em;
+}
+
+.btn-primary{
+    background-color: var(--primary) !important;
+    color: var(--light) !important;
 }
 
 @keyframes typing {
