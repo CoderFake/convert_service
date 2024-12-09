@@ -3,48 +3,130 @@
 {% load i18n %}
 {% block title %} Dashboard {% endblock title %}
 
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/drag-drop-file.css' %}"/>
+{% endblock stylesheets %}
 
 {% block content %}
 
-    <!-- Header -->
-    <div class="header bg-primary pb-1">
-        <div class="container-fluid">
-            <div class="header-body">
-                <div class="row align-items-center py-4">
-                    <div class="col-lg-6 col-7">
-                        <nav aria-label="breadcrumb" class="d-none d-md-inline-block ml-md-4">
-                            <ol class="breadcrumb breadcrumb-links breadcrumb-dark">
-                                <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i></a></li>
-                                <li class="breadcrumb-item"><a href="{% url 'home' %}">ホームページ</a></li>
-                            </ol>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Page content -->
-    <div class="container-fluid mt--6">
+    <div class="container-fluid mt-5">
         {% if not request.user.is_authenticated %}
             <div class="wrapper demo-wrapper">
                 <div class="typing-demo">
-                  予約情報一括変換サービス
+                    予約情報一括変換サービス
                 </div>
             </div>
         {% else %}
+            <div class="container compact drag-drop-file reservation w-90">
+                <div class="header-section">
+                    <h1 class="text-center text-dark font-weight-bold">
+                        予約情報ファイルを各施設様配布用ファイルに一括変換</h1>
+                </div>
+                <div class="row">
+                    <div class="col-lg-12 form-file w-100">
+                        <form class="mt-2" id="input-form" enctype="multipart/form-data" onsubmit="return false;">
+                            {% csrf_token %}
+                            <div class="drop-section">
+                                <div class="col-12 mt-5">
+                                    <span>予約情報ファイルを選択</span>
+                                    <span>ここにファイルをドラッグ＆ドロップしてください</span>
+                                    <button class="file-selector">ファイルを選択</button>
+                                    <input type="file" name="files" class="file-selector-input" multiple/>
+                                </div>
+                                <div class="col">
+                                    <div class="drop-here">ここにドロップ</div>
+                                </div>
+                            </div>
+                            <div class="list-section">
+                                <div class="col-12 mt-3 p-0">
+                                   <div class="process w-100 d-flex flex-column flex-sm-row gap-5 align-items-center">
+                                        <button type="submit"
+                                                class="btn-primary border-0 rounded p-2 pl-3 pr-3 ml-2 mr-2 submit-btn d-none">
+                                            選択したファイルを一括変換
+                                        </button>
+                                        <div class="lds-roller d-none">
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="list pb-5 mt-2"></div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="d-none show-file">
+                        <div class="row">
+                            <div class="spin w-100 h-100">
+                                <div id="Overlay" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container compact drag-drop-file response w-90">
+                <div class="header-section">
+                    <h1 class="text-center text-dark font-weight-bold">各施設様からの予約回答ファイルを一括変換</h1>
+                </div>
+                <div class="row">
+                    <div class="col-lg-12 form-file w-100">
+                        <form class="mt-2" id="input-form" enctype="multipart/form-data" onsubmit="return false;">
+                            {% csrf_token %}
+                            <div class="drop-section">
+                                <div class="col-12 mt-5">
+                                    <span>予約回答ファイルを選択</span>
+                                    <span>ここにファイルをドラッグ＆ドロップしてください</span>
+                                    <button class="file-selector">ファイルを選択</button>
+                                    <input type="file" name="files" class="file-selector-input" multiple/>
+                                </div>
+                                <div class="col">
+                                    <div class="drop-here">ここにドロップ</div>
+                                </div>
+                            </div>
+                            <div class="list-section">
+                                <div class="col-12 mt-3 p-0">
+                                    <div class="process w-100 d-flex flex-column flex-sm-row gap-5 align-items-center">
+                                        <button type="submit"
+                                                class="btn-primary border-0 rounded p-2 pl-3 pr-3 ml-2 mr-2 submit-btn d-none">
+                                            選択したファイルを一括変換
+                                        </button>
+                                        <div class="lds-roller d-none">
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                            <div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="list pb-5 mt-2"></div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="d-none show-file">
+                        <div class="row">
+                            <div class="spin w-100 h-100">
+                                <div id="Overlay" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         {% endif %}
-        {% include "web/includes/footer.html" %}
-
     </div>
 
 {% endblock content %}
 
 <!-- Specific JS goes HERE -->
 {% block javascripts %}
-
-    <script src="{% static 'web/vendor/chart.js/dist/Chart.min.js' %}"></script>
-    <script src="{% static 'web/vendor/chart.js/dist/Chart.extension.js' %}"></script>
-
+    <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
 {% endblock javascripts %}
