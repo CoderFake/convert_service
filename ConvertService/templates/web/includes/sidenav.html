@@ -3,7 +3,8 @@
     <div class="scrollbar-inner">
         <div class="sidenav-header align-items-center pt-3 w-100">
             <div class="nav-item w-100 d-block d-md-none">
-                <div class="pr-3 sidenav-toggler d-flex justify-content-end sidenav-toggler-dark active" data-action="sidenav-pin"
+                <div class="pr-3 sidenav-toggler d-flex justify-content-end sidenav-toggler-dark active"
+                     data-action="sidenav-pin"
                      data-target="#sidenav-main">
                     <div class="sidenav-toggler-inner ">
                         <i class="sidenav-toggler-line bg-white"></i>
@@ -37,13 +38,14 @@
                 <ul class="navbar-nav mb-md-3">
                     {% if request.user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'logout' %}">
+                            <a class="nav-link" href="" data-bs-toggle="modal" data-bs-target="#logoutModal">
                                 <span class="nav-link-text">ログアウト</span>
                             </a>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link {% if request.path == "/login/" %} active {% endif %}" href="{% url 'login' %}">
+                            <a class="nav-link {% if request.path == "/login/" %} active {% endif %}"
+                               href="{% url 'login' %}">
                                 <span class="nav-link-text">ログイン</span>
                             </a>
                         </li>

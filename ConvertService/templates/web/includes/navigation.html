@@ -29,7 +29,7 @@
                         <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true"
                            aria-expanded="false">
                             <div class="media align-items-center">
-                              <span class="avatar avatar-sm bg-white rounded-circle">
+                              <span class="avatar avatar-sm bg-white rounded-circle p-0">
                                 <img alt="Image placeholder" src="{% static 'web/img/theme/Sample_User_Icon.png' %}">
                               </span>
                                 <div class="media-body  ml-2  d-none d-lg-block">
@@ -39,24 +39,24 @@
                                 </div>
                             </div>
                         </a>
-                        <div class="dropdown-menu  dropdown-menu-right ">
-                            <div class="dropdown-header noti-title">
-                                <h6 class="text-overflow m-0">ようこそ！</h6>
-                            </div>
-                            <a href="" class="dropdown-item">
-                                <i class="ni ni-single-02"></i>
-                                <span>マイプロフィール</span>
-                            </a>
-                            <a target="_blank" href="" class="dropdown-item">
-                                <i class="ni ni-support-16"></i>
-                                <span>サポート</span>
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a href="{% url 'logout' %}" class="dropdown-item">
-                                <i class="ni ni-user-run text-red"></i>
-                                <span>ログアウト</span>
-                            </a>
-                        </div>
+{#                        <div class="dropdown-menu  dropdown-menu-right ">#}
+{#                            <div class="dropdown-header noti-title">#}
+{#                                <h6 class="text-overflow m-0">ようこそ！</h6>#}
+{#                            </div>#}
+{#                            <a href="" class="dropdown-item">#}
+{#                                <i class="ni ni-single-02"></i>#}
+{#                                <span>マイプロフィール</span>#}
+{#                            </a>#}
+{#                            <a target="_blank" href="" class="dropdown-item">#}
+{#                                <i class="ni ni-support-16"></i>#}
+{#                                <span>サポート</span>#}
+{#                            </a>#}
+{#                            <div class="dropdown-divider"></div>#}
+{#                            <a href="{% url 'logout' %}" class="dropdown-item">#}
+{#                                <i class="ni ni-user-run text-red"></i>#}
+{#                                <span>ログアウト</span>#}
+{#                            </a>#}
+{#                        </div>#}
                     </li>
                 </ul>
             {% endif %}
