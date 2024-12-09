@@ -27,7 +27,7 @@
 }
 
 .notifications .tst {
-    width: 400px;
+    width: 450px;
     position: relative;
     z-index: 10000;
     overflow: hidden;
@@ -214,6 +214,97 @@
 #LoadOverlay .load :last-child {
     background: #bc2e02
 }
+
+.lds-roller,
+.lds-roller div,
+.lds-roller div:after {
+  box-sizing: border-box;
+}
+.lds-roller {
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+.lds-roller div {
+  animation: lds-roller 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  transform-origin: 20px 20px;
+}
+.lds-roller div:after {
+  content: " ";
+  display: block;
+  position: absolute;
+  width: 3.6px;
+  height: 3.6px;
+  border-radius: 50%;
+  background: currentColor;
+  margin: -1.8px 0 0 -1.8px;
+}
+.lds-roller div:nth-child(1) {
+  animation-delay: -0.024s;
+}
+.lds-roller div:nth-child(1):after {
+  top: 31.3px;
+  left: 31.3px;
+}
+.lds-roller div:nth-child(2) {
+  animation-delay: -0.048s;
+}
+.lds-roller div:nth-child(2):after {
+  top: 33.86px;
+  left: 28px;
+}
+.lds-roller div:nth-child(3) {
+  animation-delay: -0.072s;
+}
+.lds-roller div:nth-child(3):after {
+  top: 35.45px;
+  left: 24.14px;
+}
+.lds-roller div:nth-child(4) {
+  animation-delay: -0.096s;
+}
+.lds-roller div:nth-child(4):after {
+  top: 36px;
+  left: 20px;
+}
+.lds-roller div:nth-child(5) {
+  animation-delay: -0.12s;
+}
+.lds-roller div:nth-child(5):after {
+  top: 35.45px;
+  left: 15.86px;
+}
+.lds-roller div:nth-child(6) {
+  animation-delay: -0.144s;
+}
+.lds-roller div:nth-child(6):after {
+  top: 33.86px;
+  left: 12px;
+}
+.lds-roller div:nth-child(7) {
+  animation-delay: -0.168s;
+}
+.lds-roller div:nth-child(7):after {
+  top: 31.3px;
+  left: 8.69px;
+}
+.lds-roller div:nth-child(8) {
+  animation-delay: -0.192s;
+}
+.lds-roller div:nth-child(8):after {
+  top: 28px;
+  left: 6.14px;
+}
+@keyframes lds-roller {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 
 
 @keyframes spin {
