@@ -8,6 +8,8 @@ $(document).ready(function () {
         const fileSelectorInput = container.find('.file-selector-input');
         const submitBtn = container.find('.submit-btn');
 
+        listSection.hide();
+
         buttonFileSelector.on('click', function (e) {
             e.preventDefault();
             fileSelectorInput.click();
@@ -19,7 +21,6 @@ $(document).ready(function () {
             }
             this.value = '';
         });
-
 
         fileSelector.on('dragover', function (e) {
             e.preventDefault();
@@ -43,7 +44,7 @@ $(document).ready(function () {
         Array.from(files).forEach(file => {
             const validationResult = typeValidation(file);
             if (validationResult.valid) {
-                const li = createListItem(file, listContainer);
+                const li = createListItem(file, listContainer, listSection, submitBtn);
                 listContainer.append(li);
                 simulateUpload(li, listSection);
             } else {
@@ -54,7 +55,7 @@ $(document).ready(function () {
         checkFiles(listContainer, listSection, submitBtn);
     }
 
-    function createListItem(file, listContainer) {
+    function createListItem(file, listContainer, listSection, submitBtn) {
         const iconName = iconSelector(file.type);
         const fileSizeMB = (file.size / (1024 * 1024));
         const displayFileSize = fileSizeMB < 0.01 ? '0.01 MB' : `${fileSizeMB.toFixed(2)} MB`;
@@ -106,8 +107,6 @@ $(document).ready(function () {
     function checkFiles(listContainer, listSection, submitBtn) {
         const hasFiles = listContainer.children().length > 0;
         submitBtn.toggleClass('d-none', !hasFiles);
-        listSection.toggle(hasFiles);
-
         if (!hasFiles) {
             listSection.hide();
         }
@@ -169,7 +168,6 @@ $(document).ready(function () {
         }
 
         setTimeout(() => {
-
             loader.addClass('d-none');
             $(this).attr('disabled', false);
         }, 3000);
