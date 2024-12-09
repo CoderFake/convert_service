@@ -9,7 +9,7 @@ services:
       python manage.py makemessages -l ja &&
       python manage.py compilemessages &&
       python create_superuser.py &&
-      gunicorn --workers 3 --bind 0.0.0.0:8000 admin.wsgi:application"
+      gunicorn --workers 3 --bind 0.0.0.0:8000 ConvertService.wsgi:application"
     ports:
       - "${SERVER_PORT}:8000"
     environment:
