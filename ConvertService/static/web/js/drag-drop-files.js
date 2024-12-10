@@ -170,6 +170,7 @@ $(document).ready(function () {
         setTimeout(() => {
             loader.addClass('d-none');
             $(this).attr('disabled', false);
+            window.location.href= "/?tab=process-file";
         }, 3000);
     });
 });
