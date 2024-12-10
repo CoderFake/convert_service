@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "accounts",
+    "home",
+    "configs",
 ]
 
 MIDDLEWARE = [
@@ -98,6 +101,8 @@ DATABASES = {
         # "PORT": 16311
     }
 }
+AUTH_USER_MODEL = "accounts.Account"
+
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # Password validation
