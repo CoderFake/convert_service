@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ConvertService.settings")
 django.setup()
 
-from django.contrib.auth.models import User
+from accounts.models import Account as User
 
 username = os.getenv("SUPERUSER_USERNAME", "")
 email = os.getenv("SUPERUSER_EMAIL", "")
