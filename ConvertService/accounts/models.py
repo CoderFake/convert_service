@@ -1,8 +1,12 @@
-# -*- encoding: utf-8 -*-
-"""
-Copyright (c) 2019 - present AppSeed.us
-"""
-
+from django.contrib.auth.models import AbstractUser
 from django.db import models
+from home.models import Tenant
 
-# Create your models here.
+class Account(AbstractUser):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)
+
+    class Meta:
+        db_table = "account"
+
+    def __str__(self):
+        return self.username
