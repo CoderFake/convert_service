@@ -4,6 +4,7 @@ services:
     build: ./ConvertService
     image: "${PROJECT_NAME}:${SERVER_NAME}"
     command: sh -c "mkdir -p /home/ConvertService/locale &&
+      python manage.py makemigrations &&
       python manage.py migrate &&
       python manage.py collectstatic --noinput --clear &&
       python manage.py makemessages -l ja &&
