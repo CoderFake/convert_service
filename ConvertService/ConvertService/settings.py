@@ -92,10 +92,10 @@ DATABASES = {
         "NAME": os.getenv("DB_NAME"),
         "USER": os.getenv("DB_USER"),
         "PASSWORD": os.getenv("DB_PASSWORD"),
-        # "HOST": os.getenv("DB_HOST"),
-        # "PORT": os.getenv("DB_PORT"),
-        "HOST": "localhost",
-        "PORT": 16311
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
+        # "HOST": "localhost",
+        # "PORT": 16311
     }
 }
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
@@ -194,13 +194,6 @@ LOGGING = {
             'level': 'INFO',
             'filters': ['exclude_autoreload'],
         },
-        'debug_file': {
-            'class': 'logging.FileHandler',
-            'filename': 'logs/debug_log.log',
-            'formatter': 'verbose',
-            'level': 'DEBUG',
-            'filters': ['exclude_autoreload'],
-        },
         'error_file': {
             'class': 'logging.FileHandler',
             'filename': 'logs/error_log.log',
@@ -210,8 +203,8 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'debug_file', 'error_file'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'error_file'],
+            'level': 'INFO',
             'propagate': True,
         },
         'django.request': {
