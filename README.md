@@ -52,7 +52,7 @@ $ docker image ls
     arctec_convert_service   convert_service   c795199916a8   2 days ago    421MB
     mysql                    8.0               6c55ddbef969   8 weeks ago   591MB
 
-$ docker image rm [image_id]
+$ docker image rmi [image_id]
 ```
 - Remove the old volume
 ```bash
