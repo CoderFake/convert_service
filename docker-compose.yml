@@ -26,6 +26,9 @@ services:
       - "db_volume:/var/lib/mysql"
       - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
       - ./db/data:/master
+    command: >
+      sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
+
   db_test:
     image: mysql:8.0
     ports:
@@ -37,6 +40,9 @@ services:
     volumes:
       - "db_test_volume:/var/lib/mysql"
       - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
+    command: >
+      sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
+
 volumes:
   db_volume:
   db_test_volume:
