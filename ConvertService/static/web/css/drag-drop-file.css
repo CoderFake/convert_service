@@ -1,0 +1,322 @@
+.drag-drop-file{
+    text-align: center;
+    width: 100%;
+    min-height: 435px;
+    margin: auto;
+    border-radius: 16px;
+    /*box-shadow: rgba(255, 255, 255, 0.1) 0px 1px 1px 0px inset, rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px;*/
+    transition: max-width 0.3s;
+}
+
+.drag-drop-file {
+    max-width: 1200px;
+}
+
+.drag-drop-file .header-section{
+    padding: 25px 0;
+}
+
+.drag-drop-file .header-section h1{
+    font-weight: 500;
+    font-size: 1.7rem;
+    text-transform: uppercase;
+    color: #707EA0;
+    margin: 0;
+    margin-bottom: 8px;
+}
+.drag-drop-file .show-file h5{
+     color: #707EA0;
+}
+
+.drag-drop-file .header-section p{
+    margin: 5px;
+    font-size: 0.95rem;
+    color: #707EA0;
+}
+
+.drag-drop-file #input-form {
+    text-align: center;
+    width: 100%;
+    max-width: 100%;
+    min-height: 250px;
+    margin: 30px auto;
+    /*background-color: white;*/
+    border-radius: 16px;
+}
+
+#input-form .drop-section {
+    min-height: 250px;
+    border: 1px dashed #A8B3E3;
+    background-image: none;
+    margin: 0;
+    border-radius: 12px;
+    position: relative;
+}
+
+#input-form .drop-section div.col:first-child {
+    opacity: 1;
+    visibility: visible;
+    transition-duration: 0.2s;
+    transform: scale(1);
+    width: 200px;
+    margin: auto;
+}
+
+#input-form .drop-section div.col:last-child {
+    font-size: 40px;
+    font-weight: 700;
+    color: #c0cae1;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    width: 200px;
+    height: 55px;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.6);
+    transition-duration: 0.2s;
+}
+
+#input-form .drag-over-effect div.col:first-child {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(1.1);
+}
+
+#input-form .drag-over-effect div.col:last-child {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+#input-form .drop-section .cloud-icon {
+    margin-top: 25px;
+    margin-bottom: 20px;
+}
+
+#input-form .drop-section img {
+    width: 150px;
+    height: auto;
+}
+
+#input-form .drop-section span,
+#input-form .drop-section button {
+    display: block;
+    margin: auto;
+    color: #707EA0;
+    margin-bottom: 10px;
+}
+
+#input-form .drop-section button {
+    color: white;
+    background-color: #5874C6;
+    border: none;
+    outline: none;
+    padding: 7px 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    cursor: pointer;
+
+}
+
+#input-form .drop-section input {
+    display: none;
+}
+
+#input-form .list-section {
+    display: none;
+    height: 410px;
+    max-height: 410px;
+    overflow: hidden;
+    text-align: left;
+    margin: 0;
+    padding-bottom: 20px;
+}
+
+#input-form .list-section .list{
+    height: 400px;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+
+#input-form .list-section .list-title {
+    margin-top: 20px;
+    font-size: 0.95rem;
+    color: #707EA0;
+}
+
+#input-form .list-section li {
+    display: flex;
+    margin: 15px 0;
+    padding-top: 4px;
+    padding-bottom: 2px;
+    border-radius: 8px;
+    transition-duration: 0.2s;
+}
+
+#input-form .list-section li:hover {
+    box-shadow: #E3EAF9 0px 0px 4px 0px, #E3EAF9 0px 12px 16px 0px;
+}
+
+#input-form .list-section li .col {
+    flex: .1;
+}
+
+#input-form .list-section li .col:nth-child(1) {
+    flex: .15;
+    text-align: center;
+}
+
+#input-form .list-section li .col:nth-child(2) {
+    flex: .75;
+    text-align: left;
+    font-size: 0.9rem;
+    color: #3e4046;
+    padding: 8px 10px;
+}
+
+#input-form .list-section li .col:nth-child(2) div.name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 250px;
+    display: inline-block;
+}
+
+#input-form .list-section li .col .file-name span {
+    color: #707EA0;
+    float: right;
+}
+
+#input-form .list-section li .file-progress {
+    width: 100%;
+    height: 5px;
+    margin-top: 8px;
+    border-radius: 8px;
+    background-color: #dee6fd;
+}
+
+#input-form .list-section li .file-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 8px;
+    background-image: linear-gradient(120deg, #6b99fd, #9385ff);
+    transition-duration: 0.4s;
+}
+
+#input-form .list-section li .col .file-size {
+    font-size: 0.75rem;
+    margin-top: 3px;
+    color: #707EA0;
+}
+
+#input-form .list-section li .col svg.cross,
+#input-form .list-section li .col svg.tick {
+    fill: #8694d2;
+    background-color: #dee6fd;
+    position: relative;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+}
+
+#input-form .list-section li .col svg.tick {
+    fill: #50a156;
+    background-color: transparent;
+}
+
+#input-form .list-section li.complete span,
+#input-form .list-section li.complete .file-progress,
+#input-form .list-section li.complete svg.cross {
+    display: none;
+}
+
+#input-form .list-section li.in-prog .file-size,
+#input-form .list-section li.in-prog svg.tick {
+    display: none;
+}
+
+
+#Overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.load {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+}
+
+.load hr {
+    border: 0;
+    margin: 0;
+    width: 40%;
+    height: 40%;
+    position: absolute;
+    border-radius: 50%;
+    animation: spin 2s ease infinite
+}
+
+.load :first-child {
+    background: #24a3da;
+    animation-delay: -1.5s
+}
+
+.load :nth-child(2) {
+    background: #6bf3ad;
+    animation-delay: -1s
+}
+
+.load :nth-child(3) {
+    background: #f6b060;
+    animation-delay: -0.5s
+}
+
+.load :last-child {
+    background: #bc2e02
+}
+@keyframes spin {
+
+    0%,
+    100% {
+        transform: translate(0)
+    }
+
+    25% {
+        transform: translate(160%)
+    }
+
+    50% {
+        transform: translate(160%, 160%)
+    }
+
+    75% {
+        transform: translate(0, 160%)
+    }
+}
+
+@media screen and (max-width: 500px) {
+    #input-form .list-section .list{
+        overflow-x: auto;
+    }
+}

@@ -1,0 +1,97 @@
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>
+        Arctec - {% block title %}  {% endblock %}
+    </title>
+
+    <!-- Favicon - loaded as static -->
+    <link rel="icon" href="{% static 'web/img/brand/logo-icon.png' %}" type="image/png">
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">
+    <!-- Icons -->
+    <link rel="stylesheet" href="{% static 'web/vendor/nucleo/css/nucleo.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'web/vendor/@fortawesome/fontawesome-free/css/all.min.css' %}"
+          type="text/css">
+    <link rel="stylesheet" href="{% static 'web/vendor/bootstrap/dist/css/bootstrap.min.css' %}"
+          type="text/css">
+    <link rel="stylesheet" href="{% static 'web/css/argon.css' %}" type="text/css">
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/toast.css' %}"/>
+    {% block stylesheets %}{% endblock stylesheets %}
+
+</head>
+
+<body class="">
+
+{% include "web/includes/sidenav.html" %}
+
+<div class="main-content" id="panel" style="height:100vh;"> 
+
+    {% include "web/includes/navigation.html" %}
+
+    {% block content %}{% endblock content %}
+
+</div>
+
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                ログアウトしますか？
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">いいえ
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmLogout">はい</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% for message in messages %}
+    <div class="alert alert-dismissible d-none" role="alert">
+        <div class="message-tag">{{ message.tags }}</div>
+        <div class="message">{{ message }}</div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endfor %}
+
+
+<ul class="notifications"></ul>
+{% include "web/includes/scripts.html" %}
+
+<!-- Specific JS goes HERE -->
+{% block javascripts %}{% endblock javascripts %}
+<script src="{% static 'web/js/toast.js' %}"></script>
+<script src="{% static 'web/js/argon.js' %}"></script>
+<script>
+    $(document).ready(function () {
+
+        $('.nav-link[data-bs-toggle="modal"]').on('click', function (e) {
+            e.preventDefault();
+            const targetModal = $(this).data('bs-target');
+            $(targetModal).modal('show');
+        });
+        $('.btn-secondary[data-bs-dismiss="modal"]').on('click', function (e) {
+            e.preventDefault(); 
+            $(this).closest('.modal').modal('hide');
+        });
+
+        $('#confirmLogout').on('click', function () {
+            window.location.href = "{% url 'logout' %}";
+        });
+    });
+</script>
+
+</body>
+
+</html>

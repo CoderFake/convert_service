@@ -1,0 +1,23 @@
+version: '3.7'
+services:
+  server:
+    build: ./ConvertService
+    image: "${PROJECT_NAME}:${SERVER_NAME}"
+    command: sh -c "mkdir -p /home/ConvertService/locale &&
+      python manage.py makemigrations &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput --clear &&
+      python manage.py makemessages -l ja &&
+      python manage.py compilemessages &&
+      python create_superuser.py &&
+      python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "${SERVER_PORT}:8000"
+    environment:
+      SERVER_ENV: dev
+    tty: true
+    volumes:
+      - "./ConvertService:/home/ConvertService"
+    depends_on:
+      - db
+    restart: always
