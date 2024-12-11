@@ -21,7 +21,7 @@
     font-size: 1.7rem;
     text-transform: uppercase;
     color: #707EA0;
-    margin: 0px;
+    margin: 0;
     margin-bottom: 8px;
 }
 .drag-drop-file .show-file h5{
@@ -130,8 +130,8 @@
 
 #input-form .list-section {
     display: none;
-    height: 310px;
-    max-height: 310px;
+    height: 410px;
+    max-height: 410px;
     overflow: hidden;
     text-align: left;
     margin: 0;
@@ -139,8 +139,8 @@
 }
 
 #input-form .list-section .list{
-    height: 300px;
-    max-height: 300px;
+    height: 400px;
+    max-height: 400px;
     overflow-y: auto;
     overflow-x: hidden;
 }
