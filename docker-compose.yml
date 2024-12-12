@@ -1,12 +1,26 @@
 version: '3.7'
+
+networks:
+  arctec_network:
+    driver: bridge
+
+volumes:
+  db_volume:
+  db_test_volume:
+  redis_data:
+
 services:
   server:
     build: ./ConvertService
     image: "${PROJECT_NAME}:${SERVER_NAME}"
     ports:
       - "${SERVER_PORT}:8000"
+    command: >
+      sh -c "./scripts/entrypoint.sh"
     environment:
       SERVER_ENV: dev
+      CELERY_BROKER_URL: "${REDIS_URL}"
+      CELERY_RESULT_BACKEND: "${REDIS_URL}"
     tty: true
     volumes:
       - "./ConvertService:/home/ConvertService"
@@ -14,20 +28,67 @@ services:
       - "./ConvertService/static:/home/ConvertService/static"
     depends_on:
       - db
+      - redis
+      - celery_worker
+    restart: always
+    networks:
+      - arctec_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - arctec_network
+
+  celery_worker:
+    build: ./ConvertService
+    command: >
+      sh -c "./scripts/celery_start.sh"
+    privileged: true
+    environment:
+      CELERY_BROKER_URL: "${REDIS_URL}"
+      CELERY_RESULT_BACKEND: "${REDIS_URL}"
+      SERVER_ENV: dev
+    depends_on:
+      - redis
+    volumes:
+      - "./ConvertService:/home/ConvertService"
+    restart: always
+    networks:
+      - arctec_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
   db:
     image: mysql:8.0
     ports:
       - "${DB_EXPORT}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
-      MYSQL_PASSWORD: "${DB_PASSWORD}"
       MYSQL_DATABASE: "${DB_NAME}"
     volumes:
       - "db_volume:/var/lib/mysql"
       - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
-      - ./db/data:/master
     command: >
       sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
+    networks:
+      - arctec_network
 
   db_test:
     image: mysql:8.0
@@ -35,14 +96,11 @@ services:
       - "${TEST_DB_EXPORT}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
-      MYSQL_PASSWORD: "${DB_PASSWORD}"
       MYSQL_DATABASE: "${DB_NAME}_test"
     volumes:
       - "db_test_volume:/var/lib/mysql"
       - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
     command: >
       sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
-
-volumes:
-  db_volume:
-  db_test_volume:
+    networks:
+      - arctec_network
