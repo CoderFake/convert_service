@@ -21,6 +21,9 @@ services:
       SERVER_ENV: dev
       CELERY_BROKER_URL: "${REDIS_URL}"
       CELERY_RESULT_BACKEND: "${REDIS_URL}"
+      DB_USER: root
+      DB_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      DB_PORT: 3306
     tty: true
     volumes:
       - "./ConvertService:/home/ConvertService"
