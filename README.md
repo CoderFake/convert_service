@@ -13,7 +13,7 @@
 - Run script FernetKeyGenerator.py to generate key 
     ```bash
     $ pip install cryptography
-    $ python ConvertService/FernetKeyGenerator.py     (for ubuntu/lilux or macos)
+    $ python ConvertService/FernetKeyGenerator.py    (for ubuntu/lilux or macos)
     $ python .\ConvertService\FernetKeyGenerator.py  (for window)
     ```
 
@@ -25,8 +25,8 @@
 Start the container and launch the server.
 
 ```bash
-$ chmod +x db/initdb.d/create-db.sh                 (for ubuntu/lilux or macos)
-$ chmod +x ConvertService/scripts/celery_start.sh   (for ubuntu/lilux or macos)
+$ chmod +x db/initdb.d/create-db.sh             (for ubuntu/lilux or macos)
+$ chmod +x ConvertService/scripts/*.sh          (for ubuntu/lilux or macos)
 $ docker compose -f docker-compose.yml -f dev.yml up -d
 ```
 
@@ -35,8 +35,8 @@ $ docker compose -f docker-compose.yml -f dev.yml up -d
 Start the container and launch the server.
 
 ```bash
-$ chmod +x db/initdb.d/create-db.sh                 (for ubuntu/lilux or macos)
-$ chmod +x ConvertService/scripts/celery_start.sh   (for ubuntu/lilux or macos)
+$ chmod +x db/initdb.d/create-db.sh             (for ubuntu/lilux or macos)
+$ chmod +x ConvertService/scripts/*.sh          (for ubuntu/lilux or macos)
 $ docker compose -f docker-compose.yml -f staging.yml up -d
 ```
 
@@ -78,4 +78,4 @@ In the development environment, access the web at the following URL. Adjust the 
 - Web URL: http://localhost:16310
 
 URL availability, authentication settings, and Basic Auth parameters can be configured in the configuration file
-- If you want to log in, please use the SUPER_USERNAME and SUPER_PASSWORD that you have previously set in P-017_ReservationConvertService/ConvertService/.env.{name}
+- If you want to log in, please use the SUPERUSER_EMAIL and SUPERUSER_PASSWORD that you have previously set in P-017_ReservationConvertService/ConvertService/.env.{name}
