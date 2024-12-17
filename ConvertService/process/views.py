@@ -1,14 +1,13 @@
 import json
 import os
-import zipfile
-import io
-import base64
-from pathlib import Path
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from .utils import get_redis_client, FileProcessor
+from home.dataclasses import PatientRecord
+from .file_tasks import process_and_format_file, process_multiple_files_task, generate_zip_task
+from .utils import get_redis_client
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,6 +74,29 @@ def delete_file(request):
         return JsonResponse({'status': 'error', 'message': f'ファイルの削除中にエラーが発生しました: {str(e)}'})
 
 
+@login_required
+def process_files(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': '無効なHTTPメソッドです。'})
+
+    try:
+        body_data = json.loads(request.body.decode('utf-8'))
+        mode = body_data.get('mode', 'dict')
+
+        if mode not in ['csv', 'dict']:
+            return JsonResponse({'status': 'error', 'message': "無効なモードです。 'csv' または 'dict' を選択してください。"})
+
+        process_multiple_files_task.run(mode)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'File processing started.'
+        })
+    except Exception as e:
+        logger.error(f"Error starting file processing task: {e}")
+        return JsonResponse({'status': 'error', 'message': f'エラー: {str(e)}'})
+
+
 # @login_required
 # def process_files(request):
 #     if request.method != 'POST':
@@ -87,94 +109,93 @@ def delete_file(request):
 #         if not keys:
 #             return JsonResponse({'status': 'error', 'message': '処理するファイルがありません。'})
 #
-#         results = []
-#         for key in keys:
-#             file_name = key.decode('utf-8').replace('file:', '')
-#             file_path = redis_client.get(key).decode('utf-8')
-#             output_path = Path('/tmp') / f'{file_name}'
+#         zip_buffer = io.BytesIO()
+#         output_files = []
 #
-#             task = FileProcessor.process_file(str(file_path), str(output_path))
-#             results.append({
-#                 'file_name': file_name,
-#                 'task_id': task.id,
-#                 'status': 'Processing',
-#                 'output_path': str(output_path)
-#             })
+#         def process_and_convert(file_path, key):
+#             try:
+#                 file_path = Path(file_path)
+#                 output_csv_path = file_path.with_suffix('.csv')
+#                 FileProcessor.process_file(file_path, output_csv_path)
 #
-#         return JsonResponse({'status': 'success', 'results': results})
+#                 if output_csv_path.exists():
+#                     redis_client.delete(key)
+#                     return output_csv_path
+#                 return None
+#             except Exception as e:
+#                 logger.error(f"Error processing file {file_path}: {e}")
+#                 return None
+#
+#         max_workers = os.cpu_count() or 1
+#         logger.info(f"Using max_workers={max_workers} for ThreadPoolExecutor")
+#
+#         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+#             futures = {
+#                 executor.submit(process_and_convert, redis_client.get(key).decode('utf-8'), key): key
+#                 for key in keys
+#             }
+#
+#             for future in as_completed(futures):
+#                 result = future.result()
+#                 if result:
+#                     output_files.append(result)
+#
+#         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+#             for file in output_files:
+#                 with open(file, 'rb') as f:
+#                     zip_file.writestr(file.name, f.read())
+#
+#         zip_buffer.seek(0)
+#
+#         zip_key = f'zip:{base64.urlsafe_b64encode(os.urandom(6)).decode("utf-8")}'
+#         redis_client.set(zip_key, zip_buffer.getvalue(), ex=3600)
+#
+#         return JsonResponse({'status': 'success', 'key': zip_key})
 #     except Exception as e:
 #         return JsonResponse({'status': 'error', 'message': f'ファイルの処理中にエラーが発生しました: {str(e)}'})
 
 
 @login_required
-def process_files(request):
+def format_data_processing(request):
     if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': '無効なHTTPメソッドです。'})
+        return JsonResponse({"status": "error", "message": "無効なHTTPメソッドです。"}, status=405)
 
     try:
-        redis_client = get_redis_client()
+        body_data = json.loads(request.body.decode('utf-8'))
+        data_convert_id = body_data.get('data_convert_id')
 
-        keys = redis_client.keys('file:*')
-        if not keys:
-            return JsonResponse({'status': 'error', 'message': '処理するファイルがありません。'})
+        if not data_convert_id:
+            return JsonResponse({"status": "error", "message": "必須パラメータ 'data_convert_id' が不足しています。"})
 
-        zip_buffer = io.BytesIO()
-        output_files = []
+        result = process_and_format_file.run(data_convert_id)
 
-        def process_and_convert(file_path, key):
-            try:
-                file_path = Path(file_path)
-                output_csv_path = file_path.with_suffix('.csv')
-                FileProcessor.process_file(file_path, output_csv_path)
+        return JsonResponse({
+            "status": "success",
+            "message": result
+        }, status=200)
 
-                if output_csv_path.exists():
-                    redis_client.delete(key)
-                    return output_csv_path
-                return None
-            except Exception as e:
-                logger.error(f"Error processing file {file_path}: {e}")
-                return None
-
-        max_workers = os.cpu_count() or 1
-        logger.info(f"Using max_workers={max_workers} for ThreadPoolExecutor")
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(process_and_convert, redis_client.get(key).decode('utf-8'), key): key
-                for key in keys
-            }
-
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    output_files.append(result)
-
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for file in output_files:
-                with open(file, 'rb') as f:
-                    zip_file.writestr(file.name, f.read())
-
-        zip_buffer.seek(0)
-
-        zip_key = f'zip:{base64.urlsafe_b64encode(os.urandom(6)).decode("utf-8")}'
-        redis_client.set(zip_key, zip_buffer.getvalue(), ex=3600)
-
-        return JsonResponse({'status': 'success', 'key': zip_key})
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': f'ファイルの処理中にエラーが発生しました: {str(e)}'})
+        logger.error(f"Error triggering data processing: {e}")
+        return JsonResponse({"status": "error", "message": "データ処理中にエラーが発生しました。"}, status=500)
 
 
 @login_required
-def download_zip(request, zip_key):
+def download_zip(request, zip_key="formatted:*"):
     try:
         redis_client = get_redis_client()
-        zip_data = redis_client.get(zip_key)
+        zip_key = generate_zip_task(zip_key, PatientRecord.COLUMN_NAMES.values())
 
+        if not zip_key:
+            return redirect('home')
+
+        zip_data = redis_client.get(zip_key)
         if not zip_data:
-            return JsonResponse({'status': 'error', 'message': '指定されたZIPファイルが見つかりません。'})
+            messages.error(request, '指定されたZIPファイルが見つかりません。')
+            return redirect('home')
 
         response = HttpResponse(zip_data, content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="processed_files.zip"'
+        response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d")}_output.zip"'
         return response
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': f'ZIPファイルのダウンロード中にエラーが発生しました: {str(e)}'})
+        logger.error(f"Error downloading ZIP file: {e}")
+        return redirect('home')
