@@ -15,7 +15,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ConvertService.settings")
-
 try:
     django.setup()
     logger.info("Django environment successfully initialized.")
@@ -50,13 +49,18 @@ def import_sql_file(file_path):
             if not command:
                 continue
 
-            if "CREATE TABLE" in command.upper():
-                logger.warning(f"Skipping CREATE TABLE command: {command[:50]}...")
+            if not "INSERT INTO" in command.upper():
+                logger.warning(f"Skipping command: {command[:50]}...")
                 continue
             try:
                 cursor.execute(command)
             except Exception as e:
                 logger.error(f"Failed to execute command: {command[:50]}... Error: {e}")
+
+def extract_timestamp(file_name):
+
+    base_name = file_name.split('-')[0]
+    return base_name if base_name.isdigit() else "0"
 
 def process_sql_files():
     data_dir = Path("data")
@@ -71,7 +75,9 @@ def process_sql_files():
         logger.info("No .sql files found in the data directory.")
         return
 
-    for sql_file in sql_files:
+    sorted_sql_files = sorted(sql_files, key=lambda x: extract_timestamp(x.name))
+
+    for sql_file in sorted_sql_files:
         logger.info(f"Processing file: {sql_file.name}")
 
         if sql_file.stat().st_size == 0:
@@ -98,7 +104,6 @@ def process_sql_files():
                 logger.info(f"Successfully imported {file_name}.")
         except Exception as e:
             logger.error(f"Failed to import {file_name}: {e}")
-
 
 logger.info("Script started.")
 check_database_connection()
