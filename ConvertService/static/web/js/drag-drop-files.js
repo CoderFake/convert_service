@@ -177,7 +177,7 @@ $(document).ready(function () {
 $(document).ready(function () {
     function initDownload(containerSelector) {
         const container = $(containerSelector);
-        const submitBtn = container.find('.submit-btn')
+        const submitBtn = container.find('.submit-btn');
         const parentProcess = container.find('.process');
         const loader = container.find('.lds-roller');
         const listSection = container.find('.list-section');
@@ -196,27 +196,27 @@ $(document).ready(function () {
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken'),
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({
+                        'mode': 'dict'
+                    })
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(result => {
                     if (result.status === 'success') {
-                        createToast('success', 'ファイルが正常に処理されました。');
-
-                        listContainer.empty();
-                        listSection.hide();
                         fileSelectorInput.val('');
-
-                        const downloadUrl = `/api/download-zip/${result.key}/`;
-                        window.location.href = downloadUrl;
-                        setTimeout(() => {
-                            window.location.href = '/?tab=process-file';
-                        }, 1000);
+                        window.location.href = '/?tab=process-file';
                     } else {
-                        createToast('error', result.message);
+                        createToast('error', result.message || 'エラーが発生しました。');
                     }
                 })
                 .catch(error => {
+                    console.error('Error:', error);
                     createToast('error', 'ファイル処理中にエラーが発生しました。');
                 })
                 .finally(() => {
@@ -229,21 +229,4 @@ $(document).ready(function () {
 
     initDownload('.container.reservation');
     initDownload('.container.response');
-
 });
-
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
