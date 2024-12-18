@@ -308,12 +308,16 @@ class DataFormatter:
     def convert_kana(value, kana_type='full_to_half'):
         """
         Convert Kana between full-width and half-width.
-        - 'full_to_half': Convert full-width to half-width.
-        - 'half_to_full': Convert half-width to full-width.
+        - 'full_to_half': Convert full-width Kana to half-width.
+        - 'half_to_full': Convert half-width Kana to full-width.
         """
         try:
             if not value:
                 return ""
+
+            # Convert Hiragana (or mixed Hiragana + Katakana) to Katakana
+            value = jaconv.hira2kata(value)
+
             if kana_type == 'full_to_half':
                 return jaconv.z2h(value, kana=True)
             elif kana_type == 'half_to_full':
