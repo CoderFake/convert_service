@@ -3,6 +3,7 @@ import csv
 import io
 import os
 import logging
+import threading
 import zipfile
 from django.utils import timezone
 
@@ -187,4 +188,67 @@ def generate_zip_task(zip_key, headers):
         return zip_key_name
     except Exception as e:
         logger.error(f"Error generating ZIP file: {e}")
+        return None
+
+
+@shared_task
+def generate_csv_task(csv_key, headers):
+    lock = threading.Lock()
+    try:
+        redis_client = get_redis_client()
+        keys = redis_client.keys(csv_key)
+
+        if not keys:
+            logger.warning("No formatted data found for CSV generation.")
+            return None
+
+        csv_buffer = io.StringIO()
+        csv_writer = csv.writer(csv_buffer)
+
+        csv_writer.writerow(headers)
+
+        def process_key(key):
+            try:
+                data = redis_client.get(key)
+                if not data:
+                    return None
+
+                formatted_data = json.loads(data)
+                return formatted_data
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
+                return None
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {executor.submit(process_key, key): key for key in keys}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result:
+                        with lock:
+                            try:
+                                for row in result:
+                                    if isinstance(row, dict):
+                                        csv_writer.writerow(row.values())
+                                    elif isinstance(row, list):
+                                        csv_writer.writerow(row)
+                                    else:
+                                        logger.warning(f"Invalid row format: {row}")
+                            except Exception as e:
+                                logger.error(f"Error writing row to CSV: {e}")
+                                if lock.locked():
+                                    lock.release()
+                                raise
+                except Exception as e:
+                    logger.error(f"Error occurred in future result: {e}")
+                    continue
+
+        csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
+        redis_client.set(csv_key_name, csv_buffer.getvalue(), ex=3600)
+        logger.info(f"CSV file successfully created and saved to Redis with key {csv_key_name}.")
+        return csv_key_name
+    except Exception as e:
+        logger.error(f"Critical error generating CSV file: {e}")
+        if lock.locked():
+            lock.release()
         return None
