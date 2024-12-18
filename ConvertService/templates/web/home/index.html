@@ -8,6 +8,10 @@
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'web/css/drag-drop-file.css' %}"/>
     <style>
+        .table-responsive {
+            max-height: 250px;
+        }
+
         .active-row {
             background-color: yellow !important;
         }
@@ -290,6 +294,7 @@
                     searching: false,
                     ordering: true,
                     info: false,
+                    autoWidth: true,
                     lengthChange: false,
                     columnDefs: [
                         {targets: '_all', className: 'dt-center'}
