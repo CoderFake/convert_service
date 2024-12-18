@@ -189,6 +189,27 @@ class DataFormatter:
         "CR_POSTAL_FORMAT": lambda value: DataFormatter.convert_postal_code(value),
     }
 
+    # @staticmethod
+    # def format_data_with_rules(data, rules, headers):
+    #     formatted_data = []
+    #     try:
+    #         for row in data:
+    #             formatted_row = {}
+    #             for rule_id, before_column, after_column in rules:
+    #                 try:
+    #                     column_index = headers.index(before_column)
+    #                     value = row[column_index] if column_index < len(row) else ""
+    #                     formatted_value = DataFormatter.apply_rule(value, rule_id)
+    #                     formatted_row[before_column] = formatted_value
+    #                 except ValueError:
+    #                     logger.warning(f"Column '{before_column}' not found in headers.")
+    #                     formatted_row[before_column] = ""
+    #             formatted_data.append(formatted_row)
+    #         return formatted_data
+    #     except Exception as e:
+    #         logger.error(f"Error formatting data with rules: {e}")
+    #         return []
+
     @staticmethod
     def format_data_with_rules(data, rules, headers):
         formatted_data = []

@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from home.dataclasses import PatientRecord
-from .file_tasks import process_and_format_file, process_multiple_files_task, generate_zip_task
+from .file_tasks import process_and_format_file, process_multiple_files_task, generate_zip_task, generate_csv_task
 from .utils import get_redis_client
 import logging
 
@@ -199,3 +199,26 @@ def download_zip(request, zip_key="formatted:*"):
     except Exception as e:
         logger.error(f"Error downloading ZIP file: {e}")
         return redirect('home')
+
+
+@login_required
+def download_csv(request, zip_key="formatted:*"):
+    try:
+        redis_client = get_redis_client()
+        csv_key = generate_csv_task(zip_key, PatientRecord.COLUMN_NAMES.values())
+
+        if not csv_key:
+            return redirect('home')
+
+        csv_data = redis_client.get(csv_key)
+        if not csv_data:
+            messages.error(request, '指定されたCSVファイルが見つかりません。')
+            return redirect('home')
+
+        response = HttpResponse(csv_data, content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d")}_output.csv"'
+        return response
+    except Exception as e:
+        logger.error(f"Error downloading CSV file: {e}")
+        return redirect('home')
+

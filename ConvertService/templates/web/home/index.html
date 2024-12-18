@@ -308,7 +308,7 @@
             loadProcessedFiles();
 
             $(".btn-export").on('click', function () {
-                window.location.href = "{% url 'download_zip' 'formatted:*' %}";
+                window.location.href = "{% url 'download_csv' 'formatted:*' %}";
             })
 
             $(".btn-format-file").on('click', function () {
