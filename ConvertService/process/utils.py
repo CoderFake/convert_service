@@ -11,7 +11,6 @@ import jaconv
 from openpyxl import load_workbook
 import redis
 import logging
-from home.dataclasses import PatientRecord
 
 logger = logging.getLogger(__name__)
 
@@ -28,150 +27,226 @@ def get_redis_client():
         raise
 
 
-class FileProcessor:
+class FileFormatMapper:
+    FORMAT_MAPPING = {
+        'CSV_C_SJIS': {'delimiter': ',', 'encoding': 'shift_jis'},
+        'CSV_C_UTF-8': {'delimiter': ',', 'encoding': 'utf-8'},
+        'CSV_T_SJIS': {'delimiter': '\t', 'encoding': 'shift_jis'},
+        'CSV_T_UTF-8': {'delimiter': '\t', 'encoding': 'utf-8'},
+    }
 
     @staticmethod
-    def process_file(file_path, output_path=None, mode='csv'):
+    def get_format_details(file_format_id: str):
+        return FileFormatMapper.FORMAT_MAPPING.get(file_format_id, None)
+
+
+class FileProcessor:
+    Fallback_Encodings = ['utf-8', 'shift_jis', 'cp932', 'iso-8859-1']
+
+    @staticmethod
+    def process_file(file_path, headers, mode='dict', file_format_id=None):
         file_path = Path(file_path)
         if file_path.suffix == '.csv':
-            return FileProcessor.process_csv(file_path, output_path, mode)
+            return FileProcessor.process_csv(file_path, headers, mode, file_format_id)
         elif file_path.suffix == '.json':
-            return FileProcessor.process_json(file_path, output_path, mode)
+            return FileProcessor.process_json(file_path, headers, mode)
         elif file_path.suffix == '.xml':
-            return FileProcessor.process_xml(file_path, output_path, mode)
+            return FileProcessor.process_xml(file_path, headers, mode)
         elif file_path.suffix == '.xlsx':
-            return FileProcessor.process_excel(file_path, output_path, mode)
+            return FileProcessor.process_excel(file_path, headers, mode)
         elif file_path.suffix == '.pdf':
-            return FileProcessor.process_pdf(file_path, output_path, mode)
+            return FileProcessor.process_pdf(file_path, headers, mode)
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
     @staticmethod
-    def write_to_csv(data, output_path):
+    def process_csv(file_path, headers, mode, file_format_id):
+        """
+        Process CSV files with fallback for different encodings.
+        """
         try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
-            output_path = Path(output_path)
-            with output_path.open('w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(headers)
-                writer.writerows(data)
-            logger.info(f"CSV file successfully created at: {output_path}")
+            format_details = FileFormatMapper.get_format_details(file_format_id)
+            if not format_details:
+                raise ValueError(f"Unsupported file format: {file_format_id}")
+
+            delimiter = format_details['delimiter']
+            primary_encoding = format_details['encoding']
+
+            try:
+                return FileProcessor._read_csv(file_path, headers, mode, delimiter, primary_encoding)
+            except UnicodeDecodeError as e:
+                logger.warning(f"Primary encoding {primary_encoding} failed for CSV. Error: {e}")
+
+            for encoding in FileProcessor.Fallback_Encodings:
+                if encoding != primary_encoding:
+                    try:
+                        logger.info(f"Trying fallback encoding {encoding} for CSV.")
+                        return FileProcessor._read_csv(file_path, headers, mode, delimiter, encoding)
+                    except UnicodeDecodeError as e:
+                        logger.warning(f"Encoding {encoding} failed for CSV. Error: {e}")
+
+            raise ValueError("Failed to process CSV file with all attempted encodings.")
         except Exception as e:
-            logger.error(f"Error creating CSV file: {e}")
+            logger.error(f"Error processing CSV file {file_path}: {e}")
             raise
 
     @staticmethod
-    def process_csv(file_path, output_path=None, mode='csv'):
+    def process_json(file_path, headers, mode):
+        """
+        Process JSON files with fallback for different encodings.
+        """
         try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
-            with open(file_path, 'r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                data = [
-                    [
-                        row.get(header, "") or "" for header in headers
-                    ]
-                    for row in reader
-                ]
-            if mode == 'csv' and output_path:
-                FileProcessor.write_to_csv(data, output_path)
-                return f"CSVファイル {file_path} が正常に処理されました。"
-            elif mode == 'dict':
-                return data
+            for encoding in FileProcessor.Fallback_Encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as jsonfile:
+                        json_data = json.load(jsonfile)
+                        return FileProcessor._map_data(json_data, headers, mode)
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    logger.warning(f"Error decoding JSON with encoding {encoding}: {e}")
+            raise ValueError("Failed to process JSON file with all attempted encodings.")
         except Exception as e:
-            logger.error(f"Error processing CSV file: {e}")
-            return f"CSVファイルの処理エラー: {str(e)}"
+            logger.error(f"Error processing JSON file {file_path}: {e}")
+            raise
 
     @staticmethod
-    def process_json(file_path, output_path=None, mode='csv'):
+    def process_xml(file_path, headers, mode):
+        """
+        Process XML files with fallback for different encodings.
+        """
         try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
-            with open(file_path, 'r', encoding='utf-8') as jsonfile:
-                json_data = json.load(jsonfile)
-                data = [
-                    [
-                        item.get(header, "") or "" for header in headers
-                    ]
-                    for item in json_data
-                ]
-            if mode == 'csv' and output_path:
-                FileProcessor.write_to_csv(data, output_path)
-                return f"JSONファイル {file_path} が正常に処理されました。"
-            elif mode == 'dict':
-                return data
+            for encoding in FileProcessor.Fallback_Encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as xmlfile:
+                        tree = ET.parse(xmlfile)
+                        root = tree.getroot()
+                        return FileProcessor._map_xml(root, headers, mode)
+                except (ET.ParseError, UnicodeDecodeError) as e:
+                    logger.warning(f"Error parsing XML with encoding {encoding}: {e}")
+            raise ValueError("Failed to process XML file with all attempted encodings.")
         except Exception as e:
-            logger.error(f"Error processing JSON file: {e}")
-            return f"JSONファイルの処理エラー: {str(e)}"
+            logger.error(f"Error processing XML file {file_path}: {e}")
+            raise
 
     @staticmethod
-    def process_xml(file_path, output_path=None, mode='csv'):
+    def process_excel(file_path, headers, mode):
+        """
+        Process Excel files.
+        """
         try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
-            tree = ET.parse(file_path)
-            root = tree.getroot()
-            data = [
-                [
-                    (elem.find(header).text or "") if elem.find(header) is not None else ""
-                    for header in headers
-                ]
-                for elem in root.findall('.//record')
-            ]
-            if mode == 'csv' and output_path:
-                FileProcessor.write_to_csv(data, output_path)
-                return f"XMLファイル {file_path} が正常に処理されました。"
-            elif mode == 'dict':
-                return data
-        except Exception as e:
-            logger.error(f"Error processing XML file: {e}")
-            return f"XMLファイルの処理エラー: {str(e)}"
-
-    @staticmethod
-    def process_excel(file_path, output_path=None, mode='csv'):
-        try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
             workbook = load_workbook(file_path)
             sheet = workbook.active
-            data = [
-                [
-                    cell if cell is not None else "" for cell in row
-                ]
-                for row in sheet.iter_rows(values_only=True)
-            ]
-            if mode == 'csv' and output_path:
-                FileProcessor.write_to_csv(data, output_path)
-                return f"Excelファイル {file_path} が正常に処理されました。"
-            elif mode == 'dict':
-                return data
+            return FileProcessor._map_excel(sheet, headers, mode)
+        except KeyError as e:
+            logger.error(f"Missing headers in Excel file: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Error processing Excel file: {e}")
-            return f"Excelファイルの処理エラー: {str(e)}"
+            logger.error(f"Error processing Excel file {file_path}: {e}")
+            raise
 
     @staticmethod
-    def process_pdf(file_path, output_path=None, mode='csv'):
+    def process_pdf(file_path, headers, mode):
+        """
+        Process PDF files with structured data extraction.
+        """
         try:
-            headers = list(PatientRecord.COLUMN_NAMES.values())
-            keys = list(PatientRecord.COLUMN_NAMES.keys())
-            data = []
             pdf_document = fitz.open(file_path)
+            data = []
             for page in pdf_document:
-                row = [""] * len(headers)
+                row = ["" for _ in headers]
                 form_fields = page.widgets()
                 if form_fields:
                     for widget in form_fields:
                         field_name = widget.field_name
                         field_value = widget.field_value or ""
-                        if field_name in keys:
-                            index = keys.index(field_name)
+                        if field_name in headers:
+                            index = headers.index(field_name)
                             row[index] = field_value
-                data.append(row)
+                if mode == 'dict':
+                    data.append({headers[i]: row[i] for i in range(len(headers))})
+                elif mode == 'csv':
+                    data.append(row)
             pdf_document.close()
-            if mode == 'csv' and output_path:
-                FileProcessor.write_to_csv(data, output_path)
-                return f"PDFファイル {file_path} が正常に処理されました。"
-            elif mode == 'dict':
-                return data
+            if mode == 'csv':
+                data.insert(0, headers)
+            return data
         except Exception as e:
-            logger.error(f"Error processing PDF file: {e}")
-            return f"PDFファイルの処理エラー: {str(e)}"
+            logger.error(f"Error processing PDF file {file_path}: {e}")
+            raise
+
+    @staticmethod
+    def _read_csv(file_path, headers, mode, delimiter, encoding):
+        """
+        Helper method to read CSV files with flexible encoding and handle row-level errors.
+        """
+        try:
+            with open(file_path, 'r', encoding=encoding) as csvfile:
+                reader = csv.DictReader(csvfile, delimiter=delimiter)
+                data = []
+                for row_idx, row in enumerate(reader):
+                    try:
+                        if mode == 'dict':
+                            data.append({header: row.get(header, "") for header in headers})
+                        elif mode == 'csv':
+                            data.append([row.get(header, "") for header in headers])
+                    except Exception as row_error:
+                        logger.warning(f"Error processing row {row_idx + 1}: {row_error}. Skipping this row.")
+                        continue
+
+                if mode == 'csv':
+                    data.insert(0, headers)
+
+            logger.info(f"Successfully read CSV with encoding {encoding}.")
+            return data
+        except UnicodeDecodeError as e:
+            logger.warning(f"Failed to read CSV with encoding {encoding}: {e}")
+            raise
+
+    @staticmethod
+    def _map_data(data, headers, mode):
+        """
+        Helper method to map data to headers for JSON and other formats.
+        """
+        mapped_data = []
+        for item in data:
+            if mode == 'dict':
+                mapped_data.append({header: item.get(header, "") for header in headers})
+            elif mode == 'csv':
+                mapped_data.append([item.get(header, "") for header in headers])
+        if mode == 'csv':
+            mapped_data.insert(0, headers)
+        return mapped_data
+
+    @staticmethod
+    def _map_xml(root, headers, mode):
+        """
+        Helper method to map XML data to headers.
+        """
+        data = []
+        for elem in root.findall('.//record'):
+            if mode == 'dict':
+                data.append({header: elem.find(header).text if elem.find(header) else "" for header in headers})
+            elif mode == 'csv':
+                data.append([elem.find(header).text if elem.find(header) else "" for header in headers])
+        if mode == 'csv':
+            data.insert(0, headers)
+        return data
+
+    @staticmethod
+    def _map_excel(sheet, headers, mode):
+        """
+        Helper method to map Excel data to headers.
+        """
+        header_indices = {header: idx for idx, header in enumerate(sheet[1])}
+        data = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if mode == 'dict':
+                data.append({header: row[header_indices[header]] if header in header_indices else "" for header in headers})
+            elif mode == 'csv':
+                data.append([row[header_indices[header]] if header in header_indices else "" for header in headers])
+        if mode == 'csv':
+            data.insert(0, headers)
+        return data
+
 
 
 class DataFormatter:
@@ -189,60 +264,48 @@ class DataFormatter:
         "CR_POSTAL_FORMAT": lambda value: DataFormatter.convert_postal_code(value),
     }
 
-    # @staticmethod
-    # def format_data_with_rules(data, rules, headers):
-    #     formatted_data = []
-    #     try:
-    #         for row in data:
-    #             formatted_row = {}
-    #             for rule_id, before_column, after_column in rules:
-    #                 try:
-    #                     column_index = headers.index(before_column)
-    #                     value = row[column_index] if column_index < len(row) else ""
-    #                     formatted_value = DataFormatter.apply_rule(value, rule_id)
-    #                     formatted_row[before_column] = formatted_value
-    #                 except ValueError:
-    #                     logger.warning(f"Column '{before_column}' not found in headers.")
-    #                     formatted_row[before_column] = ""
-    #             formatted_data.append(formatted_row)
-    #         return formatted_data
-    #     except Exception as e:
-    #         logger.error(f"Error formatting data with rules: {e}")
-    #         return []
-
-    @staticmethod
-    def format_data_with_rules(data, rules, headers):
-        formatted_data = []
-        try:
-            for row in data:
-                formatted_row = row.copy()
-                for rule_id, before_column, after_column in rules:
-                    try:
-                        column_index = headers.index(before_column)
-                        value = row[column_index] if column_index < len(row) else ""
-                        formatted_value = DataFormatter.apply_rule(value, rule_id)
-                        formatted_row[column_index] = formatted_value
-
-                    except ValueError:
-                        logger.warning(f"Column '{before_column}' not found in headers.")
-                formatted_data.append(formatted_row)
-            return formatted_data
-        except Exception as e:
-            logger.error(f"Error formatting data with rules: {e}")
-            return []
-
     @staticmethod
     def apply_rule(value, rule_id):
-        """
-        Apply transformation rule to a value.
-        """
+
         try:
             rule_function = DataFormatter.RULE_MAPPING.get(rule_id, lambda v: v)
-            return rule_function(value)
+            transformed_value = rule_function(value)
+            return transformed_value
         except Exception as e:
             logger.error(f"Error applying rule {rule_id} to value {value}: {e}")
             return value
 
+    @staticmethod
+    @staticmethod
+    def format_data_with_rules(data, rules, before_headers, after_headers):
+        """
+        Format data based on conversion rules and map it to match after_headers.
+        """
+        formatted_data = []
+        try:
+            for row in data:
+                mapped_row = []
+
+                for idx, after_header in enumerate(after_headers):
+                    if after_header in before_headers:
+                        before_idx = before_headers.index(after_header)
+                        value = row.get(before_headers[before_idx], "") if before_idx < len(before_headers) else ""
+                    else:
+                        value = ""
+
+                    if idx < len(rules):
+                        rule_id = rules[idx]
+                        value = DataFormatter.apply_rule(value, rule_id)
+
+                    mapped_row.append(value)
+
+                formatted_data.append(mapped_row)
+
+            return formatted_data
+
+        except Exception as e:
+            logger.error(f"Error formatting data with rules: {e}")
+            return []
 
 
     @staticmethod
