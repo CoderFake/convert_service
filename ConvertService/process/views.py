@@ -5,7 +5,8 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
-from home.dataclasses import PatientRecord
+from accounts.models import Account
+from home.ultis import HeaderFetcher, FileFormatFetcher, RuleFetcher
 from .file_tasks import process_and_format_file, process_multiple_files_task, generate_zip_task, generate_csv_task
 from .utils import get_redis_client
 import logging
@@ -86,7 +87,10 @@ def process_files(request):
         if mode not in ['csv', 'dict']:
             return JsonResponse({'status': 'error', 'message': "無効なモードです。 'csv' または 'dict' を選択してください。"})
 
-        process_multiple_files_task.run(mode)
+        user = Account.objects.get(pk=request.user.id)
+        headers = HeaderFetcher.get_headers(user, before=True)
+        file_format = FileFormatFetcher.get_file_format_id(user, before=True)
+        process_multiple_files_task.run(headers, file_format, mode)
 
         return JsonResponse({
             'status': 'success',
@@ -167,7 +171,13 @@ def format_data_processing(request):
         if not data_convert_id:
             return JsonResponse({"status": "error", "message": "必須パラメータ 'data_convert_id' が不足しています。"})
 
-        result = process_and_format_file.run(data_convert_id)
+        user = Account.objects.get(pk=request.user.id)
+
+        before_headers = HeaderFetcher.get_headers(user, before=True)
+        after_headers = HeaderFetcher.get_headers(user, before=False)
+        rules = RuleFetcher.get_rules(user, before = False)
+
+        result = process_and_format_file.run(rules, before_headers, after_headers, data_convert_id)
 
         return JsonResponse({
             "status": "success",
@@ -183,7 +193,12 @@ def format_data_processing(request):
 def download_zip(request, zip_key="formatted:*"):
     try:
         redis_client = get_redis_client()
-        zip_key = generate_zip_task(zip_key, PatientRecord.COLUMN_NAMES.values())
+
+        user = Account.objects.get(pk=request.user.id)
+        headers = HeaderFetcher.get_headers(user, before=False)
+        file_format = FileFormatFetcher.get_file_format_id(user, before=False)
+
+        zip_key = generate_zip_task(zip_key, headers, file_format)
 
         if not zip_key:
             return redirect('home')
@@ -205,7 +220,12 @@ def download_zip(request, zip_key="formatted:*"):
 def download_csv(request, zip_key="formatted:*"):
     try:
         redis_client = get_redis_client()
-        csv_key = generate_csv_task(zip_key, PatientRecord.COLUMN_NAMES.values())
+
+        user = Account.objects.get(pk=request.user.id)
+        headers = HeaderFetcher.get_headers(user, before=False)
+        file_format = FileFormatFetcher.get_file_format_id(user, before=False)
+
+        csv_key = generate_csv_task(zip_key, headers, file_format)
 
         if not csv_key:
             return redirect('home')

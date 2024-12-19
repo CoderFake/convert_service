@@ -309,6 +309,9 @@
 
             $(".btn-export").on('click', function () {
                 window.location.href = "{% url 'download_csv' 'formatted:*' %}";
+                setInterval(function (){
+                    window.location.href = "{% url 'home' %}";
+                }, 1000)
             })
 
             $(".btn-format-file").on('click', function () {

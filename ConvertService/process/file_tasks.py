@@ -6,10 +6,8 @@ import logging
 import threading
 import zipfile
 from django.utils import timezone
-
 from home.models import DataConversionInfo
-from home.dataclasses import PatientRecord
-from process.utils import DataFormatter, get_redis_client, FileProcessor
+from process.utils import DataFormatter, get_redis_client, FileProcessor, FileFormatMapper
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
@@ -19,7 +17,7 @@ from celery import shared_task
 from pathlib import Path
 
 @shared_task
-def process_multiple_files_task(mode='dict'):
+def process_multiple_files_task(headers, file_format=None, mode='dict'):
 
     redis_client = get_redis_client()
     processed_keys = redis_client.keys('processed:*')
@@ -39,11 +37,11 @@ def process_multiple_files_task(mode='dict'):
             file_path = Path(file_path)
             if mode == 'csv':
                 output_csv_path = file_path.with_suffix('.csv')
-                FileProcessor.process_file(file_path, output_csv_path, mode='csv')
+                FileProcessor.process_file(file_path, headers, mode, file_format)
                 redis_client.delete(key)
                 return {'type': 'csv', 'result': str(output_csv_path)}
             elif mode == 'dict':
-                result_dict = FileProcessor.process_file(file_path, mode='dict')
+                result_dict = FileProcessor.process_file(file_path, headers, mode, file_format)
                 redis_key = f"processed:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
                 redis_client.set(redis_key, json.dumps(result_dict), ex=3600)
                 redis_client.delete(key)
@@ -56,21 +54,22 @@ def process_multiple_files_task(mode='dict'):
     logger.info(f"Processing files with {max_workers} workers.")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(process_and_convert, redis_client.get(key).decode('utf-8'), key): key
-            for key in keys
-        }
+        futures = {executor.submit(process_and_convert, redis_client.get(key).decode('utf-8'), key): key for key in
+                   keys}
         for future in as_completed(futures):
-            result = future.result()
-            if result:
-                output_results.append(result)
+            try:
+                result = future.result()
+                if result:
+                    output_results.append(result)
+            except Exception as e:
+                logger.error(f"Error processing future: {e}")
 
     logger.info("All files processed successfully.")
     return {"status": "success", "results": output_results}
 
 
 @shared_task
-def process_and_format_file(data_convert_id):
+def process_and_format_file(rules, before_headers, after_headers, data_convert_id):
     """
     Process and format file based on conversion rules.
     """
@@ -88,24 +87,14 @@ def process_and_format_file(data_convert_id):
             logger.warning("No data found in Redis for processing.")
             return "処理するデータが見つかりません。"
 
-        conversion_info = DataConversionInfo.objects.prefetch_related(
-            'detailedinfo_set__data_item_id_before',
-            'detailedinfo_set__data_item_id_after',
-            'detailedinfo_set__convert_rule'
-        ).get(data_convert_id=data_convert_id)
 
-        detailed_info = conversion_info.detailedinfo_set.all()
-
-        rules = [[detail.convert_rule.convert_rule_id, detail.data_item_id_before.data_item_name,
-                  detail.data_item_id_after.data_item_name] for detail in detailed_info]
-        headers = list(PatientRecord.COLUMN_NAMES.values())
 
         def process_single_key(key):
             try:
                 raw_data = redis_client.get(key)
                 if raw_data:
                     data = json.loads(raw_data.decode('utf-8'))
-                    formatted_data = DataFormatter.format_data_with_rules(data, rules, headers)
+                    formatted_data = DataFormatter.format_data_with_rules(data, rules, before_headers, after_headers)
                     formatted_key = f"formatted:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
                     redis_client.set(formatted_key, json.dumps(formatted_data), ex=3600)
                     logger.info(f"Saved formatted data to Redis: {formatted_key}")
@@ -131,7 +120,7 @@ def process_and_format_file(data_convert_id):
 
 
 @shared_task
-def generate_zip_task(zip_key, headers):
+def generate_zip_task(zip_key, headers, file_format_id):
     try:
         redis_client = get_redis_client()
         keys = redis_client.keys(zip_key)
@@ -142,6 +131,14 @@ def generate_zip_task(zip_key, headers):
 
         zip_buffer = io.BytesIO()
 
+        format_details = FileFormatMapper.get_format_details(file_format_id)
+        if not format_details:
+            logger.error(f"Invalid file_format_id: {file_format_id}")
+            return None
+
+        delimiter = format_details['delimiter']
+        encoding = format_details['encoding']
+
         def process_key(key):
             try:
                 data = redis_client.get(key)
@@ -150,7 +147,8 @@ def generate_zip_task(zip_key, headers):
 
                 formatted_data = json.loads(data)
                 csv_buffer = io.StringIO()
-                csv_writer = csv.writer(csv_buffer)
+                csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
+
                 csv_writer.writerow(headers)
 
                 if isinstance(formatted_data, list):
@@ -165,11 +163,10 @@ def generate_zip_task(zip_key, headers):
                 redis_client.delete(key)
 
                 file_name = f"{timezone.now().strftime('%Y%m%d')}_output.csv"
-                return file_name, csv_buffer.getvalue()
+                return file_name, csv_buffer.getvalue().encode(encoding)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
                 return None, None
-
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -181,7 +178,6 @@ def generate_zip_task(zip_key, headers):
                         zip_file.writestr(file_name, csv_content)
                         logger.info(f"Added file {file_name} to ZIP.")
 
-
         zip_key_name = f"zip:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         redis_client.set(zip_key_name, zip_buffer.getvalue(), ex=3600)
         logger.info(f"ZIP file successfully created and saved to Redis with key {zip_key_name}.")
@@ -192,7 +188,7 @@ def generate_zip_task(zip_key, headers):
 
 
 @shared_task
-def generate_csv_task(csv_key, headers):
+def generate_csv_task(csv_key, headers, file_format_id):
     lock = threading.Lock()
     try:
         redis_client = get_redis_client()
@@ -202,8 +198,16 @@ def generate_csv_task(csv_key, headers):
             logger.warning("No formatted data found for CSV generation.")
             return None
 
+        format_details = FileFormatMapper.get_format_details(file_format_id)
+        if not format_details:
+            logger.error(f"Invalid file_format_id: {file_format_id}")
+            return None
+
+        delimiter = format_details['delimiter']
+        encoding = format_details['encoding']
+
         csv_buffer = io.StringIO()
-        csv_writer = csv.writer(csv_buffer)
+        csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
 
         csv_writer.writerow(headers)
 
@@ -214,6 +218,8 @@ def generate_csv_task(csv_key, headers):
                     return None
 
                 formatted_data = json.loads(data)
+                redis_client.delete(key)
+
                 return formatted_data
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
@@ -244,7 +250,7 @@ def generate_csv_task(csv_key, headers):
                     continue
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
-        redis_client.set(csv_key_name, csv_buffer.getvalue(), ex=3600)
+        redis_client.set(csv_key_name, csv_buffer.getvalue().encode(encoding), ex=3600)
         logger.info(f"CSV file successfully created and saved to Redis with key {csv_key_name}.")
         return csv_key_name
     except Exception as e:

@@ -1,8 +1,9 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-from django.http import Http404, JsonResponse
+from django.http import JsonResponse
+from accounts.models import Account
+from home.ultis import HeaderFetcher
 from process.utils import get_redis_client
-from home.dataclasses import PatientRecord
 import json
 import logging
 
@@ -19,6 +20,9 @@ def get_processed_files(request):
             request_key = body_data.get('request_key', 'processed:*')
             keys = redis_client.keys(request_key)
 
+            user = Account.objects.get(pk=request.user.id)
+            headers = HeaderFetcher.get_headers(user, before = True if request_key == "processed:*" else False)
+
             if not keys:
                 return JsonResponse({'status': 'error', 'message': '処理されたファイルが見つかりません。'})
 
@@ -32,7 +36,6 @@ def get_processed_files(request):
                 except Exception as e:
                     logger.error(f"Error reading data from Redis key {key}: {e}")
 
-            headers = list(PatientRecord.COLUMN_NAMES.values())
             return JsonResponse({'status': 'success', 'headers': headers, 'processed_files': processed_data})
 
         return JsonResponse({'status': 'error', "message": "無効なHTTPメソッドです。"})
