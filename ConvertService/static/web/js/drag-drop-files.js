@@ -42,17 +42,31 @@ $(document).ready(function () {
 
     function handleFiles(files, listContainer, listSection, submitBtn) {
         Array.from(files).forEach(file => {
-            const validationResult = typeValidation(file);
-            if (validationResult.valid) {
-                const li = createListItem(file, listContainer, listSection, submitBtn);
-                listContainer.append(li);
-                simulateUpload(li, listSection);
-            } else {
-                createToast("error", validationResult.message);
-            }
-        });
+            const formData = new FormData();
+            formData.append('file', file);
 
-        checkFiles(listContainer, listSection, submitBtn);
+            fetch('/api/upload-file/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === 'success') {
+                        const li = createListItem(file, listContainer, listSection, submitBtn);
+                        listContainer.append(li);
+                        checkFiles(listContainer, listSection, submitBtn);
+                        simulateUpload(li, listSection);
+                    } else {
+                        createToast('error', result.message);
+                    }
+                })
+                .catch(error => {
+                    createToast('error', 'サーバーとの通信に失敗しました。');
+                });
+        });
     }
 
     function createListItem(file, listContainer, listSection, submitBtn) {
@@ -73,7 +87,7 @@ $(document).ready(function () {
                     <div class="file-size">${displayFileSize}</div>
                 </div>
                 <div class="col col-btn d-flex justify-content-center align-items-center">
-                    <button class="btn btn-danger btn-sm cancel-upload" type="button" style="position: unset !important;">
+                    <button class="btn btn-danger btn-sm cancel-upload" type="button">
                         <i class="fa fa-trash"></i>
                     </button>
                 </div>
@@ -81,8 +95,28 @@ $(document).ready(function () {
         `);
 
         li.find('.cancel-upload').on('click', function () {
-            li.remove();
-            checkFiles(listContainer, listSection, submitBtn);
+            const fileName = li.find('.file-name .name').text();
+
+            fetch('/api/delete-file/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({file_name: fileName})
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === 'success') {
+                        li.remove();
+                        checkFiles(listContainer, listSection, submitBtn);
+                    } else {
+                        createToast('error', result.message);
+                    }
+                })
+                .catch(error => {
+                    createToast('error', 'ファイル削除中にエラーが発生しました。');
+                });
         });
 
         return li;
@@ -106,29 +140,13 @@ $(document).ready(function () {
 
     function checkFiles(listContainer, listSection, submitBtn) {
         const hasFiles = listContainer.children().length > 0;
-        submitBtn.toggleClass('d-none', !hasFiles);
-        if (!hasFiles) {
+        if (hasFiles) {
+            submitBtn.removeClass('d-none');
+            listSection.show();
+        } else {
+            submitBtn.addClass('d-none');
             listSection.hide();
         }
-    }
-
-    function typeValidation(file) {
-        const validTypes = [
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/json',
-            'application/csv',
-            'application/xml',
-            'text/xml',
-            'application/pdf',
-            'text/csv'
-        ];
-        if (!validTypes.includes(file.type)) {
-            return { valid: false, message: `${file.name} はサポートされていないファイル形式です。` };
-        } else if (file.size > 5 * 1024 * 1024) {
-            return { valid: false, message: `${file.name} のファイルサイズが5MBを超えています。` };
-        }
-        return { valid: true };
     }
 
     function iconSelector(type) {
@@ -155,22 +173,78 @@ $(document).ready(function () {
     initDragDrop('.container.response');
 });
 
+
 $(document).ready(function () {
-    $('.submit-btn').on('click', function (e) {
-        e.preventDefault();
+    function initDownload(containerSelector) {
+        const container = $(containerSelector);
+        const submitBtn = container.find('.submit-btn');
+        const parentProcess = container.find('.process');
+        const loader = container.find('.lds-roller');
+        const listSection = container.find('.list-section');
+        const listContainer = container.find('.list');
+        const fileSelectorInput = container.find('.file-selector-input');
 
-        const parentProcess = $(this).closest('.process');
-        const loader = parentProcess.find('.lds-roller');
+        submitBtn.on('click', function (e) {
+            e.preventDefault();
 
-        if (loader.hasClass('d-none')) {
-            loader.removeClass('d-none');
-            $(this).attr('disabled', true);
-        }
+            if (loader.hasClass('d-none')) {
+                loader.removeClass('d-none');
+                $(this).attr('disabled', true);
 
-        setTimeout(() => {
-            loader.addClass('d-none');
-            $(this).attr('disabled', false);
-            window.location.href= "/?tab=process-file";
-        }, 3000);
-    });
+                fetch('/api/process-files/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        'mode': 'dict'
+                    })
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        if (result.status === 'success') {
+                            fileSelectorInput.val('');
+                            $.ajax({
+                                url: "/api/file-format/",
+                                type: "POST",
+                                headers: {
+                                    'X-CSRFToken': getCookie('csrftoken'),
+                                    'Content-Type': 'application/json'
+                                },
+                                data: JSON.stringify({
+                                    "data_convert_id": "C_001"
+                                }),
+                                success: function (response) {
+                                    if (response.status === "success") {
+                                        window.location.href = '/?tab=process-file';
+                                    } else {
+                                        createToast(response.status, response.message);
+                                    }
+                                }
+                            })
+
+                        } else {
+                            createToast('error', result.message || 'エラーが発生しました。');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        createToast('error', 'ファイル処理中にエラーが発生しました。');
+                    })
+                    .finally(() => {
+                        loader.addClass('d-none');
+                        $(this).attr('disabled', false);
+                    });
+            }
+        });
+    }
+
+    initDownload('.container.reservation');
+    initDownload('.container.response');
 });

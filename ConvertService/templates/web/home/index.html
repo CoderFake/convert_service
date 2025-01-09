@@ -7,29 +7,48 @@
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'web/css/drag-drop-file.css' %}"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
+        .table-responsive {
+            max-height: 250px;
+        }
+
+        table.dataTable th,
+        table.dataTable td {
+            cursor: default;
+        }
+
         .active-row {
             background-color: yellow !important;
         }
-        .show-data label{
+
+        .show-data label {
             text-wrap: nowrap !important;
         }
-        .show-data .form-control{
+
+        .show-data .form-control {
             height: calc(1em + 1.25rem + 5px) !important;
         }
-        .export{
+
+        .export {
             bottom: 30px;
             right: 30px;
         }
+        input[type="radio"] {
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
         @media screen and (max-width: 576px) {
-            .export{
+            .export {
                 position: unset !important;
                 width: 100%;
                 display: flex;
                 justify-content: center;
             }
-            
-            .btn-export{
+
+            .btn-export {
                 bottom: 25px;
             }
         }
@@ -102,60 +121,60 @@
                         </div>
                     </div>
                 </div>
-{#                <div class="container compact drag-drop-file response w-90">#}
-{#                    <div class="header-section">#}
-{#                        <h1 class="text-center text-dark font-weight-bold">各施設様からの予約回答ファイルを一括変換</h1>#}
-{#                    </div>#}
-{#                    <div class="row">#}
-{#                        <div class="col-lg-12 form-file w-100">#}
-{#                            <form class="mt-2" id="input-form" enctype="multipart/form-data" onsubmit="return false;">#}
-{#                                {% csrf_token %}#}
-{#                                <div class="drop-section">#}
-{#                                    <div class="col-12 mt-5">#}
-{#                                        <span>予約回答ファイルを選択</span>#}
-{#                                        <span>ここにファイルをドラッグ＆ドロップしてください</span>#}
-{#                                        <button class="file-selector btn-primary">ファイルを選択</button>#}
-{#                                        <input type="file" name="files" class="file-selector-input" multiple/>#}
-{#                                    </div>#}
-{#                                    <div class="col">#}
-{#                                        <div class="drop-here">ここにドロップ</div>#}
-{#                                    </div>#}
-{#                                </div>#}
-{#                                <div class="list-section">#}
-{#                                    <div class="col-12 mt-3 p-0">#}
-{#                                        <div class="process w-100 d-flex flex-column flex-sm-row gap-5 align-items-center">#}
-{#                                            <button type="submit"#}
-{#                                                    class="btn-primary border-0 rounded p-2 pl-3 pr-3 ml-2 mr-2 submit-btn d-none">#}
-{#                                                選択したファイルを一括変換#}
-{#                                            </button>#}
-{#                                            <div class="lds-roller d-none">#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                                <div></div>#}
-{#                                            </div>#}
-{#                                            <div class="lds-roller ml-2 mr-2 d-none">#}
-{#                                                <p class="mt-2 text-dark text-nowrap">変換中</p>#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                    </div>#}
-{#                                    <div class="list pb-5 mt-2"></div>#}
-{#                                </div>#}
-{#                            </form>#}
-{#                        </div>#}
-{#                        <div class="d-none show-file">#}
-{#                            <div class="row">#}
-{#                                <div class="spin w-100 h-100">#}
-{#                                    <div id="Overlay" style="display:none;"></div>#}
-{#                                </div>#}
-{#                            </div>#}
-{#                        </div>#}
-{#                    </div>#}
-{#                </div>#}
+                {#                <div class="container compact drag-drop-file response w-90">#}
+                {#                    <div class="header-section">#}
+                {#                        <h1 class="text-center text-dark font-weight-bold">各施設様からの予約回答ファイルを一括変換</h1>#}
+                {#                    </div>#}
+                {#                    <div class="row">#}
+                {#                        <div class="col-lg-12 form-file w-100">#}
+                {#                            <form class="mt-2" id="input-form" enctype="multipart/form-data" onsubmit="return false;">#}
+                {#                                {% csrf_token %}#}
+                {#                                <div class="drop-section">#}
+                {#                                    <div class="col-12 mt-5">#}
+                {#                                        <span>予約回答ファイルを選択</span>#}
+                {#                                        <span>ここにファイルをドラッグ＆ドロップしてください</span>#}
+                {#                                        <button class="file-selector btn-primary">ファイルを選択</button>#}
+                {#                                        <input type="file" name="files" class="file-selector-input" multiple/>#}
+                {#                                    </div>#}
+                {#                                    <div class="col">#}
+                {#                                        <div class="drop-here">ここにドロップ</div>#}
+                {#                                    </div>#}
+                {#                                </div>#}
+                {#                                <div class="list-section">#}
+                {#                                    <div class="col-12 mt-3 p-0">#}
+                {#                                        <div class="process w-100 d-flex flex-column flex-sm-row gap-5 align-items-center">#}
+                {#                                            <button type="submit"#}
+                {#                                                    class="btn-primary border-0 rounded p-2 pl-3 pr-3 ml-2 mr-2 submit-btn d-none">#}
+                {#                                                選択したファイルを一括変換#}
+                {#                                            </button>#}
+                {#                                            <div class="lds-roller d-none">#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                                <div></div>#}
+                {#                                            </div>#}
+                {#                                            <div class="lds-roller ml-2 mr-2 d-none">#}
+                {#                                                <p class="mt-2 text-dark text-nowrap">変換中</p>#}
+                {#                                            </div>#}
+                {#                                        </div>#}
+                {#                                    </div>#}
+                {#                                    <div class="list pb-5 mt-2"></div>#}
+                {#                                </div>#}
+                {#                            </form>#}
+                {#                        </div>#}
+                {#                        <div class="d-none show-file">#}
+                {#                            <div class="row">#}
+                {#                                <div class="spin w-100 h-100">#}
+                {#                                    <div id="Overlay" style="display:none;"></div>#}
+                {#                                </div>#}
+                {#                            </div>#}
+                {#                        </div>#}
+                {#                    </div>#}
+                {#                </div>#}
             {% elif tab and tab == "process-file" %}
                 <div class="row">
                     <div class="col-12 w-100">
@@ -165,642 +184,36 @@
                                 <span class="content text-dark font-weight-bold">解析完了</span>
                             </div>
                             <div class="justify-items-end d-flex" style="align-self: flex-end; margin-left: auto;">
-                                <button class="btn btn-primary pr-3 pl-3 pt-1 pb-1">フォーマットを続ける</button>
+                                <button class="btn btn-format-file btn-primary pr-3 pl-3 pt-1 pb-1 d-none">
+                                    フォーマットを続ける
+                                </button>
                             </div>
                         </div>
-                        <div class="table-responsive overflow-hidden mt-2 d-none">
+                        <div class="table-responsive overflow-hidden mt-2">
                             <table id="inputData" class="table table-bordered w-100">
                                 <thead class="bg-info">
                                 <tr>
-                                    <th>代行機関名</th>
-                                    <th>依頼機関番号</th>
-                                    <th>保険証記号</th>
-                                    <th>保険証番号</th>
-                                    <th>受診者企業</th>
-                                    <th>受診者カナ</th>
-                                    <th>性別</th>
-                                    <th>生年月日</th>
-                                    <th>郵便番号</th>
-                                    <th>住所</th>
-                                    <th>電話番号1</th>
-                                    <th>電話番号2</th>
-                                    <th>受診コース</th>
-                                    <th>受診オプション1</th>
-                                    <th>受診オプション2</th>
-                                    <th>受診オプション3</th>
-                                    <th>備考</th>
-                                    <th>希望日時1</th>
-                                    <th>希望日時2</th>
-                                    <th>希望日時3</th>
-                                    <th>希望日時4</th>
-                                    <th class="bg-success">希望日時5</th>
-                                    <th class="bg-success">希望日時6</th>
+                                    {% for header in headers %}
+                                        <th>{{ header }}</th>
+                                    {% endfor %}
                                 </tr>
                                 </thead>
                                 <tbody>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
-                                <tr>
-                                    <td>株式会社プロ予防 健診予約受付センター</td>
-                                    <td>13987492</td>
-                                    <td>111</td>
-                                    <td>1111</td>
-                                    <td>トウキョウバナナ</td>
-                                    <td>東京バナナ</td>
-                                    <td>男</td>
-                                    <td>1985/06/01</td>
-                                    <td>163-8001</td>
-                                    <td>東京都新宿区西新宿2丁目8-1</td>
-                                    <td>03-5321-1111</td>
-                                    <td></td>
-                                    <td>人間ドック標準40歳以上コース</td>
-                                    <td>選択CT検査</td>
-                                    <td>受診オプション</td>
-                                    <td>受診オプション</td>
-                                    <td>どうしても8月中に予約数がないそうです。</td>
-                                    <td>2024/08/07 (水) 午前</td>
-                                    <td>2024/08/02 (金) 午前</td>
-                                    <td>2024/08/02 (金) 午後</td>
-                                    <td>2024/08/12 (月) 午前</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                    <td>2024/08/12 (月) 午後</td>
-                                </tr>
+                                {% if processed_files %}
+                                    {% for file in processed_files %}
+                                        {% for row in file.data %}
+                                            <tr>
+                                                {% for cell in row %}
+                                                    <td>{{ cell }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
                                 </tbody>
                             </table>
                         </div>
+
                     </div>
                     <div class="col-12 mt-4 w-100">
                         <div class="show-data pr-0 mb-5 mb-sm-0 w-100">
@@ -818,9 +231,79 @@
 {% endblock content %}
 
 {% block javascripts %}
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
     {% if tab == 'process-file' %}
         <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
+            function loadProcessedFiles() {
+                $.ajax({
+                    url: "{% url 'get_data' %}",
+                    type: "POST",
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    },
+                    success: function (response) {
+                        if (response.status === "success") {
+                            const headers = response.headers || [];
+                            const processedFiles = response.processed_files || [];
+                            const formattedKeys = response.formatted_keys || [];
+                            console.log(response.formatted_keys);
+
+                            if ($.fn.DataTable.isDataTable("#inputData")) {
+                                $("#inputData").DataTable().destroy();
+                            }
+
+                            const thead = $("#inputData thead tr");
+                            thead.empty();
+                            headers.forEach((header, index) => {
+                                const headerClass = index >= headers.length - 2 ? 'bg-success' : '';
+                                thead.append(`<th class="${headerClass}">${header}</th>`);
+                            });
+
+                            const tbody = $("#inputData tbody");
+                            tbody.empty();
+                            processedFiles.forEach((row, rowIndex) => {
+                                const rowHTML = row.map((cell, cellIndex) => {
+                                    const cellClass =
+                                        cellIndex === row.length - 2 ? 'row-date' :
+                                        cellIndex === row.length - 1 ? 'row-time' :
+                                        '';
+                                    return `<td class="${cellClass}">${cell || ''}</td>`;
+                                }).join('');
+
+                                const formattedKey = formattedKeys[rowIndex] || '';
+                                tbody.append(`<tr data-index="${formattedKey}">${rowHTML}</tr>`);
+                            });
+
+                            initDataTable($("#inputData"));
+                        } else {
+                            createToast("error", response.message);
+                        }
+                    },
+                    error: function (error) {
+                        createToast(error.status, "エラーが発生しました。データを取得できませんでした。");
+                    }
+                });
+            }
+
             function initDataTable(idTable) {
                 idTable.DataTable({
                     scrollY: "200px",
@@ -828,32 +311,37 @@
                     scrollCollapse: true,
                     paging: false,
                     searching: false,
-                    ordering: true,
+                    ordering: false,
                     info: false,
                     lengthChange: false,
                     columnDefs: [
-                        {targets: '_all', className: 'dt-center'}
+                        {targets: '_all', className: 'dt-center', orderable: false}
                     ],
                     language: {
                         url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+                    },
+                    fixedHeader: true,
+                    autoWidth: true,
+                    initComplete: function () {
+                        this.api().columns.adjust();
                     }
                 });
-                setInterval(function (){
-                    $(".table-responsive").removeClass('d-none');
-                }, 200);
             }
 
-            initDataTable($("#inputData"));
-            
-            $(".btn-export").on('click', function (){
-                window.location.href ="/";
+            loadProcessedFiles();
+
+            $(".btn-export").on('click', function () {
+                window.location.href = "{% url 'download_csv' 'formatted:*' %}";
+                setInterval(function () {
+                    window.location.href = "{% url 'home' %}";
+                }, 1000)
             })
 
         </script>
         <script>
             $(document).ready(function () {
                 $('#inputData').on('click', 'tbody tr', function () {
-                    $('#inputData tbody tr').removeClass('active-row'); 
+                    $('#inputData tbody tr').removeClass('active-row');
                     $(this).addClass('active-row');
 
                     const headers = $('#inputData thead th').map(function () {
@@ -862,45 +350,106 @@
 
                     const cells = $(this).find('td').map(function () {
                         return $(this).text();
-                    }).get(); 
+                    }).get();
 
+                    const formattedKey = $(this).data('index');
                     const showDataDiv = $('.show-data');
-                    showDataDiv.empty(); 
-                    
+                    showDataDiv.empty();
+                    showDataDiv.attr('data-index', formattedKey);
+
                     let rowHTML = '<div class="row">';
-                    let col1 = '<div class="col-12 col-sm-6 col-xl-8"><div class="row">'; 
-                    let col2 = '<div class="col-12 col-sm-6 col-xl-4 d-flex flex-column justify-content-center align-items-center">'; 
+                    let col1 = '<div class="col-12 col-sm-6 col-xl-8"><div class="row">';
+                    let col2 = '<div class="col-12 col-sm-6 col-xl-4 d-flex flex-column justify-content-center align-items-center">';
 
                     headers.forEach((header, index) => {
                         if (index < headers.length - 2) {
-                            col1 += `
-                                <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
-                                    <input type="text" class="form-control" value="${cells[index] || ''}" readonly>
+                            if (header.startsWith("予約希望日")) {
+                                col1 += `
+                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
+                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
+                                <div class="position-relative w-100">
+                                    <input type="radio" name="birthdate" class="mr-2 position-absolute">
+                                    <input type="text" class="form-control pl-4" value="${cells[index] || ''}" readonly>
                                 </div>
-                            `;
+                            </div>
+                        `;
+                            } else {
+                                col1 += `
+                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
+                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
+                                <input type="text" class="form-control" value="${cells[index] || ''}" readonly>
+                            </div>
+                        `;
+                            }
                         } else if (index === headers.length - 2) {
                             col2 += `
                                 <div class="d-flex align-items-center mb-2 w-100">
                                     <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
-                                    <input type="text" class="form-control" value="${cells[index] || ''}">
+                                  <input type="text" id="date-picker" class="form-control date-input">
                                 </div>
                                 <div class="d-flex align-items-center w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${headers[index + 1]}</label>
-                                    <input type="text" class="form-control" value="${cells[index + 1] || ''}">
+                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
+                                    <input type="text" id="time-picker" class="form-control time-input">
                                 </div>
+
                             `;
                         }
                     });
 
                     col1 += '</div></div>';
-                    col2 += '</div>'; 
-                    rowHTML += col1 + col2 + '</div>'; 
+                    col2 += '</div>';
+                    rowHTML += col1 + col2 + '</div>';
 
-                    showDataDiv.append(rowHTML); 
+                    showDataDiv.append(rowHTML);
+
+                    flatpickr("#date-picker", {
+                        locale: "ja",
+                        dateFormat: "Y/m/d",
+
+                    });
+
+                    flatpickr("#time-picker", {
+                        locale: "ja",
+                        enableTime: true,
+                        noCalendar: true,
+                        dateFormat: "H:i",
+                        time_24hr: true,
+                    });
                 });
             });
         </script>
+        <script>
+            $(document).on('change', 'input[type="radio"]', function () {
+                const name = $(this).attr('name');
+                const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+                $("#date-picker").val(selectedDate);
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                targetRow.find('td.row-date').text(selectedDate);
+
+                $(`input[name="${name}"]`).not(this).prop('checked', false);
+            });
+
+            $(document).on('change', '#date-picker', function () {
+                const newDate = $(this).val();
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+
+                targetRow.find('td.row-date').text(newDate);
+            });
+
+            $(document).on('change', '#time-picker', function () {
+                const newTime = $(this).val();
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+
+                targetRow.find('td.row-time').text(newTime);
+            });
+
+        </script>
+
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}

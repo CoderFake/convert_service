@@ -11,7 +11,7 @@ WORKDIR /home/ConvertService
 ADD requirements.txt /home/ConvertService
 
 RUN apt-get update \
-    && apt-get install -y gettext locales libpq-dev task-japanese gcc git \
+    && apt-get install -y gettext locales libpq-dev task-japanese gcc git procps \
     && echo "ja_JP.UTF-8 UTF-8" >> /etc/locale.gen \
     && locale-gen ja_JP.UTF-8 \
     && update-locale LANG=ja_JP.UTF-8 \
@@ -22,4 +22,3 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
-

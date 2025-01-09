@@ -50,7 +50,10 @@ INSTALLED_APPS = [
     "accounts",
     "home",
     "configs",
+    "process",
 ]
+
+INSTALLED_APPS += ["django_extensions"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -101,6 +104,15 @@ DATABASES = {
         # "PORT": 16311
     }
 }
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+CELERY_ACCEPT_CONTENT = ['json', 'yaml']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
 AUTH_USER_MODEL = "accounts.Account"
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
