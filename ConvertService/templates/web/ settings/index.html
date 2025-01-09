@@ -1,0 +1,265 @@
+{% extends 'web/layouts/base.html' %}
+{% load static %}
+{% load i18n %}
+{% block title %} Dashboard {% endblock title %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" type="text/css"
+          href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+{% endblock stylesheets %}
+
+{% block content %}
+    <!-- Page content -->
+    <div class="container-fluid h-100 position-relative">
+        <div class="row h-100">
+            <div class="col-12 col">
+                <form id="process-header" method="post" enctype="multipart/form-data"
+                      action="{% url 'process_headers' %}">
+                    {% csrf_token %}
+
+                    <!-- Input File Section -->
+                    <div class="form-group">
+                        <h5>Input File</h5>
+                        <label for="input-file">Upload input file:</label>
+                        <input id="input-file" class="form-control" type="file" name="input-file">
+                        <label for="input-type">Type:</label>
+                        <select class="form-select mt-2" name="input-type" id="input-type">
+                            {% for format in format_list %}
+                                <option value="{{ format.file_format_id }}">{{ format.file_format_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Format File Section -->
+                    <div class="form-group mt-4">
+                        <h5>Format File</h5>
+                        <label for="format-file">Upload format file:</label>
+                        <input id="format-file" class="form-control" type="file" name="format-file">
+                        <label for="format-type">Type:</label>
+                        <select class="form-select mt-2" name="format-type" id="format-type">
+                            {% for format in format_list %}
+                                <option value="{{ format.file_format_id }}">{{ format.file_format_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group mt-4">
+                        <h5>Output File</h5>
+                        <label for="output-file">Upload output file:</label>
+                        <input id="output-file" class="form-control" type="file" name="output-file">
+                        <label for="output-type">Type:</label>
+                        <select class="form-select mt-2" name="output-type" id="output-type">
+                            {% for format in format_list %}
+                                <option value="{{ format.file_format_id }}">{{ format.file_format_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-4">Submit</button>
+                </form>
+
+                <div id="response-container" class="mt-4">
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block javascripts %}
+    <script>
+        $(document).ready(function () {
+            $('#process-header').on('submit', function (e) {
+                e.preventDefault();
+
+                var formData = new FormData(this);
+
+                $.ajax({
+                    url: $(this).attr('action'),
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function (response) {
+                        $('#response-container').empty();
+                        if (response.status === "success") {
+                            const structuredData = response.structured_data;
+
+
+                            const typeOptions = [
+                                {value: 'string', display: 'String'},
+                                {value: 'number', display: 'Number'},
+                                {value: 'date', display: 'Date'},
+                                {value: 'time', display: 'Time'},
+                                {value: 'datetime', display: 'Datetime'},
+                                {value: 'boolean', display: 'Boolean'},
+                                {value: 'period', display: 'Period'}
+                            ];
+
+                            let html = `
+                                <form id="update-headers-form" method="post">
+                                    <!-- CSRF Token -->
+                                    <input type="hidden" name="csrfmiddlewaretoken" value="${document.querySelector('[name=csrfmiddlewaretoken]').value}">
+                                    <table class="table table-bordered" id="editable-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Header Name</th>
+                                                <th>Input</th>
+                                                <th>Format</th>
+                                                <th>Output</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                            `;
+
+                            for (const [header, attributes] of Object.entries(structuredData)) {
+                                html += `
+                                    <tr>
+                                        <td class="header-name fw-bold text-primary">${header}</td>
+                                        <td>
+                                            ${attributes.input ? `
+                                                <div class="mb-2">
+                                                    <label class="form-label">Display:</label>
+                                                    <select class="form-control form-select-sm" name="input[${header}][display]" id="input-display-${header}">
+                                                        <option value="1" ${attributes.input.display === 1 ? 'selected' : ''}>Yes</option>
+                                                        <option value="0" ${attributes.input.display === 0 ? 'selected' : ''}>No</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Type:</label>
+                                                    <select class="form-control form-select-sm" name="input[${header}][type]" id="input-type-${header}">
+                                                        ${typeOptions.map(option => `
+                                                            <option value="${option.value}" ${attributes.input.type === option.value ? 'selected' : ''}>
+                                                                ${option.display}
+                                                            </option>
+                                                        `).join('')}
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Index:</label>
+                                                    <input type="text" class="form-control form-control-sm" name="input[${header}][index]" id="input-index-${header}" value="${attributes.input.index}">
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Edit:</label>
+                                                    <select class="form-control form-select-sm" name="input[${header}][edit]" id="input-edit-${header}">
+                                                        <option value="1">Yes</option>
+                                                        <option value="0" selected>No</option>
+                                                    </select>
+                                                </div>
+                                            ` : '<span class="text-muted">None</span>'}
+                                        </td>
+                                        <td>
+                                            ${attributes.format ? `
+                                                <div class="mb-2">
+                                                    <label class="form-label">Display:</label>
+                                                    <select class="form-control form-select-sm" name="format[${header}][display]" id="format-display-${header}">
+                                                        <option value="1" ${attributes.format.display === 1 ? 'selected' : ''}>Yes</option>
+                                                        <option value="0" ${attributes.format.display === 0 ? 'selected' : ''}>No</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Type:</label>
+                                                    <select class="form-control form-select-sm" name="format[${header}][type]" id="format-type-${header}">
+                                                        ${typeOptions.map(option => `
+                                                            <option value="${option.value}" ${attributes.format.type === option.value ? 'selected' : ''}>
+                                                                ${option.display}
+                                                            </option>
+                                                        `).join('')}
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Index:</label>
+                                                    <input type="text" class="form-control form-control-sm" name="format[${header}][index]" id="format-index-${header}" value="${attributes.format.index}">
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Edit:</label>
+                                                    <select class="form-control form-select-sm" name="format[${header}][edit]" id="format-edit-${header}">
+                                                        <option value="1">Yes</option>
+                                                        <option value="0" selected>No</option>
+                                                    </select>
+                                                </div>
+                                            ` : '<span class="text-muted">None</span>'}
+                                        </td>
+                                        <td>
+                                            ${attributes.output ? `
+                                                <div class="mb-2">
+                                                    <label class="form-label">Display:</label>
+                                                    <select class="form-control form-select-sm" name="output[${header}][display]" id="output-display-${header}">
+                                                        <option value="1" ${attributes.output.display === 1 ? 'selected' : ''}>Yes</option>
+                                                        <option value="0" ${attributes.output.display === 0 ? 'selected' : ''}>No</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Type:</label>
+                                                    <select class="form-control form-select-sm" name="output[${header}][type]" id="output-type-${header}">
+                                                        ${typeOptions.map(option => `
+                                                            <option value="${option.value}" ${attributes.output.type === option.value ? 'selected' : ''}>
+                                                                ${option.display}
+                                                            </option>
+                                                        `).join('')}
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Index:</label>
+                                                    <input type="text" class="form-control form-control-sm" name="output[${header}][index]" id="output-index-${header}" value="${attributes.output.index}">
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Edit:</label>
+                                                    <select class="form-control form-select-sm" name="output[${header}][edit]" id="output-edit-${header}">
+                                                        <option value="1">Yes</option>
+                                                        <option value="0" selected>No</option>
+                                                    </select>
+                                                </div>
+                                            ` : '<span class="text-muted">None</span>'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }
+
+                            html += `
+                                    </tbody>
+                                </table>
+                                <button id="save-changes" type="submit" class="btn btn-primary mt-4">Save Changes</button>
+                                </form>
+                            `;
+
+                            $('#response-container').append(html);
+
+                            $('#update-headers-form').on('submit', function (e) {
+                                e.preventDefault();
+
+                                const formData = $(this).serialize();
+
+                                $.ajax({
+                                    url: '{% url "save_data_item" %}',
+                                    type: 'POST',
+                                    data: formData,
+                                    success: function (response) {
+                                        $('#response-container').append(
+                                            `<div class="alert alert-success mt-2">${response.message}</div>`
+                                        );
+                                    },
+                                    error: function (xhr) {
+                                        $('#response-container').append(
+                                            `<div class="alert alert-danger mt-2">An error occurred: ${xhr.statusText} (${xhr.status})</div>`
+                                        );
+                                    }
+                                });
+                            });
+
+                        } else {
+                            $('#response-container').append(
+                                `<div class="alert alert-danger">${response.message}</div>`
+                            );
+                        }
+                    },
+                    error: function (xhr) {
+                        $('#response-container').empty().append(
+                            `<div class="alert alert-danger">An error occurred: ${xhr.statusText} (${xhr.status})</div>`
+                        );
+                    }
+                });
+            });
+        });
+
+    </script>
+{% endblock javascripts %}
