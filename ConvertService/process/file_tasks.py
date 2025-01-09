@@ -4,6 +4,7 @@ import io
 import os
 import logging
 import threading
+import uuid
 import zipfile
 from django.utils import timezone
 from home.models import DataConversionInfo
@@ -68,10 +69,11 @@ def process_multiple_files_task(headers, file_format=None, mode='dict'):
     return {"status": "success", "results": output_results}
 
 
+
 @shared_task
-def process_and_format_file(rules, before_headers, after_headers, data_convert_id):
+def process_and_format_file(rules, before_headers, after_headers, tenant_id):
     """
-    Process and format file based on conversion rules.
+    Process and format each row of data and save it in Redis with unique keys.
     """
     try:
         logger.info("Task 'process_and_format_file' started.")
@@ -87,36 +89,36 @@ def process_and_format_file(rules, before_headers, after_headers, data_convert_i
             logger.warning("No data found in Redis for processing.")
             return "処理するデータが見つかりません。"
 
+        raw_data = redis_client.get(keys[0])
+        if not raw_data:
+            logger.error("No valid data found in the first processed key.")
+            return "処理可能なデータが見つかりませんでした。"
 
+        data = json.loads(raw_data.decode('utf-8'))
 
-        def process_single_key(key):
+        def process_single_row(row, row_index):
             try:
-                raw_data = redis_client.get(key)
-                if raw_data:
-                    data = json.loads(raw_data.decode('utf-8'))
-                    formatted_data = DataFormatter.format_data_with_rules(data, rules, before_headers, after_headers)
-                    formatted_key = f"formatted:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
-                    redis_client.set(formatted_key, json.dumps(formatted_data), ex=3600)
-                    logger.info(f"Saved formatted data to Redis: {formatted_key}")
+                formatted_row = DataFormatter.format_data_with_rules(row, rules, before_headers, after_headers, tenant_id)
+                formatted_key = f"formatted:{uuid.uuid4().hex}"
+                redis_client.set(formatted_key, json.dumps(formatted_row), ex=3600)
+                logger.info(f"Saved formatted row {row_index} to Redis: {formatted_key}")
             except Exception as e:
-                logger.error(f"Error processing key {key}: {e}")
+                logger.error(f"Error processing row {row_index}: {e}")
 
         max_workers = os.cpu_count() or 1
-        logger.info(f"Processing files with {max_workers} workers.")
+        logger.info(f"Processing rows with {max_workers} workers.")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_single_key, key) for key in keys]
+            futures = [executor.submit(process_single_row, row, row_index) for row_index, row in enumerate(data)]
             for future in as_completed(futures):
                 future.result()
 
-        logger.info("All data has been successfully processed and stored.")
+        logger.info("All rows have been successfully processed and stored.")
         return "データは正常に処理され、保存されました。"
 
-    except DataConversionInfo.DoesNotExist:
-        logger.error(f"Conversion settings for ID '{data_convert_id}' not found.")
-        return "指定されたデータ変換IDの設定が見つかりませんでした"
     except Exception as e:
         logger.error(f"Error in 'process_and_format_file' task: {e}")
         return "データフォーマット処理中にエラーが発生しました。"
+
 
 
 @shared_task
