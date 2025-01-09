@@ -7,9 +7,15 @@
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'web/css/drag-drop-file.css' %}"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         .table-responsive {
             max-height: 250px;
+        }
+
+        table.dataTable th,
+        table.dataTable td {
+            cursor: default;
         }
 
         .active-row {
@@ -27,6 +33,11 @@
         .export {
             bottom: 30px;
             right: 30px;
+        }
+        input[type="radio"] {
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
         }
 
         @media screen and (max-width: 576px) {
@@ -173,7 +184,7 @@
                                 <span class="content text-dark font-weight-bold">解析完了</span>
                             </div>
                             <div class="justify-items-end d-flex" style="align-self: flex-end; margin-left: auto;">
-                                <button class="btn btn-format-file btn-primary pr-3 pl-3 pt-1 pb-1">
+                                <button class="btn btn-format-file btn-primary pr-3 pl-3 pt-1 pb-1 d-none">
                                     フォーマットを続ける
                                 </button>
                             </div>
@@ -238,8 +249,10 @@
     </script>
     {% if tab == 'process-file' %}
         <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
-            function loadProcessedFiles(key) {
+            function loadProcessedFiles() {
                 $.ajax({
                     url: "{% url 'get_data' %}",
                     type: "POST",
@@ -247,36 +260,42 @@
                         'X-CSRFToken': getCookie('csrftoken'),
                         'Content-Type': 'application/json'
                     },
-                    data: JSON.stringify({
-                        "request_key": key
-                    }),
                     success: function (response) {
                         if (response.status === "success") {
-                            const headers = response.headers;
-                            const processedFiles = response.processed_files;
-                            
+                            const headers = response.headers || [];
+                            const processedFiles = response.processed_files || [];
+                            const formattedKeys = response.formatted_keys || [];
+                            console.log(response.formatted_keys);
+
                             if ($.fn.DataTable.isDataTable("#inputData")) {
                                 $("#inputData").DataTable().destroy();
                             }
 
                             const thead = $("#inputData thead tr");
                             thead.empty();
-                            headers.forEach(header => {
-                                thead.append(`<th>${header}</th>`);
+                            headers.forEach((header, index) => {
+                                const headerClass = index >= headers.length - 2 ? 'bg-success' : '';
+                                thead.append(`<th class="${headerClass}">${header}</th>`);
                             });
 
                             const tbody = $("#inputData tbody");
                             tbody.empty();
-                           processedFiles.forEach(file => {
-                                file.data.forEach(row => {
-                                    const rowHTML = Object.values(row).map(cell => `<td>${cell || ''}</td>`).join('');
-                                    tbody.append(`<tr>${rowHTML}</tr>`);
-                                });
+                            processedFiles.forEach((row, rowIndex) => {
+                                const rowHTML = row.map((cell, cellIndex) => {
+                                    const cellClass =
+                                        cellIndex === row.length - 2 ? 'row-date' :
+                                        cellIndex === row.length - 1 ? 'row-time' :
+                                        '';
+                                    return `<td class="${cellClass}">${cell || ''}</td>`;
+                                }).join('');
+
+                                const formattedKey = formattedKeys[rowIndex] || '';
+                                tbody.append(`<tr data-index="${formattedKey}">${rowHTML}</tr>`);
                             });
 
                             initDataTable($("#inputData"));
                         } else {
-                            createToast(response.status, response.message || "データの取得に失敗しました。");
+                            createToast("error", response.message);
                         }
                     },
                     error: function (error) {
@@ -292,15 +311,19 @@
                     scrollCollapse: true,
                     paging: false,
                     searching: false,
-                    ordering: true,
+                    ordering: false,
                     info: false,
-                    autoWidth: true,
                     lengthChange: false,
                     columnDefs: [
-                        {targets: '_all', className: 'dt-center'}
+                        {targets: '_all', className: 'dt-center', orderable: false}
                     ],
                     language: {
                         url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+                    },
+                    fixedHeader: true,
+                    autoWidth: true,
+                    initComplete: function () {
+                        this.api().columns.adjust();
                     }
                 });
             }
@@ -309,32 +332,9 @@
 
             $(".btn-export").on('click', function () {
                 window.location.href = "{% url 'download_csv' 'formatted:*' %}";
-                setInterval(function (){
+                setInterval(function () {
                     window.location.href = "{% url 'home' %}";
                 }, 1000)
-            })
-
-            $(".btn-format-file").on('click', function () {
-                $.ajax({
-                    url: "{% url 'format_data_processing' %}",
-                    type: "POST",
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        "data_convert_id": "C_001"
-                    }),
-                    success: function (response) {
-                        if(response.status === "success"){
-                            loadProcessedFiles("formatted:*");
-                        }
-                        else{
-                            createToast(response.status, response.message);
-                        }
-                    }
-                })
-                
             })
 
         </script>
@@ -352,8 +352,10 @@
                         return $(this).text();
                     }).get();
 
+                    const formattedKey = $(this).data('index');
                     const showDataDiv = $('.show-data');
                     showDataDiv.empty();
+                    showDataDiv.attr('data-index', formattedKey);
 
                     let rowHTML = '<div class="row">';
                     let col1 = '<div class="col-12 col-sm-6 col-xl-8"><div class="row">';
@@ -361,22 +363,35 @@
 
                     headers.forEach((header, index) => {
                         if (index < headers.length - 2) {
-                            col1 += `
-                                <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
-                                    <input type="text" class="form-control" value="${cells[index] || ''}" readonly>
+                            if (header.startsWith("予約希望日")) {
+                                col1 += `
+                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
+                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
+                                <div class="position-relative w-100">
+                                    <input type="radio" name="birthdate" class="mr-2 position-absolute">
+                                    <input type="text" class="form-control pl-4" value="${cells[index] || ''}" readonly>
                                 </div>
-                            `;
+                            </div>
+                        `;
+                            } else {
+                                col1 += `
+                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
+                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
+                                <input type="text" class="form-control" value="${cells[index] || ''}" readonly>
+                            </div>
+                        `;
+                            }
                         } else if (index === headers.length - 2) {
                             col2 += `
                                 <div class="d-flex align-items-center mb-2 w-100">
                                     <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
-                                    <input type="text" class="form-control" value="${cells[index] || ''}">
+                                  <input type="text" id="date-picker" class="form-control date-input">
                                 </div>
                                 <div class="d-flex align-items-center w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${headers[index + 1]}</label>
-                                    <input type="text" class="form-control" value="${cells[index + 1] || ''}">
+                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
+                                    <input type="text" id="time-picker" class="form-control time-input">
                                 </div>
+
                             `;
                         }
                     });
@@ -386,9 +401,55 @@
                     rowHTML += col1 + col2 + '</div>';
 
                     showDataDiv.append(rowHTML);
+
+                    flatpickr("#date-picker", {
+                        locale: "ja",
+                        dateFormat: "Y/m/d",
+
+                    });
+
+                    flatpickr("#time-picker", {
+                        locale: "ja",
+                        enableTime: true,
+                        noCalendar: true,
+                        dateFormat: "H:i",
+                        time_24hr: true,
+                    });
                 });
             });
         </script>
+        <script>
+            $(document).on('change', 'input[type="radio"]', function () {
+                const name = $(this).attr('name');
+                const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+                $("#date-picker").val(selectedDate);
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                targetRow.find('td.row-date').text(selectedDate);
+
+                $(`input[name="${name}"]`).not(this).prop('checked', false);
+            });
+
+            $(document).on('change', '#date-picker', function () {
+                const newDate = $(this).val();
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+
+                targetRow.find('td.row-date').text(newDate);
+            });
+
+            $(document).on('change', '#time-picker', function () {
+                const newTime = $(this).val();
+                const formattedKey = $('.show-data').attr('data-index');
+                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+
+                targetRow.find('td.row-time').text(newTime);
+            });
+
+        </script>
+
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}
