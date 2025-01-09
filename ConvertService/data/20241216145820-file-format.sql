@@ -13,4 +13,4 @@ VALUES ((SELECT id FROM tenant WHERE tenant_id = 'T_001'), 'DF_001', '健診シ�
        ((SELECT id FROM tenant WHERE tenant_id = 'T_001'), 'DF_002', '予約代行業者Aの予約データ',
         (SELECT id FROM file_format WHERE file_format_id = 'JSON'), NOW(), NOW()),
        ((SELECT id FROM tenant WHERE tenant_id = 'T_001'), 'DF_003', '予約代行業者Bの予約データ',
-        (SELECT id FROM file_format WHERE file_format_id = 'CSV_C_SJIS'), NOW(), NOW());
+        (SELECT id FROM file_format WHERE file_format_id = 'CSV_C_UTF-8'), NOW(), NOW());
