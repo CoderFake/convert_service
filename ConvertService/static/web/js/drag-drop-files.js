@@ -201,28 +201,46 @@ $(document).ready(function () {
                         'mode': 'dict'
                     })
                 })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    if (result.status === 'success') {
-                        fileSelectorInput.val('');
-                        window.location.href = '/?tab=process-file';
-                    } else {
-                        createToast('error', result.message || 'エラーが発生しました。');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    createToast('error', 'ファイル処理中にエラーが発生しました。');
-                })
-                .finally(() => {
-                    loader.addClass('d-none');
-                    $(this).attr('disabled', false);
-                });
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        if (result.status === 'success') {
+                            fileSelectorInput.val('');
+                            $.ajax({
+                                url: "/api/file-format/",
+                                type: "POST",
+                                headers: {
+                                    'X-CSRFToken': getCookie('csrftoken'),
+                                    'Content-Type': 'application/json'
+                                },
+                                data: JSON.stringify({
+                                    "data_convert_id": "C_001"
+                                }),
+                                success: function (response) {
+                                    if (response.status === "success") {
+                                        window.location.href = '/?tab=process-file';
+                                    } else {
+                                        createToast(response.status, response.message);
+                                    }
+                                }
+                            })
+
+                        } else {
+                            createToast('error', result.message || 'エラーが発生しました。');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        createToast('error', 'ファイル処理中にエラーが発生しました。');
+                    })
+                    .finally(() => {
+                        loader.addClass('d-none');
+                        $(this).attr('disabled', false);
+                    });
             }
         });
     }
