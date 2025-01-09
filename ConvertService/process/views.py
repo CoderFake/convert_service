@@ -6,12 +6,24 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from accounts.models import Account
-from home.ultis import HeaderFetcher, FileFormatFetcher, RuleFetcher
-from .file_tasks import process_and_format_file, process_multiple_files_task, generate_zip_task, generate_csv_task
-from .utils import get_redis_client
+from home.ultis import (
+    HeaderFetcher,
+    FileFormatFetcher,
+    RuleFetcher,
+    HeaderType,
+    DisplayType
+)
+from .file_tasks import (
+    process_and_format_file,
+    process_multiple_files_task,
+    generate_zip_task,
+    generate_csv_task
+)
+from .utils import get_redis_client, ProcessHeader
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 @login_required
 def upload_file(request):
@@ -85,10 +97,11 @@ def process_files(request):
         mode = body_data.get('mode', 'dict')
 
         if mode not in ['csv', 'dict']:
-            return JsonResponse({'status': 'error', 'message': "無効なモードです。 'csv' または 'dict' を選択してください。"})
+            return JsonResponse(
+                {'status': 'error', 'message': "無効なモードです。 'csv' または 'dict' を選択してください。"})
 
         user = Account.objects.get(pk=request.user.id)
-        headers = HeaderFetcher.get_headers(user, before=True)
+        headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=True)
         process_multiple_files_task.run(headers, file_format, mode)
 
@@ -101,83 +114,19 @@ def process_files(request):
         return JsonResponse({'status': 'error', 'message': f'エラー: {str(e)}'})
 
 
-# @login_required
-# def process_files(request):
-#     if request.method != 'POST':
-#         return JsonResponse({'status': 'error', 'message': '無効なHTTPメソッドです。'})
-#
-#     try:
-#         redis_client = get_redis_client()
-#
-#         keys = redis_client.keys('file:*')
-#         if not keys:
-#             return JsonResponse({'status': 'error', 'message': '処理するファイルがありません。'})
-#
-#         zip_buffer = io.BytesIO()
-#         output_files = []
-#
-#         def process_and_convert(file_path, key):
-#             try:
-#                 file_path = Path(file_path)
-#                 output_csv_path = file_path.with_suffix('.csv')
-#                 FileProcessor.process_file(file_path, output_csv_path)
-#
-#                 if output_csv_path.exists():
-#                     redis_client.delete(key)
-#                     return output_csv_path
-#                 return None
-#             except Exception as e:
-#                 logger.error(f"Error processing file {file_path}: {e}")
-#                 return None
-#
-#         max_workers = os.cpu_count() or 1
-#         logger.info(f"Using max_workers={max_workers} for ThreadPoolExecutor")
-#
-#         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-#             futures = {
-#                 executor.submit(process_and_convert, redis_client.get(key).decode('utf-8'), key): key
-#                 for key in keys
-#             }
-#
-#             for future in as_completed(futures):
-#                 result = future.result()
-#                 if result:
-#                     output_files.append(result)
-#
-#         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-#             for file in output_files:
-#                 with open(file, 'rb') as f:
-#                     zip_file.writestr(file.name, f.read())
-#
-#         zip_buffer.seek(0)
-#
-#         zip_key = f'zip:{base64.urlsafe_b64encode(os.urandom(6)).decode("utf-8")}'
-#         redis_client.set(zip_key, zip_buffer.getvalue(), ex=3600)
-#
-#         return JsonResponse({'status': 'success', 'key': zip_key})
-#     except Exception as e:
-#         return JsonResponse({'status': 'error', 'message': f'ファイルの処理中にエラーが発生しました: {str(e)}'})
-
-
 @login_required
 def format_data_processing(request):
     if request.method != 'POST':
         return JsonResponse({"status": "error", "message": "無効なHTTPメソッドです。"}, status=405)
 
     try:
-        body_data = json.loads(request.body.decode('utf-8'))
-        data_convert_id = body_data.get('data_convert_id')
-
-        if not data_convert_id:
-            return JsonResponse({"status": "error", "message": "必須パラメータ 'data_convert_id' が不足しています。"})
-
         user = Account.objects.get(pk=request.user.id)
 
-        before_headers = HeaderFetcher.get_headers(user, before=True)
-        after_headers = HeaderFetcher.get_headers(user, before=False)
-        rules = RuleFetcher.get_rules(user, before = False)
+        before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
+        format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+        rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
 
-        result = process_and_format_file.run(rules, before_headers, after_headers, data_convert_id)
+        result = process_and_format_file.run(rules, before_headers, format_headers, request.user.tenant.id)
 
         return JsonResponse({
             "status": "success",
@@ -195,7 +144,7 @@ def download_zip(request, zip_key="formatted:*"):
         redis_client = get_redis_client()
 
         user = Account.objects.get(pk=request.user.id)
-        headers = HeaderFetcher.get_headers(user, before=False)
+        headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.SHOW.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
         zip_key = generate_zip_task(zip_key, headers, file_format)
@@ -222,7 +171,7 @@ def download_csv(request, zip_key="formatted:*"):
         redis_client = get_redis_client()
 
         user = Account.objects.get(pk=request.user.id)
-        headers = HeaderFetcher.get_headers(user, before=False)
+        headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.SHOW.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
         csv_key = generate_csv_task(zip_key, headers, file_format)
@@ -242,3 +191,78 @@ def download_csv(request, zip_key="formatted:*"):
         logger.error(f"Error downloading CSV file: {e}")
         return redirect('home')
 
+
+def get_uploaded_files(request):
+    input_file = request.FILES.get('input-file')
+    format_file = request.FILES.get('format-file')
+    output_file = request.FILES.get('output-file')
+
+    if not input_file or not format_file or not output_file:
+        return None, 'すべてのファイル (input-file, format-file, output-file) を提供してください。'
+
+    input_type = request.POST.get('input-type', '').strip()
+    format_type = request.POST.get('format-type', '').strip()
+    output_type = request.POST.get('output-type', '').strip()
+
+    if not input_type or not format_type or not output_type:
+        return None, 'すべてのファイル形式 (input-type, format-type, output-type) を選択してください。'
+    uploaded_files = []
+
+    for file, file_type in [(input_file, input_type), (format_file, format_type), (output_file, output_type)]:
+        uploaded_files.append((file, file_type))
+
+    return uploaded_files, None
+
+
+@login_required
+def process_headers(request):
+    if request.method != 'POST':
+        return JsonResponse({"status": "error", "message": "POST メソッドのみ許可されています。"}, status=405)
+
+    uploaded_files, error = get_uploaded_files(request)
+    if error:
+        return JsonResponse({"status": "error", "message": error}, status=400)
+
+    structured_data = {}
+
+    for idx, (file, file_type) in enumerate(uploaded_files):
+        try:
+            headers = ProcessHeader.get_header(file, file_type)
+            if headers:
+                for i, header in enumerate(headers):
+                    if header not in structured_data:
+                        structured_data[header] = {
+                            "input": None,
+                            "format": None,
+                            "output": None
+                        }
+
+                    data_type = "string"
+                    display = 0 if idx == 0 else 1
+
+                    if idx == 0:
+                        structured_data[header]["input"] = {
+                            "display": display,
+                            "type": data_type,
+                            "index": i
+                        }
+                    elif idx == 1:
+                        structured_data[header]["format"] = {
+                            "display": display,
+                            "type": data_type,
+                            "index": i
+                        }
+                    elif idx == 2:
+                        structured_data[header]["output"] = {
+                            "display": display,
+                            "type": data_type,
+                            "index": i
+                        }
+
+        except Exception as e:
+            logger.error(f"Error processing file {file.name}: {e}")
+
+    return JsonResponse({
+        "status": "success",
+        "structured_data": structured_data
+    })
