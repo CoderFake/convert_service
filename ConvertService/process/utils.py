@@ -6,9 +6,11 @@ import json
 import fitz
 import xml.etree.ElementTree as ET
 from pathlib import Path
-
+import pandas as pd
 import jaconv
+from PyPDF2 import PdfReader
 from openpyxl import load_workbook
+from configs.cache_manager import ConvertDataValueCache
 import redis
 import logging
 
@@ -184,10 +186,7 @@ class FileProcessor:
                 data = []
                 for row_idx, row in enumerate(reader):
                     try:
-                        if mode == 'dict':
-                            data.append({header: row.get(header, "") for header in headers})
-                        elif mode == 'csv':
-                            data.append([row.get(header, "") for header in headers])
+                        data.append([row.get(header, "") for header in headers])
                     except Exception as row_error:
                         logger.warning(f"Error processing row {row_idx + 1}: {row_error}. Skipping this row.")
                         continue
@@ -276,37 +275,46 @@ class DataFormatter:
             return value
 
     @staticmethod
-    @staticmethod
-    def format_data_with_rules(data, rules, before_headers, after_headers):
+    def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
         """
-        Format data based on conversion rules and map it to match after_headers.
+        Format a single row of data based on conversion rules and map it to match after_headers.
+        Add two empty columns at the end of the row.
         """
-        formatted_data = []
         try:
-            for row in data:
-                mapped_row = []
+            mapped_row = [
+                row[before_headers.index(after_header)] if after_header in before_headers and before_headers.index(
+                    after_header) < len(row) else ""
+                for after_header in after_headers
+            ]
 
-                for idx, after_header in enumerate(after_headers):
-                    if after_header in before_headers:
-                        before_idx = before_headers.index(after_header)
-                        value = row.get(before_headers[before_idx], "") if before_idx < len(before_headers) else ""
+            for rule_id, col_idx in rules:
+                if col_idx <= len(after_headers):
+                    if rule_id == "CR_FIXED_VALUE":
+                        mapped_row[col_idx - 1] = DataFormatter.convert_fixed_value(mapped_row[col_idx - 1], tenant_id)
                     else:
-                        value = ""
-
-                    if idx < len(rules):
-                        rule_id = rules[idx]
-                        value = DataFormatter.apply_rule(value, rule_id)
-
-                    mapped_row.append(value)
-
-                formatted_data.append(mapped_row)
-
-            return formatted_data
+                        mapped_row[col_idx - 1] = DataFormatter.apply_rule(mapped_row[col_idx - 1], rule_id)
+            return mapped_row
 
         except Exception as e:
-            logger.error(f"Error formatting data with rules: {e}")
+            logger.error(f"Error formatting row with rules: {e}")
             return []
 
+    @staticmethod
+    def convert_fixed_value(value, tenant_id):
+        """
+        Convert the value based on fixed rules stored in Redis cache.
+        """
+        try:
+            cache_manager = ConvertDataValueCache()
+            cache_data = cache_manager.get_cache(tenant_id)
+
+            for cached_item in cache_data:
+                if cached_item['data_value_before'] == value:
+                    return cached_item['data_value_after']
+            return value
+        except Exception as e:
+            logger.error(f"Error in convert_fixed_value for tenant {tenant_id}: {value} -> {e}")
+            return value
 
     @staticmethod
     def convert_date(value, target_format='%Y/%m/%d'):
@@ -532,3 +540,87 @@ class DataFormatter:
             logger.error(f"Error formatting file: {file_path} - {e}")
             return f"File formatting error: {e}"
 
+
+class ProcessHeader:
+
+    @staticmethod
+    def get_csv_header(file, delimiter, encoding):
+        try:
+            file.seek(0)
+            reader = csv.reader(file.read().decode(encoding).splitlines(), delimiter=delimiter)
+            header = next(reader)
+            return [col.strip() for col in header]
+        except Exception as e:
+            logger.error(f"Error reading CSV header: {e}")
+            return []
+
+    @staticmethod
+    def get_pdf_header(file):
+        try:
+            file.seek(0)
+            reader = PdfReader(file)
+            fields = reader.get_form_text_fields()
+            return [field.strip() for field in fields.keys()] if fields else []
+        except Exception as e:
+            logger.error(f"Error reading PDF header: {e}")
+            return []
+
+    @staticmethod
+    def get_excel_header(file):
+        try:
+            file.seek(0)
+            df = pd.read_excel(file, nrows=0)
+            return [col.strip() for col in df.columns]
+        except Exception as e:
+            logger.error(f"Error reading Excel header: {e}")
+            return []
+
+    @staticmethod
+    def get_json_header(file):
+        try:
+            file.seek(0)
+            data = json.load(file)
+            if isinstance(data, list) and len(data) > 0:
+                return [key.strip() for key in data[0].keys()]
+            elif isinstance(data, dict):
+                return [key.strip() for key in data.keys()]
+            return []
+        except Exception as e:
+            logger.error(f"Error reading JSON header: {e}")
+            return []
+
+    @staticmethod
+    def get_xml_header(file):
+        try:
+            file.seek(0)
+            tree = ET.parse(file)
+            root = tree.getroot()
+            return [elem.tag.strip() for elem in root[0]] if len(root) > 0 else []
+        except Exception as e:
+            logger.error(f"Error reading XML header: {e}")
+            return []
+
+    @staticmethod
+    def get_header(file, file_type):
+        format_details = FileFormatMapper.get_format_details(file_type)
+        if not format_details:
+            logger.error(f"Unsupported file type: {file_type}")
+            return []
+
+        if file_type.startswith("CSV"):
+            return ProcessHeader.get_csv_header(
+                file,
+                delimiter=format_details['delimiter'],
+                encoding=format_details['encoding']
+            )
+        elif file_type == "PDF":
+            return ProcessHeader.get_pdf_header(file)
+        elif file_type == "Excel":
+            return ProcessHeader.get_excel_header(file)
+        elif file_type == "JSON":
+            return ProcessHeader.get_json_header(file)
+        elif file_type == "XML":
+            return ProcessHeader.get_xml_header(file)
+        else:
+            logger.error(f"Unsupported file type: {file_type}")
+            return []
