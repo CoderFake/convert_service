@@ -29,6 +29,17 @@ class ConvertRule(models.Model):
         return self.convert_rule_name
 
 
+class ConvertDataValue(models.Model):
+    id = models.AutoField(primary_key=True)
+    tenant = models.ForeignKey("home.Tenant", on_delete=models.CASCADE, null=True, blank=True)
+    data_value_before = models.CharField(max_length=255, null=True, blank=True)
+    data_value_after = models.CharField(max_length=255, null=True, blank=True)
+    convert_rule = models.ForeignKey(ConvertRule, on_delete=models.CASCADE, related_name='convert_data_values')
+
+    class Meta:
+        db_table = "convert_data_value"
+
+
 class Migrations(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(unique=True, max_length=255)
