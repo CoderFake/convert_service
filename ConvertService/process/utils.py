@@ -290,9 +290,9 @@ class DataFormatter:
             for rule_id, col_idx in rules:
                 if col_idx <= len(after_headers):
                     if rule_id == "CR_FIXED_VALUE":
-                        mapped_row[col_idx - 1] = DataFormatter.convert_fixed_value(mapped_row[col_idx - 1], tenant_id)
+                        mapped_row[col_idx] = DataFormatter.convert_fixed_value(mapped_row[col_idx], tenant_id)
                     else:
-                        mapped_row[col_idx - 1] = DataFormatter.apply_rule(mapped_row[col_idx - 1], rule_id)
+                        mapped_row[col_idx] = DataFormatter.apply_rule(mapped_row[col_idx], rule_id)
             return mapped_row
 
         except Exception as e:
