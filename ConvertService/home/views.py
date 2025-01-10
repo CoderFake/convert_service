@@ -90,8 +90,6 @@ def get_processed_files(request):
                                 first_headers, first_hidden_headers, input_data
                             )
 
-                            last_headers += ["予約確定日", "受付時間"]
-
                             format_visible_headers, filtered_format_data = filter_list(
                                 last_headers, last_hidden_headers, all_formatted_data
                             )

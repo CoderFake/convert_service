@@ -21,7 +21,7 @@ class DisplayType(enum.Enum):
 
 class HeaderFetcher:
     @staticmethod
-    def get_headers(user: Account, type_name: str, display: any):
+    def get_headers(user: Account, type_name: str, display: any, edit=False):
         """
         Fetch headers based on type_name and display flag.
         """
@@ -41,16 +41,26 @@ class HeaderFetcher:
                     data_item__tenant_id=tenant_id,
                     type_name=type_name
                 ).select_related('data_item')
-            else:
+            elif not edit:
                 data_item_types = DataItemType.objects.filter(
                     data_item__tenant_id=tenant_id,
                     type_name=type_name,
                     display=display
                 ).select_related('data_item')
+            else:
+                data_item_types = DataItemType.objects.filter(
+                    data_item__tenant_id=tenant_id,
+                    type_name=type_name,
+                    display=display,
+                    edit_value=True
+                ).select_related('data_item')
+
 
             data_items = [
                 {
                     'data_item_name': item.data_item.data_item_name,
+                    'edit_value': item.edit_value,
+                    'format_value': item.format_value,
                     'sort_index': item.index_value
                 }
                 for item in data_item_types
@@ -62,6 +72,16 @@ class HeaderFetcher:
             )
 
             headers = [item['data_item_name'] for item in sorted_headers]
+            #
+            # if edit:
+            #     headers = {
+            #         {
+            #             'header_name': item['data_item_name'],
+            #             'edit_value': item['edit_value'],
+            #             'format_value': item['format_value']
+            #         } for item in sorted_headers
+            #     }
+            #
             return headers
 
         except Exception as e:
