@@ -114,31 +114,16 @@ class DataItemType(models.Model):
         PERIOD = 'period', '時間帯'
 
     id = models.AutoField(primary_key=True)
-    data_item = models.ForeignKey('DataItem', on_delete=models.CASCADE)
-    type_name = models.CharField(max_length=50, choices=TypeName.choices)
+    data_item = models.ForeignKey('DataItem', on_delete=models.CASCADE, related_name='data_item_types')
+    type_name = models.CharField(max_length=50, choices=TypeName.choices, null=True, blank=True)
     index_value = models.IntegerField(null=True, blank=True)
-    display = models.BooleanField(default=True)
-    edit_value = models.BooleanField(default=False)
-    format_value = models.CharField(max_length=50, choices=FormatValue.choices, default=FormatValue.STRING)
+    display = models.BooleanField(null=True, blank=True)
+    edit_value = models.BooleanField(null=True, blank=True)
+    format_value = models.CharField(max_length=50, choices=FormatValue.choices, null=True, blank=True)
 
 
     class Meta:
         db_table = "data_item_type"
-
-    def check_constraints(self):
-        existing_types = DataItemType.objects.filter(data_item=self.data_item).values_list('type_name', flat=True)
-
-        if self.type_name in existing_types:
-            return f"種類 '{self.type_name}' は既にこのデータアイテムに存在します。"
-        if len(existing_types) >= 3:
-            return "データアイテムは最大3種類のみ登録できます。"
-        return None
-
-    def save(self, *args, **kwargs):
-        message = self.check_constraints()
-        if message:
-            return message
-        super().save(*args, **kwargs)
 
     @staticmethod
     def get_all_type_names():
