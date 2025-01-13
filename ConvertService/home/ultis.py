@@ -1,6 +1,8 @@
 import enum
 from accounts.models import Account
 from django.db.models import Q, F
+
+from configs.models import ConvertDataValue
 from .models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType
 import logging
 
@@ -115,7 +117,6 @@ class FileFormatFetcher:
             return None
 
 
-
 class RuleFetcher:
 
     @staticmethod
@@ -137,44 +138,50 @@ class RuleFetcher:
             results = []
             for detail in detailed_infos:
 
-                if before_type == DataItemType.TypeName.BEFORE:
-                    before_item = detail.data_item_id_before
-                elif before_type == DataItemType.TypeName.FORMAT:
-                    before_item = detail.data_item_id_after
-                else:
-                    continue
-
-                if after_type == DataItemType.TypeName.FORMAT:
-                    after_item = detail.data_item_id_before
-                elif after_type == DataItemType.TypeName.AFTER:
-                    after_item = detail.data_item_id_after
-                else:
-                    continue
+                before_item_type = DataItemType.objects.filter(
+                    data_item__data_item_id=detail.data_item_id_before.data_item_id,
+                    type_name=before_type
+                ).first()
 
                 after_item_type = DataItemType.objects.filter(
-                    data_item__data_item_name=after_item,
+                    data_item__data_item_id=detail.data_item_id_after.data_item_id,
                     type_name=after_type
                 ).first()
 
-                if not after_item_type:
-                    logger.warning(f"No DataItemType found for {before_item} with type {before_type}")
+                if not before_item_type or not after_item_type:
                     continue
 
                 results.append({
-                    'header_before_name': before_item.data_item_name,
-                    'header_after_name': after_item.data_item_name,
                     'convert_rule_id': detail.convert_rule.convert_rule_id,
-                    'sort_index': after_item_type.index_value
+                    'index_before': before_item_type.index_value,
+                    'index_after': after_item_type.index_value
                 })
 
             sorted_results = sorted(
                 results,
-                key=lambda x: (x['sort_index'] is None, x['sort_index'])
+                key=lambda x: (x['index_after'] is None, x['index_after'])
             )
 
-            return [[item['convert_rule_id'], item['sort_index']] for item in sorted_results]
-
+            return [[item['convert_rule_id'], item['index_before'], item['index_after']] for item in sorted_results]
 
         except Exception as e:
             logger.error(f"Error fetching conversion rules: {e}")
+            return []
+
+
+
+class FixedValueFetcher:
+
+    @staticmethod
+    def get_fixed_values(user: Account):
+        try:
+            tenant_id = user.tenant.id if user.tenant else 1
+            fixed_values = ConvertDataValue.objects.filter(tenant_id=tenant_id).values(
+                "data_value_before", "data_value_after"
+            )
+
+            return list(fixed_values)
+
+        except Exception as e:
+            logger.error(f"Error fetching fixed values: {e}")
             return []
