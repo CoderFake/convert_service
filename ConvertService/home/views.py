@@ -38,7 +38,6 @@ def filter_list(headers, hidden_headers, data):
         return [], []
 
 
-
 @login_required
 def get_processed_files(request):
     """
@@ -50,10 +49,11 @@ def get_processed_files(request):
         if request.method == "POST":
             input_keys = redis_client.keys("processed:*")
             format_keys = redis_client.keys("formatted:*")
+            format_keys = sorted(format_keys, key=lambda x: int(x.decode("utf-8").split(":")[1]))
 
             user = Account.objects.get(pk=request.user.id)
             first_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
-            last_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+            last_headers, edit_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, edit=True)
             first_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.HIDDEN.value)
             last_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.HIDDEN.value)
 
@@ -114,13 +114,64 @@ def get_processed_files(request):
                 'status': 'success',
                 'headers': visible_headers,
                 'processed_files': processed_data,
-                'formatted_keys': formatted_keys
+                'formatted_keys': formatted_keys,
+                'edit_headers': edit_headers
             })
 
         return JsonResponse({'status': 'error', "message": "無効なHTTPメソッドです。"})
     except Exception as e:
         logger.error(f"Error fetching processed files: {e}")
         return JsonResponse({'status': 'error', 'message': 'エラーが発生しました。'})
+
+
+
+@login_required
+def update_format_data(request):
+
+    try:
+        if request.method == "POST":
+            redis_client = get_redis_client()
+
+            key = request.POST.get('key')
+            field_name = request.POST.get('field_name')
+            field_value = request.POST.get('field_value')
+
+            if not key or not field_name:
+                return JsonResponse({'status': 'error', 'message': 'キーまたはフィールド名が提供されていません。'})
+
+            raw_format_data = redis_client.get(key)
+            if not raw_format_data:
+                return JsonResponse({'status': 'error', 'message': '指定されたキーが見つかりません。'})
+
+            try:
+                format_data = json.loads(raw_format_data.decode('utf-8'))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
+
+            user = Account.objects.get(pk=request.user.id)
+            header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+
+            if field_name not in header_names:
+                return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
+
+            header_index = header_names.index(field_name)
+
+            if len(format_data) > header_index:
+                format_data[header_index] = field_value
+            else:
+                return JsonResponse({'status': 'error', 'message': 'データの更新中にエラーが発生しました。'})
+            try:
+                redis_client.set(key, json.dumps(format_data))
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': f'フォーマットデータの更新中にエラーが発生しました: {e}'})
+
+            return JsonResponse({'status': 'success', 'message': 'データが正常に更新されました。'})
+
+        return JsonResponse({'status': 'error', 'message': '無効なHTTPメソッドです。'})
+    except Exception as e:
+        logger.error(f"Error updating format data: {e}")
+        return JsonResponse({'status': 'error', 'message': 'エラーが発生しました。'})
+
 
 
 def home(request):
