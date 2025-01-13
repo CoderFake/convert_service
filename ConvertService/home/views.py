@@ -3,7 +3,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from accounts.models import Account
 from home.ultis import HeaderFetcher, HeaderType, DisplayType
-from process.utils import get_redis_client
+from process.utils import get_redis_client, delete_all_keys
 import json
 import logging
 
@@ -46,9 +46,9 @@ def get_processed_files(request):
     try:
         redis_client = get_redis_client()
 
-        if request.method == "POST":
-            input_keys = redis_client.keys("processed:*")
-            format_keys = redis_client.keys("formatted:*")
+        if request.method == "POST" and request.user.is_authenticated:
+            input_keys = redis_client.keys(f"{request.session.session_key}-processed:*")
+            format_keys = redis_client.keys(f"{request.session.session_key}-formatted:*")
             format_keys = sorted(format_keys, key=lambda x: int(x.decode("utf-8").split(":")[1]))
 
             user = Account.objects.get(pk=request.user.id)
@@ -179,6 +179,9 @@ def home(request):
         tab = request.GET.get("tab", "upload-file")
         if tab not in ["upload-file", "process-file"]:
             tab = "upload-file"
+
+        if tab == "upload-file":
+            delete_all_keys()
 
         context = {"tab": tab}
 
