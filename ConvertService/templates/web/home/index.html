@@ -368,7 +368,7 @@
                 loadProcessedFiles();
 
                 $(".btn-export").on('click', function () {
-                    window.location.href = "{% url 'download_csv' 'formatted:*' %}";
+                    window.location.href = "{% url 'download_csv' 'output:*' %}";
                     setInterval(function () {
                         window.location.href = "{% url 'home' %}";
                     }, 1000)
@@ -458,11 +458,11 @@
                     colRight += '</div>';
 
                     rowHTML += `
-                        <div class="row col-12 col-md-6 col-lg-8">
+                        <div class="row col-12 col-md-6 col-lg-9">
                             ${colLeft1}
                             ${colLeft2}
                         </div>
-                        <div class="row col-12 col-md-6 col-lg-4">
+                        <div class="row col-12 col-md-6 col-lg-3">
                             ${colRight}
                         </div>
                     `;
