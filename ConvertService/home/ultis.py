@@ -41,26 +41,16 @@ class HeaderFetcher:
                     data_item__tenant_id=tenant_id,
                     type_name=type_name
                 ).select_related('data_item')
-            elif not edit:
+            else:
                 data_item_types = DataItemType.objects.filter(
                     data_item__tenant_id=tenant_id,
                     type_name=type_name,
                     display=display
                 ).select_related('data_item')
-            else:
-                data_item_types = DataItemType.objects.filter(
-                    data_item__tenant_id=tenant_id,
-                    type_name=type_name,
-                    display=display,
-                    edit_value=True
-                ).select_related('data_item')
-
 
             data_items = [
                 {
                     'data_item_name': item.data_item.data_item_name,
-                    'edit_value': item.edit_value,
-                    'format_value': item.format_value,
                     'sort_index': item.index_value
                 }
                 for item in data_item_types
@@ -72,16 +62,22 @@ class HeaderFetcher:
             )
 
             headers = [item['data_item_name'] for item in sorted_headers]
-            #
-            # if edit:
-            #     headers = {
-            #         {
-            #             'header_name': item['data_item_name'],
-            #             'edit_value': item['edit_value'],
-            #             'format_value': item['format_value']
-            #         } for item in sorted_headers
-            #     }
-            #
+
+            if edit:
+                data_item_types = DataItemType.objects.filter(
+                    data_item__tenant_id=tenant_id,
+                    type_name=type_name,
+                    edit_value=True
+                ).select_related('data_item')
+
+                edit_headers = [
+                    {
+                        'header_name': item.data_item.data_item_name,
+                        'format_value': item.format_value,
+                    } for item in data_item_types
+                ]
+                return headers, edit_headers
+
             return headers
 
         except Exception as e:
