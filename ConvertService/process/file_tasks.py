@@ -4,11 +4,9 @@ import io
 import os
 import logging
 import threading
-import uuid
 import zipfile
 from django.utils import timezone
-from home.models import DataConversionInfo
-from process.utils import DataFormatter, get_redis_client, FileProcessor, FileFormatMapper
+from process.utils import DataFormatter, get_redis_client, FileProcessor, FileFormatMapper, delete_all_keys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
@@ -18,7 +16,7 @@ from celery import shared_task
 from pathlib import Path
 
 @shared_task
-def process_multiple_files_task(headers, file_format=None, mode='dict'):
+def process_multiple_files_task(session_id, headers, file_format=None, mode='dict'):
 
     redis_client = get_redis_client()
     processed_keys = redis_client.keys('processed:*')
@@ -43,7 +41,7 @@ def process_multiple_files_task(headers, file_format=None, mode='dict'):
                 return {'type': 'csv', 'result': str(output_csv_path)}
             elif mode == 'dict':
                 result_dict = FileProcessor.process_file(file_path, headers, mode, file_format)
-                redis_key = f"processed:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
+                redis_key = f"{session_id}-processed:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
                 redis_client.set(redis_key, json.dumps(result_dict), ex=3600)
                 redis_client.delete(key)
                 return {'type': 'dict', 'result': redis_key}
@@ -69,67 +67,94 @@ def process_multiple_files_task(headers, file_format=None, mode='dict'):
     return {"status": "success", "results": output_results}
 
 
-
 @shared_task
-def process_and_format_file(rules, before_headers, after_headers, tenant_id, keys="processed:*"):
-
+def process_and_format_file(session_id, fixed_values, rules, before_headers, after_headers, tenant_id, keys="processed:*"):
     try:
         logger.info("Task 'process_and_format_file' started.")
         redis_client = get_redis_client()
 
+        type_key = "formatted"
+        if keys == "processed:*":
+            formatted_keys = redis_client.keys(f'{session_id}-formatted:*')
+            delete_key_batch(redis_client, formatted_keys)
 
-        formatted_keys = redis_client.keys('formatted:*')
-        for key in formatted_keys:
-            redis_client.delete(key)
-        logger.info(f"Deleted {len(formatted_keys)} formatted keys from Redis.")
+        else:
+            output_keys = redis_client.keys(f'{session_id}-output:*')
+            delete_key_batch(redis_client, output_keys)
+            type_key = "output"
 
-        keys = redis_client.keys(keys)
+        keys = redis_client.keys(f"{session_id}-{keys}")
+
+        if type_key == "output":
+            keys = sorted(keys, key=lambda x: int(x.decode("utf-8").split(":")[1]))
+
         if not keys:
             logger.warning("No data found in Redis for processing.")
             return "処理するデータが見つかりません。"
 
-        raw_data = redis_client.get(keys[0])
-        if not raw_data:
-            logger.error("No valid data found in the first processed key.")
-            return "処理可能なデータが見つかりませんでした。"
-
-        data = json.loads(raw_data.decode('utf-8'))
-
-        results = [None] * len(data)
-
-        def process_single_row(row_index, row):
-
-            try:
-                formatted_row = DataFormatter.format_data_with_rules(row, rules, before_headers, after_headers, tenant_id)
-                results[row_index] = formatted_row
-            except Exception as e:
-                logger.error(f"Error processing row {row_index}: {e}")
-                results[row_index] = None
-
-
+        global_row_index = 0
         max_workers = os.cpu_count() or 1
-        logger.info(f"Processing rows with {max_workers} workers.")
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_single_row, idx, row): idx for idx, row in enumerate(data)}
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.error(f"Error in processing row {futures[future]}: {e}")
+        logger.info(f"Using {max_workers} workers for processing.")
 
-        for row_index, formatted_row in enumerate(results):
-            if formatted_row is not None:
-                formatted_key = f"formatted:{row_index}"
-                redis_client.set(formatted_key, json.dumps(formatted_row), ex=3600)
-                logger.info(f"Saved ordered row {row_index} to Redis: {formatted_key}")
+        for key in keys:
+            raw_data = redis_client.get(key)
+            if not raw_data:
+                logger.warning(f"No valid data found for key {key}. Skipping...")
+                continue
 
-        logger.info("All rows have been successfully processed and stored.")
+            data = json.loads(raw_data.decode('utf-8'))
+
+            def process_batch(rows, start_index):
+                formatted_rows = []
+                for row_index, row in enumerate(rows):
+                    try:
+                        formatted_row = DataFormatter.format_data_with_rules(
+                            row,
+                            fixed_values,
+                            rules,
+                            before_headers,
+                            after_headers,
+                            tenant_id
+                        )
+                        formatted_rows.append((start_index + row_index, formatted_row))
+                    except Exception as e:
+                        logger.error(f"Error processing row {start_index + row_index}: {e}")
+                return formatted_rows
+
+            batch_size = 100
+            batches = [data[i:i + batch_size] for i in range(0, len(data), batch_size)]
+            if type_key == "output":
+                batches = [batches]
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for batch_index, batch in enumerate(batches):
+                    start_index = global_row_index + batch_index * batch_size
+                    futures = executor.submit(process_batch, batch, start_index)
+                    for row_index, formatted_row in futures.result():
+                        if formatted_row is not None:
+                            formatted_key = f"{session_id}-{type_key}:{row_index}"
+                            redis_client.set(formatted_key, json.dumps(formatted_row), ex=3600)
+
+            global_row_index += len(data)
+
+        if type_key == "output":
+            redis_client.delete(f'{session_id}-formatted:*')
+
         return "データは正常に処理され、保存されました。"
 
     except Exception as e:
         logger.error(f"Error in 'process_and_format_file' task: {e}")
         return "データフォーマット処理中にエラーが発生しました。"
 
+
+def delete_key_batch(redis_client, keys):
+    try:
+        pipeline = redis_client.pipeline()
+        for key in keys:
+            pipeline.delete(key)
+        pipeline.execute()
+        logger.info(f"Deleted {len(keys)} keys from Redis.")
+    except Exception as e:
+        logger.error(f"Error deleting keys: {e}")
 
 @shared_task
 def generate_zip_task(zip_key, headers, file_format_id):
@@ -205,8 +230,9 @@ def generate_csv_task(csv_key, headers, file_format_id):
     try:
         redis_client = get_redis_client()
         keys = redis_client.keys(csv_key)
+        format_keys = sorted(keys, key=lambda x: int(x.decode("utf-8").split(":")[1]))
 
-        if not keys:
+        if not format_keys:
             logger.warning("No formatted data found for CSV generation.")
             return None
 
@@ -220,18 +246,16 @@ def generate_csv_task(csv_key, headers, file_format_id):
 
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
-
         csv_writer.writerow(headers)
+
 
         def process_key(key):
             try:
                 data = redis_client.get(key)
                 if not data:
                     return None
-
                 formatted_data = json.loads(data)
                 redis_client.delete(key)
-
                 return formatted_data
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
@@ -239,20 +263,19 @@ def generate_csv_task(csv_key, headers, file_format_id):
 
         max_workers = os.cpu_count() or 1
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_key, key): key for key in keys}
+            futures = {executor.submit(process_key, key): key for key in format_keys}
             for future in as_completed(futures):
                 try:
                     result = future.result()
                     if result:
                         with lock:
                             try:
-                                for row in result:
-                                    if isinstance(row, dict):
-                                        csv_writer.writerow(row.values())
-                                    elif isinstance(row, list):
-                                        csv_writer.writerow(row)
-                                    else:
-                                        logger.warning(f"Invalid row format: {row}")
+                                if isinstance(result, dict):
+                                    csv_writer.writerow(result.values())
+                                elif isinstance(result, list):
+                                    csv_writer.writerow(result)
+                                else:
+                                    logger.warning(f"Invalid row format: {result}")
                             except Exception as e:
                                 logger.error(f"Error writing row to CSV: {e}")
                                 if lock.locked():
@@ -264,10 +287,11 @@ def generate_csv_task(csv_key, headers, file_format_id):
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         redis_client.set(csv_key_name, csv_buffer.getvalue().encode(encoding), ex=3600)
-        logger.info(f"CSV file successfully created and saved to Redis with key {csv_key_name}.")
         return csv_key_name
+
     except Exception as e:
         logger.error(f"Critical error generating CSV file: {e}")
         if lock.locked():
             lock.release()
         return None
+
