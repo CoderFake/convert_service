@@ -18,6 +18,28 @@
             cursor: default;
         }
 
+         table.dataTable .truncate-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 100px;
+            max-width: 250px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+         table.dataTable .truncate-text:hover {
+            overflow: visible;
+            white-space: normal;
+            word-wrap: normal;
+            position: absolute;
+            background-color: #f9f9f9;
+            z-index: 10;
+            padding: 5px;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+
         .active-row {
             background-color: yellow !important;
         }
@@ -35,7 +57,7 @@
             right: 30px;
         }
         input[type="radio"] {
-            left: 5px;
+            left: 35%;
             top: 50%;
             transform: translateY(-50%);
         }
@@ -252,100 +274,117 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
-            function loadProcessedFiles() {
-                $.ajax({
-                    url: "{% url 'get_data' %}",
-                    type: "POST",
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/json'
-                    },
-                    success: function (response) {
-                        if (response.status === "success") {
-                            const headers = response.headers || [];
-                            const processedFiles = response.processed_files || [];
-                            const formattedKeys = response.formatted_keys || [];
-                            console.log(response.formatted_keys);
-
-                            if ($.fn.DataTable.isDataTable("#inputData")) {
-                                $("#inputData").DataTable().destroy();
-                            }
-
-                            const thead = $("#inputData thead tr");
-                            thead.empty();
-                            headers.forEach((header, index) => {
-                                const headerClass = index >= headers.length - 2 ? 'bg-success' : '';
-                                thead.append(`<th class="${headerClass}">${header}</th>`);
-                            });
-
-                            const tbody = $("#inputData tbody");
-                            tbody.empty();
-                            processedFiles.forEach((row, rowIndex) => {
-                                const rowHTML = row.map((cell, cellIndex) => {
-                                    const cellClass =
-                                        cellIndex === row.length - 2 ? 'row-date' :
-                                        cellIndex === row.length - 1 ? 'row-time' :
-                                        '';
-                                    return `<td class="${cellClass}">${cell || ''}</td>`;
-                                }).join('');
-
-                                const formattedKey = formattedKeys[rowIndex] || '';
-                                tbody.append(`<tr data-index="${formattedKey}">${rowHTML}</tr>`);
-                            });
-
-                            initDataTable($("#inputData"));
-                        } else {
-                            createToast("error", response.message);
-                        }
-                    },
-                    error: function (error) {
-                        createToast(error.status, "エラーが発生しました。データを取得できませんでした。");
-                    }
-                });
-            }
-
-            function initDataTable(idTable) {
-                idTable.DataTable({
-                    scrollY: "200px",
-                    scrollX: true,
-                    scrollCollapse: true,
-                    paging: false,
-                    searching: false,
-                    ordering: false,
-                    info: false,
-                    lengthChange: false,
-                    columnDefs: [
-                        {targets: '_all', className: 'dt-center', orderable: false}
-                    ],
-                    language: {
-                        url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
-                    },
-                    fixedHeader: true,
-                    autoWidth: true,
-                    initComplete: function () {
-                        this.api().columns.adjust();
-                    }
-                });
-            }
-
-            loadProcessedFiles();
-
-            $(".btn-export").on('click', function () {
-                window.location.href = "{% url 'download_csv' 'formatted:*' %}";
-                setInterval(function () {
-                    window.location.href = "{% url 'home' %}";
-                }, 1000)
-            })
-
-        </script>
-        <script>
             $(document).ready(function () {
+                let editHeaders = [];
+                function loadProcessedFiles() {
+                    $.ajax({
+                        url: "{% url 'get_data' %}",
+                        type: "POST",
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json'
+                        },
+                        success: function (response) {
+                            if (response.status === "success") {
+                                const headers = response.headers || [];
+                                const processedFiles = response.processed_files || [];
+                                const formattedKeys = response.formatted_keys || [];
+                                editHeaders = response.edit_headers || [];
+
+                                if ($.fn.DataTable.isDataTable("#inputData")) {
+                                    $("#inputData").DataTable().destroy();
+                                }
+
+                                const thead = $("#inputData thead tr");
+                                thead.empty();
+                                headers.forEach((header) => {
+                                    const isEditable = editHeaders.some(h => h.header_name === header);
+                                    const headerClass = isEditable ? 'bg-success' : '';
+                                    thead.append(`<th class="${headerClass}">${header}</th>`);
+                                });
+                                const tbody = $("#inputData tbody");
+                                tbody.empty();
+
+                                processedFiles.forEach((row, rowIndex) => {
+                                    const rowHTML = row.map((cell, cellIndex) => {
+                                        const headerName = headers[cellIndex];
+                                        const editHeader = editHeaders.find(h => h.header_name === headerName);
+
+                                        const cellClass = editHeader
+                                            ? (editHeader.format_value === 'date' ? 'row-date'
+                                              : editHeader.format_value === 'time' ? 'row-time'
+                                              : '')
+                                            : '';
+
+                                        return `<td class="${cellClass} ${headerName}">${cell || ''}</td>`;
+                                    }).join('');
+
+                                    const formattedKey = formattedKeys[rowIndex] || '';
+                                    tbody.append(`<tr data-index="${formattedKey}">${rowHTML}</tr>`);
+                                });
+
+                                initDataTable($("#inputData"));
+                            } else {
+                                createToast("error", response.message);
+                            }
+                        },
+                        error: function (error) {
+                            createToast(error.status, "エラーが発生しました。データを取得できませんでした。");
+                        }
+                    });
+                }
+
+                function initDataTable(idTable) {
+                    idTable.DataTable({
+                        scrollY: "200px",
+                        scrollX: true,
+                        scrollCollapse: true,
+                        paging: false,
+                        searching: false,
+                        ordering: false,
+                        info: false,
+                        lengthChange: false,
+                        columnDefs: [
+                            {
+                                targets: '_all',
+                                className: 'dt-center',
+                                orderable: false,
+                                render: function (data, type, row) {
+                                    return `<div class="truncate-text" title="${data}">${data}</div>`;
+                                }
+                            }
+                        ],
+                        language: {
+                            url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+                        },
+                        fixedHeader: true,
+                        autoWidth: true,
+                        initComplete: function () {
+                            this.api().columns.adjust();
+                        }
+                    });
+                }
+
+                loadProcessedFiles();
+
+                $(".btn-export").on('click', function () {
+                    window.location.href = "{% url 'download_csv' 'formatted:*' %}";
+                    setInterval(function () {
+                        window.location.href = "{% url 'home' %}";
+                    }, 1000)
+                })
+
+
                 $('#inputData').on('click', 'tbody tr', function () {
                     $('#inputData tbody tr').removeClass('active-row');
                     $(this).addClass('active-row');
 
                     const headers = $('#inputData thead th').map(function () {
                         return $(this).text();
+                    }).get();
+
+                    const headerClasses = $('#inputData thead th').map(function () {
+                        return $(this).hasClass('bg-success');
                     }).get();
 
                     const cells = $(this).find('td').map(function () {
@@ -358,57 +397,84 @@
                     showDataDiv.attr('data-index', formattedKey);
 
                     let rowHTML = '<div class="row">';
-                    let col1 = '<div class="col-12 col-sm-6 col-xl-8"><div class="row">';
-                    let col2 = '<div class="col-12 col-sm-6 col-xl-4 d-flex flex-column justify-content-center align-items-center">';
+                    let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
 
+                    let nonBgSuccessHeaders = [];
+                    let bgSuccessHeaders = [];
                     headers.forEach((header, index) => {
-                        if (index < headers.length - 2) {
-                            if (header.startsWith("予約希望日")) {
-                                col1 += `
-                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
-                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
-                                <div class="position-relative w-100">
-                                    <input type="radio" name="birthdate" class="mr-2 position-absolute">
-                                    <input type="text" class="form-control pl-4" value="${cells[index] || ''}" readonly>
-                                </div>
-                            </div>
-                        `;
-                            } else {
-                                col1 += `
-                            <div class="col-xl-6 mb-2 d-flex align-items-center w-100">
-                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${header}</label>
-                                <input type="text" class="form-control" value="${cells[index] || ''}" readonly>
-                            </div>
-                        `;
-                            }
-                        } else if (index === headers.length - 2) {
-                            col2 += `
-                                <div class="d-flex align-items-center mb-2 w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
-                                  <input type="text" id="date-picker" class="form-control date-input">
-                                </div>
-                                <div class="d-flex align-items-center w-100">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${header}</label>
-                                    <input type="text" id="time-picker" class="form-control time-input">
-                                </div>
-
-                            `;
+                        if (!headerClasses[index]) {
+                            nonBgSuccessHeaders.push({ header, cell: cells[index] });
+                        } else {
+                            bgSuccessHeaders.push({ header, cell: cells[index] });
                         }
                     });
+                    const midpoint = Math.ceil(nonBgSuccessHeaders.length / 2);
+                    nonBgSuccessHeaders.forEach((item, index) => {
+                        let content;
+                        const regex = /第\d+希望日付/;
+                        if (regex.test(item.header)  && item.cell) {
+                            content = `
+                                <div class="mb-3 d-flex align-items-center w-100 position-relative">
+                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
 
-                    col1 += '</div></div>';
-                    col2 += '</div>';
-                    rowHTML += col1 + col2 + '</div>';
+                                    <input type="radio" name="preferred-date" class="position-absolute">
+                                    <input type="text" class="form-control pl-4" value="${item.cell || ''}" readonly>
+
+                                </div>
+                            `;
+                        } else {
+                            content = `
+                                <div class="mb-3 d-flex align-items-center w-100">
+                                    <label class="text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                                    <input type="text" id="${item.header}" class="form-control" value="${item.cell || ''}" readonly>
+                                </div>
+                            `;
+                        }
+                        if (index < midpoint) {
+                            colLeft1 += content;
+                        } else {
+                            colLeft2 += content;
+                        }
+                    });
+                    bgSuccessHeaders.forEach((item) => {
+                        const editHeader = editHeaders.find(h => h.header_name === item.header);
+                        const cellClass = editHeader
+                            ? (editHeader.format_value === 'date' ? 'date-picker'
+                              : editHeader.format_value === 'time' ? 'time-picker'
+                              : '')
+                            : '';
+                        let content = `
+                            <div class="mb-3 d-flex align-items-center w-100">
+                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                                <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                            </div>
+                        `;
+                        colRight += content;
+                    });
+                    colLeft1 += '</div>';
+                    colLeft2 += '</div>';
+                    colRight += '</div>';
+
+                    rowHTML += `
+                        <div class="row col-12 col-md-6 col-lg-8">
+                            ${colLeft1}
+                            ${colLeft2}
+                        </div>
+                        <div class="row col-12 col-md-6 col-lg-4">
+                            ${colRight}
+                        </div>
+                    `;
 
                     showDataDiv.append(rowHTML);
 
-                    flatpickr("#date-picker", {
+                    flatpickr(".date-picker", {
                         locale: "ja",
                         dateFormat: "Y/m/d",
-
                     });
 
-                    flatpickr("#time-picker", {
+                    flatpickr(".time-picker", {
                         locale: "ja",
                         enableTime: true,
                         noCalendar: true,
@@ -416,36 +482,54 @@
                         time_24hr: true,
                     });
                 });
-            });
-        </script>
-        <script>
-            $(document).on('change', 'input[type="radio"]', function () {
-                const name = $(this).attr('name');
-                const selectedDate = $(this).closest('div').find('input[type="text"]').val();
-                $("#date-picker").val(selectedDate);
-                const formattedKey = $('.show-data').attr('data-index');
-                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-                targetRow.find('td.row-date').text(selectedDate);
 
-                $(`input[name="${name}"]`).not(this).prop('checked', false);
-            });
+                function UpdateFormatData(Input){
+                    const dataIndex = $('.show-data').attr('data-index');
+                    const fieldName = Input.attr('name');
+                    const fieldValue = Input.val();
 
-            $(document).on('change', '#date-picker', function () {
-                const newDate = $(this).val();
-                const formattedKey = $('.show-data').attr('data-index');
-                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    const postData = {
+                        key: dataIndex,
+                        field_name: fieldName,
+                        field_value: fieldValue,
+                        csrfmiddlewaretoken: getCookie('csrftoken')
+                    };
+
+                    $.ajax({
+                        url: "{% url 'update_format_data' %}",
+                        type: "POST",
+                        data: postData,
+                        error: function (error) {
+                            createToast('error', 'データ送信中にエラーが発生しました。');
+                        }
+                    });
+                }
+
+                $(document).on('blur', '.edit-input', function () {
+                    new UpdateFormatData($(this));
+                });
 
 
-                targetRow.find('td.row-date').text(newDate);
-            });
+                $(document).on('change', 'input[type="radio"]', function () {
+                    const name = $(this).attr('name');
+                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+                    $(".date-picker").val(selectedDate);
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    targetRow.find('td.row-date').text(selectedDate);
 
-            $(document).on('change', '#time-picker', function () {
-                const newTime = $(this).val();
-                const formattedKey = $('.show-data').attr('data-index');
-                const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    $(`input[name="${name}"]`).not(this).prop('checked', false);
+                    new UpdateFormatData($(".date-picker"));
+                });
 
+                $(document).on('change', '.edit-input', function () {
+                    const newText = $(this).val();
+                    const name = $(this).attr('name');
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
 
-                targetRow.find('td.row-time').text(newTime);
+                    targetRow.find(`td.${name}`).text(newText);
+                });
             });
 
         </script>
