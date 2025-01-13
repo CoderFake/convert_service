@@ -117,7 +117,9 @@ def rule_settings(request):
                 ).first()
 
                 if detail_info:
-                    return JsonResponse({"status": "error", "message": "Data item is exist"}, status=404)
+                    detail_info.convert_rule = rule
+                    detail_info.save()
+                    return JsonResponse({"status": "success", "message": "Rule updated successfully!"}, status=200)
 
                 DetailedInfo.objects.create(
                     tenant=tenant,
@@ -139,13 +141,13 @@ def rule_settings(request):
     data_inputs = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
-        data_item_types__type_name=HeaderType.BEFORE.value
+        data_item_types__type_name=HeaderType.FORMAT.value
     )
 
     data_formats = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
-        data_item_types__type_name=HeaderType.FORMAT.value
+        data_item_types__type_name=HeaderType.AFTER.value
     )
 
     rule_list = ConvertRule.objects.all()
@@ -157,4 +159,3 @@ def rule_settings(request):
     }
 
     return render(request, 'web/ settings/rule_settings.html', context)
-
