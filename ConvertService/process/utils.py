@@ -319,9 +319,13 @@ class DataFormatter:
     @staticmethod
     def convert_date(value, target_format='%Y/%m/%d'):
         """
-        Supported target formats:
-        - 'yyyy/MM/dd'
-        - 'yyyy-MM-dd'
+        Convert a date string to the desired format.
+        Supported formats:
+        - Japanese Era formats
+        - ISO formats (YYYY/MM/DD, YYYY-MM-DD)
+        - Kanji dates (YYYY年MM月DD日)
+        - US-style formats (MM/DD/YYYY, MM-DD-YYYY)
+        - Custom formats like DD/MM/YYYY, YYYY\DD\MM
 
         :param value: The date value to be converted
         :param target_format: The desired output format
@@ -364,8 +368,44 @@ class DataFormatter:
                     year, month, day = map(int, kanji_match.groups())
                     date_result = datetime.datetime(year, month, day)
 
+            # 4. Handle US-style formats with time
+            if not date_result:
+                us_match_with_time = re.match(
+                    r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s(\d{1,2}):(\d{1,2}):(\d{1,2})\s(AM|PM)', value)
+                if us_match_with_time:
+                    month, day, year, hour, minute, second, period = us_match_with_time.groups()
+                    hour = int(hour)
+                    if period == 'PM' and hour != 12:
+                        hour += 12
+                    elif period == 'AM' and hour == 12:
+                        hour = 0
+                    date_result = datetime.datetime(int(year), int(month), int(day), hour, int(minute), int(second))
+
+            # 5. Handle US-style formats without time (e.g., MM/DD/YYYY or MM-DD-YYYY)
+            if not date_result:
+                us_match = re.match(r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})', value)
+                if us_match:
+                    month, day, year = map(int, us_match.groups())
+                    date_result = datetime.datetime(year, month, day)
+
+            # 6. Handle DD/MM/YYYY or YYYY\DD\MM
+            if not date_result:
+                custom_match = re.match(r'(\d{1,2})[\/\-\\](\d{1,2})[\/\-\\](\d{4})', value)
+                if custom_match:
+                    day, month, year = map(int, custom_match.groups())
+                    date_result = datetime.datetime(year, month, day)
+
+            if not date_result:
+                reverse_match = re.match(r'(\d{4})[\/\-\\](\d{1,2})[\/\-\\](\d{1,2})', value)
+                if reverse_match:
+                    year, day, month = map(int, reverse_match.groups())
+                    date_result = datetime.datetime(year, month, day)
+
+            # 7. Convert to the desired format
             if date_result:
-                return date_result.strftime('%Y/%m/%d' if target_format == '%Y/%m/%d' else '%Y-%m-%d')
+                if target_format == '%d/%m/%Y':
+                    return date_result.strftime('%d/%m/%Y')
+                return date_result.strftime(target_format)
 
             return value
         except Exception as e:
