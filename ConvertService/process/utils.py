@@ -10,7 +10,6 @@ import pandas as pd
 import jaconv
 from PyPDF2 import PdfReader
 from openpyxl import load_workbook
-from configs.cache_manager import ConvertDataValueCache
 import redis
 import logging
 
@@ -28,6 +27,13 @@ def get_redis_client():
         logger.error(f"Error initializing Redis client: {e}")
         raise
 
+def delete_all_keys():
+    redis_client = get_redis_client()
+    keys = redis_client.keys('*')
+    if keys:
+        redis_client.delete(*keys)
+        return len(keys)
+    return 0
 
 class FileFormatMapper:
     FORMAT_MAPPING = {
@@ -275,24 +281,29 @@ class DataFormatter:
             return value
 
     @staticmethod
-    def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
-        """
-        Format a single row of data based on conversion rules and map it to match after_headers.
-        Add two empty columns at the end of the row.
-        """
-        try:
-            mapped_row = [
-                row[before_headers.index(after_header)] if after_header in before_headers and before_headers.index(
-                    after_header) < len(row) else ""
-                for after_header in after_headers
-            ]
+    def format_data_with_rules(row, fixed_values, rules, before_headers, after_headers, tenant_id):
 
-            for rule_id, col_idx in rules:
-                if col_idx <= len(after_headers):
-                    if rule_id == "CR_FIXED_VALUE":
-                        mapped_row[col_idx] = DataFormatter.convert_fixed_value(mapped_row[col_idx], tenant_id)
+        try:
+            mapped_row = [""] * len(after_headers)
+            for rule_id, idx_before, idx_after in rules:
+                if idx_after < len(after_headers):
+                    if idx_before < len(row):
+                        mapped_row[idx_after] = row[idx_before]
                     else:
-                        mapped_row[col_idx] = DataFormatter.apply_rule(mapped_row[col_idx], rule_id)
+                        mapped_row[idx_after] = ""
+
+
+            for rule_id, idx_before, idx_after in rules:
+                if idx_after < len(mapped_row):
+                    if rule_id == "CR_FIXED_VALUE":
+                        mapped_row[idx_after] = DataFormatter.convert_fixed_value(
+                            fixed_values, mapped_row[idx_after], tenant_id
+                        )
+                    else:
+                        mapped_row[idx_after] = DataFormatter.apply_rule(
+                            mapped_row[idx_after], rule_id
+                        )
+
             return mapped_row
 
         except Exception as e:
@@ -300,17 +311,16 @@ class DataFormatter:
             return []
 
     @staticmethod
-    def convert_fixed_value(value, tenant_id):
+    def convert_fixed_value(fixed_values, value, tenant_id):
         """
-        Convert the value based on fixed rules stored in Redis cache.
+        Convert the value based on fixed rules stored in fixed_values.
+        If the value exists in data_value_before, map it to data_value_after.
         """
         try:
-            cache_manager = ConvertDataValueCache()
-            cache_data = cache_manager.get_cache(tenant_id)
+            for fixed_value in fixed_values:
+                if fixed_value["data_value_before"] == value:
+                    return fixed_value["data_value_after"]
 
-            for cached_item in cache_data:
-                if cached_item['data_value_before'] == value:
-                    return cached_item['data_value_after']
             return value
         except Exception as e:
             logger.error(f"Error in convert_fixed_value for tenant {tenant_id}: {value} -> {e}")
