@@ -11,7 +11,7 @@ from home.ultis import (
     FileFormatFetcher,
     RuleFetcher,
     HeaderType,
-    DisplayType
+    DisplayType, FixedValueFetcher
 )
 from .file_tasks import (
     process_and_format_file,
@@ -19,7 +19,7 @@ from .file_tasks import (
     generate_zip_task,
     generate_csv_task
 )
-from .utils import get_redis_client, ProcessHeader
+from .utils import get_redis_client, ProcessHeader, delete_all_keys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ def process_files(request):
         user = Account.objects.get(pk=request.user.id)
         headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=True)
-        process_multiple_files_task.run(headers, file_format, mode)
+        process_multiple_files_task.run(request.session.session_key,headers, file_format, mode)
 
         return JsonResponse({
             'status': 'success',
@@ -125,8 +125,16 @@ def format_data_processing(request):
         before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
         format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
         rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
+        fixed_values = FixedValueFetcher.get_fixed_values(user)
 
-        result = process_and_format_file.run(rules, before_headers, format_headers, request.user.tenant.id)
+        result = process_and_format_file.run(
+            request.session.session_key,
+            fixed_values,
+            rules,
+            before_headers,
+            format_headers,
+            request.user.tenant.id
+        )
 
         return JsonResponse({
             "status": "success",
@@ -166,15 +174,30 @@ def download_zip(request, zip_key="formatted:*"):
 
 
 @login_required
-def download_csv(request, zip_key="formatted:*"):
+def download_csv(request, csv_key="output:*"):
     try:
         redis_client = get_redis_client()
 
         user = Account.objects.get(pk=request.user.id)
-        headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.SHOW.value)
+
+        format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+        output_headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.ALL.value)
+        rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.AFTER.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
-        csv_key = generate_csv_task(zip_key, headers, file_format)
+        fixed_values = FixedValueFetcher.get_fixed_values(user)
+
+        process_and_format_file.run(
+            request.session.session_key,
+            fixed_values,
+            rules,
+            format_headers,
+            output_headers,
+            request.user.tenant.id,
+            keys="formatted:*"
+        )
+
+        csv_key = generate_csv_task(f"{request.session.session_key}-{csv_key}", output_headers, file_format)
 
         if not csv_key:
             return redirect('home')
@@ -186,6 +209,8 @@ def download_csv(request, zip_key="formatted:*"):
 
         response = HttpResponse(csv_data, content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d")}_output.csv"'
+
+        delete_all_keys()
         return response
     except Exception as e:
         logger.error(f"Error downloading CSV file: {e}")
