@@ -70,7 +70,6 @@
         $(document).ready(function () {
             $('#process-header').on('submit', function (e) {
                 e.preventDefault();
-
                 var formData = new FormData(this);
 
                 $.ajax({
@@ -81,9 +80,9 @@
                     processData: false,
                     success: function (response) {
                         $('#response-container').empty();
+
                         if (response.status === "success") {
                             const structuredData = response.structured_data;
-
 
                             const typeOptions = [
                                 {value: 'string', display: 'String'},
@@ -96,156 +95,132 @@
                             ];
 
                             let html = `
-                                <form id="update-headers-form" method="post">
-                                    <!-- CSRF Token -->
-                                    <input type="hidden" name="csrfmiddlewaretoken" value="${document.querySelector('[name=csrfmiddlewaretoken]').value}">
-                                    <table class="table table-bordered" id="editable-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Header Name</th>
-                                                <th>Input</th>
-                                                <th>Format</th>
-                                                <th>Output</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                            `;
+                            <form id="update-headers-form" method="post">
+                                <input type="hidden" name="csrfmiddlewaretoken" value="${document.querySelector('[name=csrfmiddlewaretoken]').value}">
+                                <table class="table table-bordered" id="editable-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Header Name</th>
+                                            <th>Input</th>
+                                            <th>Format</th>
+                                            <th>Output</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
 
                             for (const [header, attributes] of Object.entries(structuredData)) {
                                 html += `
-                                    <tr>
-                                        <td class="header-name fw-bold text-primary">${header}</td>
-                                        <td>
-                                            ${attributes.input ? `
-                                                <div class="mb-2">
-                                                    <label class="form-label">Display:</label>
-                                                    <select class="form-control form-select-sm" name="input[${header}][display]" id="input-display-${header}">
-                                                        <option value="1" ${attributes.input.display === 1 ? 'selected' : ''}>Yes</option>
-                                                        <option value="0" ${attributes.input.display === 0 ? 'selected' : ''}>No</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Type:</label>
-                                                    <select class="form-control form-select-sm" name="input[${header}][type]" id="input-type-${header}">
-                                                        ${typeOptions.map(option => `
-                                                            <option value="${option.value}" ${attributes.input.type === option.value ? 'selected' : ''}>
-                                                                ${option.display}
-                                                            </option>
-                                                        `).join('')}
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Index:</label>
-                                                    <input type="text" class="form-control form-control-sm" name="input[${header}][index]" id="input-index-${header}" value="${attributes.input.index}">
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Edit:</label>
-                                                    <select class="form-control form-select-sm" name="input[${header}][edit]" id="input-edit-${header}">
-                                                        <option value="1">Yes</option>
-                                                        <option value="0" selected>No</option>
-                                                    </select>
-                                                </div>
-                                            ` : '<span class="text-muted">None</span>'}
-                                        </td>
-                                        <td>
-                                            ${attributes.format ? `
-                                                <div class="mb-2">
-                                                    <label class="form-label">Display:</label>
-                                                    <select class="form-control form-select-sm" name="format[${header}][display]" id="format-display-${header}">
-                                                        <option value="1" ${attributes.format.display === 1 ? 'selected' : ''}>Yes</option>
-                                                        <option value="0" ${attributes.format.display === 0 ? 'selected' : ''}>No</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Type:</label>
-                                                    <select class="form-control form-select-sm" name="format[${header}][type]" id="format-type-${header}">
-                                                        ${typeOptions.map(option => `
-                                                            <option value="${option.value}" ${attributes.format.type === option.value ? 'selected' : ''}>
-                                                                ${option.display}
-                                                            </option>
-                                                        `).join('')}
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Index:</label>
-                                                    <input type="text" class="form-control form-control-sm" name="format[${header}][index]" id="format-index-${header}" value="${attributes.format.index}">
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Edit:</label>
-                                                    <select class="form-control form-select-sm" name="format[${header}][edit]" id="format-edit-${header}">
-                                                        <option value="1">Yes</option>
-                                                        <option value="0" selected>No</option>
-                                                    </select>
-                                                </div>
-                                            ` : '<span class="text-muted">None</span>'}
-                                        </td>
-                                        <td>
-                                            ${attributes.output ? `
-                                                <div class="mb-2">
-                                                    <label class="form-label">Display:</label>
-                                                    <select class="form-control form-select-sm" name="output[${header}][display]" id="output-display-${header}">
-                                                        <option value="1" ${attributes.output.display === 1 ? 'selected' : ''}>Yes</option>
-                                                        <option value="0" ${attributes.output.display === 0 ? 'selected' : ''}>No</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Type:</label>
-                                                    <select class="form-control form-select-sm" name="output[${header}][type]" id="output-type-${header}">
-                                                        ${typeOptions.map(option => `
-                                                            <option value="${option.value}" ${attributes.output.type === option.value ? 'selected' : ''}>
-                                                                ${option.display}
-                                                            </option>
-                                                        `).join('')}
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Index:</label>
-                                                    <input type="text" class="form-control form-control-sm" name="output[${header}][index]" id="output-index-${header}" value="${attributes.output.index}">
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Edit:</label>
-                                                    <select class="form-control form-select-sm" name="output[${header}][edit]" id="output-edit-${header}">
-                                                        <option value="1">Yes</option>
-                                                        <option value="0" selected>No</option>
-                                                    </select>
-                                                </div>
-                                            ` : '<span class="text-muted">None</span>'}
-                                        </td>
-                                    </tr>
-                                `;
+                                <tr>
+                                    <td class="header-name fw-bold text-primary">${header}</td>
+                                    <td>
+                                        ${attributes.input ? `
+                                            <div class="mb-2">
+                                                <label class="form-label">Display:</label>
+                                                <select class="form-control form-select-sm" name="input[${header}][display]">
+                                                    <option value="1" ${attributes.input.display === 1 ? 'selected' : ''}>Yes</option>
+                                                    <option value="0" ${attributes.input.display === 0 ? 'selected' : ''}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Type:</label>
+                                                <select class="form-control form-select-sm" name="input[${header}][type]">
+                                                    ${typeOptions.map(option => `
+                                                        <option value="${option.value}" ${attributes.input.type === option.value ? 'selected' : ''}>
+                                                            ${option.display}
+                                                        </option>
+                                                    `).join('')}
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Index:</label>
+                                                <input type="text" class="form-control form-control-sm" name="input[${header}][index]" value="${attributes.input.index}">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Edit:</label>
+                                                <select class="form-control form-select-sm" name="input[${header}][edit]">
+                                                    <option value="1">Yes</option>
+                                                    <option value="0" selected>No</option>
+                                                </select>
+                                            </div>
+                                        ` : '<span class="text-muted">None</span>'}
+                                    </td>
+                                    <td>
+                                        ${attributes.format ? `
+                                            <div class="mb-2">
+                                                <label class="form-label">Display:</label>
+                                                <select class="form-control form-select-sm" name="format[${header}][display]">
+                                                    <option value="1" ${attributes.format.display === 1 ? 'selected' : ''}>Yes</option>
+                                                    <option value="0" ${attributes.format.display === 0 ? 'selected' : ''}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Type:</label>
+                                                <select class="form-control form-select-sm" name="format[${header}][type]">
+                                                    ${typeOptions.map(option => `
+                                                        <option value="${option.value}" ${attributes.format.type === option.value ? 'selected' : ''}>
+                                                            ${option.display}
+                                                        </option>
+                                                    `).join('')}
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Index:</label>
+                                                <input type="text" class="form-control form-control-sm" name="format[${header}][index]" value="${attributes.format.index}">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Edit:</label>
+                                                <select class="form-control form-select-sm" name="format[${header}][edit]">
+                                                    <option value="1">Yes</option>
+                                                    <option value="0" selected>No</option>
+                                                </select>
+                                            </div>
+                                        ` : '<span class="text-muted">None</span>'}
+                                    </td>
+                                    <td>
+                                        ${attributes.output ? `
+                                            <div class="mb-2">
+                                                <label class="form-label">Display:</label>
+                                                <select class="form-control form-select-sm" name="output[${header}][display]">
+                                                    <option value="1" ${attributes.output.display === 1 ? 'selected' : ''}>Yes</option>
+                                                    <option value="0" ${attributes.output.display === 0 ? 'selected' : ''}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Type:</label>
+                                                <select class="form-control form-select-sm" name="output[${header}][type]">
+                                                    ${typeOptions.map(option => `
+                                                        <option value="${option.value}" ${attributes.output.type === option.value ? 'selected' : ''}>
+                                                            ${option.display}
+                                                        </option>
+                                                    `).join('')}
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Index:</label>
+                                                <input type="text" class="form-control form-control-sm" name="output[${header}][index]" value="${attributes.output.index}">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Edit:</label>
+                                                <select class="form-control form-select-sm" name="output[${header}][edit]">
+                                                    <option value="1">Yes</option>
+                                                    <option value="0" selected>No</option>
+                                                </select>
+                                            </div>
+                                        ` : '<span class="text-muted">None</span>'}
+                                    </td>
+                                </tr>
+                            `;
                             }
 
                             html += `
-                                    </tbody>
-                                </table>
-                                <button id="save-changes" type="submit" class="btn btn-primary mt-4">Save Changes</button>
-                                </form>
-                            `;
+                                </tbody>
+                            </table>
+                            <button id="save-changes" type="submit" class="btn btn-primary mt-4">Save Changes</button>
+                            </form>
+                        `;
 
                             $('#response-container').append(html);
-
-                            $('#update-headers-form').on('submit', function (e) {
-                                e.preventDefault();
-
-                                const formData = $(this).serialize();
-
-                                $.ajax({
-                                    url: '{% url "save_data_item" %}',
-                                    type: 'POST',
-                                    data: formData,
-                                    success: function (response) {
-                                        $('#response-container').append(
-                                            `<div class="alert alert-success mt-2">${response.message}</div>`
-                                        );
-                                    },
-                                    error: function (xhr) {
-                                        $('#response-container').append(
-                                            `<div class="alert alert-danger mt-2">An error occurred: ${xhr.statusText} (${xhr.status})</div>`
-                                        );
-                                    }
-                                });
-                            });
-
                         } else {
                             $('#response-container').append(
                                 `<div class="alert alert-danger">${response.message}</div>`
@@ -255,6 +230,36 @@
                     error: function (xhr) {
                         $('#response-container').empty().append(
                             `<div class="alert alert-danger">An error occurred: ${xhr.statusText} (${xhr.status})</div>`
+                        );
+                    }
+                });
+            });
+
+            $(document).on('change', '#editable-table select', function () {
+                const value = $(this).val();
+                $(this).find('option').removeAttr('selected');
+                $(this).find(`option[value="${value}"]`).attr('selected', 'selected');
+                console.log(`Updated ${$(this).attr('name')}: ${value}`);
+            });
+
+
+
+            $(document).on('submit', '#update-headers-form', function (e) {
+                e.preventDefault();
+                const formData = $(this).serialize();
+
+                $.ajax({
+                    url: '{% url "save_data_item" %}',
+                    type: 'POST',
+                    data: formData,
+                    success: function (response) {
+                        $('#response-container').append(
+                            `<div class="alert alert-success mt-2">${response.message}</div>`
+                        );
+                    },
+                    error: function (xhr) {
+                        $('#response-container').append(
+                            `<div class="alert alert-danger mt-2">An error occurred: ${xhr.statusText} (${xhr.status})</div>`
                         );
                     }
                 });
