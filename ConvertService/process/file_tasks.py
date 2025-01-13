@@ -71,20 +71,19 @@ def process_multiple_files_task(headers, file_format=None, mode='dict'):
 
 
 @shared_task
-def process_and_format_file(rules, before_headers, after_headers, tenant_id):
-    """
-    Process and format each row of data and save it in Redis with unique keys.
-    """
+def process_and_format_file(rules, before_headers, after_headers, tenant_id, keys="processed:*"):
+
     try:
         logger.info("Task 'process_and_format_file' started.")
         redis_client = get_redis_client()
+
 
         formatted_keys = redis_client.keys('formatted:*')
         for key in formatted_keys:
             redis_client.delete(key)
         logger.info(f"Deleted {len(formatted_keys)} formatted keys from Redis.")
 
-        keys = redis_client.keys('processed:*')
+        keys = redis_client.keys(keys)
         if not keys:
             logger.warning("No data found in Redis for processing.")
             return "処理するデータが見つかりません。"
@@ -96,21 +95,33 @@ def process_and_format_file(rules, before_headers, after_headers, tenant_id):
 
         data = json.loads(raw_data.decode('utf-8'))
 
-        def process_single_row(row, row_index):
+        results = [None] * len(data)
+
+        def process_single_row(row_index, row):
+
             try:
                 formatted_row = DataFormatter.format_data_with_rules(row, rules, before_headers, after_headers, tenant_id)
-                formatted_key = f"formatted:{uuid.uuid4().hex}"
-                redis_client.set(formatted_key, json.dumps(formatted_row), ex=3600)
-                logger.info(f"Saved formatted row {row_index} to Redis: {formatted_key}")
+                results[row_index] = formatted_row
             except Exception as e:
                 logger.error(f"Error processing row {row_index}: {e}")
+                results[row_index] = None
+
 
         max_workers = os.cpu_count() or 1
         logger.info(f"Processing rows with {max_workers} workers.")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_single_row, row, row_index) for row_index, row in enumerate(data)]
+            futures = {executor.submit(process_single_row, idx, row): idx for idx, row in enumerate(data)}
             for future in as_completed(futures):
-                future.result()
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Error in processing row {futures[future]}: {e}")
+
+        for row_index, formatted_row in enumerate(results):
+            if formatted_row is not None:
+                formatted_key = f"formatted:{row_index}"
+                redis_client.set(formatted_key, json.dumps(formatted_row), ex=3600)
+                logger.info(f"Saved ordered row {row_index} to Redis: {formatted_key}")
 
         logger.info("All rows have been successfully processed and stored.")
         return "データは正常に処理され、保存されました。"
@@ -118,7 +129,6 @@ def process_and_format_file(rules, before_headers, after_headers, tenant_id):
     except Exception as e:
         logger.error(f"Error in 'process_and_format_file' task: {e}")
         return "データフォーマット処理中にエラーが発生しました。"
-
 
 
 @shared_task
@@ -227,7 +237,8 @@ def generate_csv_task(csv_key, headers, file_format_id):
                 logger.error(f"Error processing key {key}: {e}")
                 return None
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        max_workers = os.cpu_count() or 1
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_key, key): key for key in keys}
             for future in as_completed(futures):
                 try:
