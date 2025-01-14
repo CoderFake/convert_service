@@ -27,18 +27,6 @@
             display: inline-block;
             vertical-align: middle;
         }
-        {# table.dataTable .truncate-text:hover {#}
-        {#    overflow: visible;#}
-        {#    white-space: normal;#}
-        {#    word-wrap: normal;#}
-        {#    position: absolute;#}
-        {#    background-color: #f9f9f9;#}
-        {#    z-index: 10;#}
-        {#    padding: 5px;#}
-        {#    border: 1px solid #ddd;#}
-        {#    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);#}
-        {#}#}
-
 
         .active-row {
             background-color: yellow !important;
@@ -420,7 +408,7 @@
                                     <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
 
                                     <input type="radio" name="preferred-date" class="position-absolute">
-                                    <input type="text" class="form-control pl-4" value="${item.cell || ''}" readonly>
+                                    <input type="text" class="form-control bg-white pl-4" value="${item.cell || ''}" readonly>
 
                                 </div>
                             `;
@@ -428,7 +416,7 @@
                             content = `
                                 <div class="mb-3 d-flex align-items-center w-100">
                                     <label class="text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                    <input type="text" id="${item.header}" class="form-control" value="${item.cell || ''}" readonly>
+                                    <input type="text" id="${item.header}" class="form-control bg-white" value="${item.cell || ''}" readonly>
                                 </div>
                             `;
                         }
