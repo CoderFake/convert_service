@@ -505,7 +505,7 @@
                     });
                 }
 
-                $(document).on('blur', '.edit-input', function () {
+                $(document).on('blur change', '.edit-input', function () {
                     new UpdateFormatData($(this));
                 });
 
