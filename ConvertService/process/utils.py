@@ -267,6 +267,7 @@ class DataFormatter:
         "CR_KANA_F-H": lambda value: DataFormatter.convert_kana(value, 'full_to_half'),
         "CR_KANA_H-F": lambda value: DataFormatter.convert_kana(value, 'half_to_full'),
         "CR_POSTAL_FORMAT": lambda value: DataFormatter.convert_postal_code(value),
+        "CR_TIME": lambda value: DataFormatter.convert_time(value),
     }
 
     @staticmethod
@@ -499,6 +500,45 @@ class DataFormatter:
         except Exception as e:
             logger.error(f"Error converting postal code: {value} -> {e}")
             return value
+
+    @staticmethod
+    def convert_time(value):
+        """
+        Convert time from hh:mm to custom format:
+        - hh:01 -> hh:15 => hh15
+        - hh:16 -> hh:30 => hh30
+        - hh:31 -> hh:45 => hh45
+        - hh:46 -> hh:00 => hh00
+
+        :param value: The time value to be converted
+        :return: Formatted time or original value if conversion fails
+        """
+        try:
+            if not value or not isinstance(value, str):
+                return ""
+
+            value = value.strip()
+            time_match = re.match(r"(\d{1,2}):(\d{2})", value)
+            if not time_match:
+                return value
+
+            hour, minute = map(int, time_match.groups())
+
+            if 1 <= minute <= 15:
+                return f"{hour:02d}15"
+            elif 16 <= minute <= 30:
+                return f"{hour:02d}30"
+            elif 31 <= minute <= 45:
+                return f"{hour:02d}45"
+            elif 46 <= minute <= 59 or minute == 0:
+                next_hour = (hour + 1) % 24 if minute >= 46 else hour
+                return f"{next_hour:02d}00"
+
+            return value
+        except Exception as e:
+            logger.error(f"Error converting time: {value} -> {e}")
+            return value
+
 
     @staticmethod
     def write_dict(data, file_paths):
