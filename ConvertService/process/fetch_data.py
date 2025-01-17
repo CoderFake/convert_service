@@ -1,24 +1,10 @@
-import enum
 from accounts.models import Account
-from django.db.models import Q, F
-
+from .data_type import HeaderType, DisplayType
 from configs.models import ConvertDataValue
-from .models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType
+from home.models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-class HeaderType(enum.Enum):
-    BEFORE = 'input'
-    FORMAT = 'format'
-    AFTER = 'output'
-
-
-class DisplayType(enum.Enum):
-    SHOW = True
-    HIDDEN = False
-    ALL = None
 
 
 class HeaderFetcher:
@@ -167,7 +153,6 @@ class RuleFetcher:
         except Exception as e:
             logger.error(f"Error fetching conversion rules: {e}")
             return []
-
 
 
 class FixedValueFetcher:
