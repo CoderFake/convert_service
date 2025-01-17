@@ -1,5 +1,4 @@
 import datetime
-import os
 import re
 import csv
 import json
@@ -10,30 +9,58 @@ import pandas as pd
 import jaconv
 from PyPDF2 import PdfReader
 from openpyxl import load_workbook
-import redis
 import logging
 
 logger = logging.getLogger(__name__)
 
-def get_redis_client():
-    try:
-        client = redis.StrictRedis(
-            host=os.getenv('REDIS_HOST', 'localhost'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            db=int(os.getenv('REDIS_DB', 0))
-        )
-        return client
-    except Exception as e:
-        logger.error(f"Error initializing Redis client: {e}")
-        raise
 
-def delete_all_keys():
-    redis_client = get_redis_client()
-    keys = redis_client.keys('*')
-    if keys:
-        redis_client.delete(*keys)
-        return len(keys)
-    return 0
+class DisplayData:
+    @staticmethod
+    def filter_list(headers, hidden_headers, data):
+        """
+        Filter headers and data based on visible headers.
+        """
+        try:
+            visible_indices = [i for i, header in enumerate(headers) if header not in hidden_headers]
+            filtered_headers = [header for i, header in enumerate(headers) if i in visible_indices]
+
+            filtered_data = []
+            for row in data:
+                if len(row) < len(headers):
+                    logger.warning(f"Skipping row due to mismatched length: {row}")
+                    continue
+                try:
+                    filtered_row = [row[i] if i < len(row) else "" for i in visible_indices]
+                    filtered_data.append(filtered_row)
+                except IndexError as e:
+                    logger.error(f"Error accessing row: {row}, error: {e}")
+                    continue
+
+            return filtered_headers, filtered_data
+        except Exception as e:
+            logger.error(f"Error filtering data: {e}")
+            return [], []
+
+    @staticmethod
+    def get_list_data(redis_client, keys):
+        try:
+            all_data = []
+            all_key = []
+            for key in keys:
+                try:
+                    raw_data = redis_client.get(key)
+                    if raw_data:
+                        data = json.loads(raw_data.decode('utf-8'))
+                        all_data.append(data)
+                        all_key.append(key.decode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Error reading formatted data from Redis key {key}: {e}")
+                    return [], []
+            return all_data, all_key
+        except Exception as e:
+            logger.error(f"Error combining formatted data: {e}")
+            return [], []
+
 
 class FileFormatMapper:
     FORMAT_MAPPING = {
