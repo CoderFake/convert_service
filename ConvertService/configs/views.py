@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 
 from configs.models import ConvertRule
 from home.models import FileFormat, DataItemType, DataItem, DataFormat, DetailedInfo, DataConversionInfo
-from home.ultis import HeaderType
+from process.fetch_data import HeaderType
 
 
 @login_required
