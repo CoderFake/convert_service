@@ -6,12 +6,13 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from accounts.models import Account
-from home.ultis import (
+from process.fetch_data import (
     HeaderFetcher,
     FileFormatFetcher,
     RuleFetcher,
     HeaderType,
-    DisplayType, FixedValueFetcher
+    DisplayType,
+    FixedValueFetcher
 )
 from .file_tasks import (
     process_and_format_file,
@@ -19,7 +20,9 @@ from .file_tasks import (
     generate_zip_task,
     generate_csv_task
 )
-from .utils import get_redis_client, ProcessHeader, delete_all_keys
+from .utils import ProcessHeader, DisplayData
+from .redis import redis_client
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 
 logger = logging.getLogger(__name__)
@@ -56,9 +59,8 @@ def upload_file(request):
 
     if file.size > 5 * 1024 * 1024:
         return JsonResponse({'status': 'error', 'message': f'ファイルサイズが制限を超えています: {file_name}。'})
-
-    redis_client = get_redis_client()
-    redis_client.set(f'file:{file_name}', file_path)
+    client = redis_client.get_client()
+    client.set(f'{request.session.session_key}-file:{file_name}', file_path)
 
     return JsonResponse({'status': 'success', 'message': f'ファイルがアップロードされました: {file_name}。'})
 
@@ -75,11 +77,11 @@ def delete_file(request):
         if not file_name:
             return JsonResponse({'status': 'error', 'message': 'ファイル名が指定されていません。'})
 
-        redis_client = get_redis_client()
-        file_path = redis_client.get(f'file:{file_name}')
+        client = redis_client.get_client()
+        file_path = client.get(f'{request.session.session_key}-file:{file_name}')
         if file_path:
             os.remove(file_path.decode('utf-8'))
-            redis_client.delete(f'file:{file_name}')
+            client.delete(f'{request.session.session_key}-file:{file_name}')
             return JsonResponse({'status': 'success', 'message': f'ファイルが削除されました: {file_name}。'})
 
         return JsonResponse({'status': 'error', 'message': f'Redisにファイルが見つかりません: {file_name}。'})
@@ -121,25 +123,24 @@ def format_data_processing(request):
 
     try:
         user = Account.objects.get(pk=request.user.id)
-
         before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
-        format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+        format_headers, edit_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, edit=True)
         rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
         fixed_values = FixedValueFetcher.get_fixed_values(user)
-
-        result = process_and_format_file.run(
+        
+        process_and_format_file.run(
             request.session.session_key,
             fixed_values,
             rules,
             before_headers,
             format_headers,
-            request.user.tenant.id
+            user.tenant.id
         )
 
         return JsonResponse({
             "status": "success",
-            "message": result
-        }, status=200)
+            "message": "データ処理がバックグラウンドで開始されました。結果は後ほど確認してください。"
+        }, status=202)
 
     except Exception as e:
         logger.error(f"Error triggering data processing: {e}")
@@ -149,7 +150,7 @@ def format_data_processing(request):
 @login_required
 def download_zip(request, zip_key="formatted:*"):
     try:
-        redis_client = get_redis_client()
+        client = redis_client.get_client()
 
         user = Account.objects.get(pk=request.user.id)
         headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.SHOW.value)
@@ -160,7 +161,7 @@ def download_zip(request, zip_key="formatted:*"):
         if not zip_key:
             return redirect('home')
 
-        zip_data = redis_client.get(zip_key)
+        zip_data = client.get(zip_key)
         if not zip_data:
             messages.error(request, '指定されたZIPファイルが見つかりません。')
             return redirect('home')
@@ -176,7 +177,7 @@ def download_zip(request, zip_key="formatted:*"):
 @login_required
 def download_csv(request, csv_key="output:*"):
     try:
-        redis_client = get_redis_client()
+        client = redis_client.get_client()
 
         user = Account.objects.get(pk=request.user.id)
 
@@ -193,8 +194,8 @@ def download_csv(request, csv_key="output:*"):
             rules,
             format_headers,
             output_headers,
-            request.user.tenant.id,
-            keys="formatted:*"
+            user.tenant.id,
+            type_keys="formatted:*"
         )
 
         csv_key = generate_csv_task(f"{request.session.session_key}-{csv_key}", output_headers, file_format)
@@ -202,7 +203,7 @@ def download_csv(request, csv_key="output:*"):
         if not csv_key:
             return redirect('home')
 
-        csv_data = redis_client.get(csv_key)
+        csv_data = client.get(csv_key)
         if not csv_data:
             messages.error(request, '指定されたCSVファイルが見つかりません。')
             return redirect('home')
@@ -210,11 +211,124 @@ def download_csv(request, csv_key="output:*"):
         response = HttpResponse(csv_data, content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d")}_output.csv"'
 
-        delete_all_keys()
+        redis_client.delete_all_keys()
         return response
     except Exception as e:
         logger.error(f"Error downloading CSV file: {e}")
         return redirect('home')
+
+
+def process_and_display(session_id, user_id):
+    client = redis_client.get_client()
+    user = Account.objects.get(pk=user_id)
+    first_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
+    last_headers, edit_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, edit=True)
+
+    first_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.HIDDEN.value)
+    last_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.HIDDEN.value)
+    
+    input_keys = client.keys(f"{session_id}-processed:*")
+    format_keys = client.keys(f"{session_id}-formatted:*")
+
+    if not input_keys or not format_keys:
+        logger.warning("No processed or formatted files found.")
+        return {'status': 'error', 'message': '処理されたファイルが見つかりません。'}
+
+    all_input_data, _ = DisplayData.get_list_data(client, input_keys)
+    all_formatted_data, formatted_keys = DisplayData.get_list_data(client, format_keys)
+
+    processed_data = []
+    visible_headers = []
+
+    def process_pair(input_key, format_key):
+        try:
+            if all_input_data and all_formatted_data:
+                input_visible_headers, filtered_input_data = DisplayData.filter_list(
+                    first_headers, first_hidden_headers, all_input_data
+                )
+
+                format_visible_headers, filtered_format_data = DisplayData.filter_list(
+                    last_headers, last_hidden_headers, all_formatted_data
+                )
+
+                if not visible_headers:
+                    visible_headers.extend(input_visible_headers + format_visible_headers)
+
+                if filtered_input_data and filtered_format_data:
+                    combined_data = [
+                        input_row + format_row
+                        for input_row, format_row in zip(filtered_input_data, filtered_format_data)
+                    ]
+                    return combined_data
+                else:
+                    logger.warning(f"Skipping pair due to empty filtered data.")
+            return []
+        except Exception as e:
+            logger.error(f"Error reading or merging data from Redis keys {input_key} and {format_key}: {e}")
+            return []
+
+    max_workers = min(len(input_keys), os.cpu_count() or 1)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(process_pair, input_key, format_key): (input_key, format_key)
+            for input_key, format_key in zip(input_keys, format_keys)
+        }
+        for future in as_completed(futures):
+            try:
+                combined_data = future.result()
+                processed_data.extend(combined_data)
+            except Exception as e:
+                logger.error(f"Error in parallel processing: {e}")
+
+    logger.info("Processed and formatted files combined successfully.")
+    return JsonResponse({
+        'status': "success",
+        'headers': visible_headers,
+        'processed_files': processed_data,
+        'formatted_keys': formatted_keys,
+        'edit_headers': edit_headers
+    }, status=200)
+
+
+def save_format_field(request):
+    client = redis_client.get_client()
+
+    key = request.POST.get('key')
+    field_name = request.POST.get('field_name')
+    field_value = request.POST.get('field_value')
+
+    if not key or not field_name:
+        return JsonResponse({'status': 'error', 'message': 'キーまたはフィールド名が提供されていません。'})
+
+    raw_format_data = client.get(key)
+    if not raw_format_data:
+        return JsonResponse({'status': 'error', 'message': '指定されたキーが見つかりません。'})
+
+    try:
+        format_data = json.loads(raw_format_data.decode('utf-8'))
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
+
+    user = Account.objects.get(pk=request.user.id)
+    header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+
+    if field_name not in header_names:
+        return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
+
+    header_index = header_names.index(field_name)
+
+    if len(format_data) > header_index:
+        format_data[header_index] = field_value
+    else:
+        return JsonResponse({'status': 'error', 'message': 'データの更新中にエラーが発生しました。'})
+    try:
+        redis_client.set(key, json.dumps(format_data))
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'フォーマットデータの更新中にエラーが発生しました: {e}'})
+
+    return JsonResponse({'status': 'success', 'message': 'データが正常に更新されました。'})
+
 
 
 def get_uploaded_files(request):
