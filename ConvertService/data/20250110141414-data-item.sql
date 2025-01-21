@@ -3,5 +3,5 @@ INSERT INTO data_conversion_info (tenant_id, data_convert_id, data_convert_name,
 VALUES ((SELECT id FROM tenant WHERE tenant_id = 'T_001'),
         'C_001', '予約代行業者B用データ変換',
         (SELECT id FROM data_format WHERE data_format_id = 'DF_003'),
-        (SELECT id FROM data_format WHERE data_format_id = 'DF_001'),
+        (SELECT id FROM data_format WHERE data_format_id = 'DF_003'),
         NOW(), NOW());
