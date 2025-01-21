@@ -49,7 +49,7 @@ def import_sql_file(file_path):
             if not command:
                 continue
 
-            if not "INSERT INTO" in command.upper():
+            if not "INSERT INTO" or "UPDATE" in command.upper():
                 logger.warning(f"Skipping command: {command[:50]}...")
                 continue
             try:
