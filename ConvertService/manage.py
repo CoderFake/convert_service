@@ -3,7 +3,7 @@
 import os
 import sys
 
-environment = os.environ.get("ENVIRONMENT", "dev")
+environment = os.environ.get("SERVER_ENV", "dev")
 print(f"INFO: Project load environment: {environment}")
 
 def main():
