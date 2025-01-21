@@ -4,7 +4,7 @@
 ## Quick initialization
 
 - Rename `.env.example ->.env`
-- Rename `.env.example ->.env.stg`
+- Rename `ConvertService/.env.example ->.env.stg`
 - Run command in terminal: 
   ```bash
   $ docker compose -f docker-compose.yml -f staging.yml up -d
