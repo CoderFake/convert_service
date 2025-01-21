@@ -97,18 +97,18 @@ services:
       sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
     networks:
       - arctec_network
-
-  db_test:
-    image: mysql:8.0
-    ports:
-      - "${TEST_DB_EXPORT}:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
-      MYSQL_DATABASE: "${DB_NAME}_test"
-    volumes:
-      - "db_test_volume:/var/lib/mysql"
-      - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
-    command: >
-      sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
-    networks:
-      - arctec_network
+#
+#  db_test:
+#    image: mysql:8.0
+#    ports:
+#      - "${TEST_DB_EXPORT}:3306"
+#    environment:
+#      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+#      MYSQL_DATABASE: "${DB_NAME}_test"
+#    volumes:
+#      - "db_test_volume:/var/lib/mysql"
+#      - ./db/initdb.d/create-db.sh:/docker-entrypoint-initdb.d/create-db.sh
+#    command: >
+#      sh -c "chmod +x /docker-entrypoint-initdb.d/create-db.sh && docker-entrypoint.sh mysqld"
+#    networks:
+#      - arctec_network
