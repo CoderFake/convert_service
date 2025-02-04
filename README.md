@@ -1,7 +1,7 @@
 # P-017_ReservationConvertService
 
 
-## Quick initialization
+## STEP 1: Quick initialization
 
 - Rename `.env.example ->.env`
 - Rename `ConvertService/.env.example ->.env.stg`
@@ -9,7 +9,7 @@
   ```bash
   $ docker compose -f docker-compose.yml -f staging.yml up -d
   ```
-## Import data
+## STEP 2: Import data
 - If you want to add SQL for the settings, please create a new SQL file with the same format as the existing files in the path `ConvertService/data`.
 - If the program has already started, please run the command below to import data:
   ```bash
@@ -29,7 +29,7 @@
   $ docker exec -i ebe python manage.py shell < ConvertService/ImportData.py
   ```
 
-- Note: Do not modify the old file after importing data; add a new sql file to proceed with importing data into the database.
+- **Note**: Do not modify the old file after importing data; add a new sql file to proceed with importing data into the database.
 
 ## Web URL
 In the development environment, access the web at the following URL. Adjust the URL for other environments based on the deployment configuration.
