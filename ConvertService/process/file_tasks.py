@@ -114,7 +114,7 @@ def process_and_format_file(
                     data_dict = json.loads(raw_data.decode('utf-8'))
 
                     if isinstance(data_dict, list):
-                        formatted_dict = {}
+                        formatted_data = []
                         for idx, row in enumerate(data_dict):
                             formatted_row = DataFormatter.format_data_with_rules(
                                 row,
@@ -124,9 +124,9 @@ def process_and_format_file(
                                 after_headers,
                                 tenant_id
                             )
-                            formatted_dict[idx] = formatted_row
+                            formatted_data.append(formatted_row)
                     else:
-                        formatted_dict = {}
+                        formatted_data = []
                         for row_key, row in data_dict.items():
                             formatted_row = DataFormatter.format_data_with_rules(
                                 row,
@@ -136,10 +136,10 @@ def process_and_format_file(
                                 after_headers,
                                 tenant_id
                             )
-                            formatted_dict[row_key] = formatted_row
+                            formatted_data.append(formatted_row)
 
                     formatted_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
-                    client.set(formatted_key, json.dumps(formatted_dict), ex=3600)
+                    client.set(formatted_key, json.dumps(formatted_data), ex=3600)
 
                 except Exception as e:
                     logger.error(f"Error processing key {key}: {e}")
@@ -235,10 +235,10 @@ def generate_zip_task(zip_key, headers, file_format_id):
 
 @shared_task
 def generate_csv_task(csv_key_pattern, headers, file_format_id):
-    lock = threading.Lock()
+
     try:
         client = redis_client.get_client()
-        keys = redis_client.scan_keys(csv_key_pattern)
+        keys = list(redis_client.scan_keys(csv_key_pattern))
 
         if not keys:
             logger.warning("No formatted data found for CSV generation.")
@@ -256,43 +256,49 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
         csv_writer.writerow(headers)
 
-        batch_size = 500
+        buffer_lock = threading.Lock()
+
         max_workers = os.cpu_count() or 1
 
-        def process_batch(batch_keys):
-            batch_data = []
-            for key in batch_keys:
-                try:
-                    data = client.get(key)
-                    if data:
-                        formatted_data = json.loads(data)
-                        client.delete(key)
-                        batch_data.append(formatted_data)
-                except Exception as e:
-                    logger.error(f"Error processing key {key}: {e}")
-            return batch_data
+        def process_rows(key):
+            try:
+                data = client.get(key)
+                if data:
+                    formatted_data = json.loads(data)
+                    client.delete(key)
+                    return formatted_data
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
+                return []
 
-        batches = [keys[i:i + batch_size] for i in range(0, len(keys), batch_size)]
+        def write_row(row):
+            try:
+                if isinstance(row, dict):
+                    return list(row.values())
+                elif isinstance(row, list):
+                    return row
+                else:
+                    logger.warning(f"Invalid row format: {row}")
+                    return None
+            except Exception as e:
+                logger.error(f"Error preparing row for CSV: {e}")
+                return None
+
+        all_rows = []
+        for key in keys:
+            all_rows.extend(process_rows(key))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_batch, batch): batch for batch in batches}
-            for future in as_completed(futures):
+            future_to_row = {executor.submit(write_row, row): row for row in all_rows}
+
+            for future in as_completed(future_to_row):
                 try:
-                    batch_results = future.result()
-                    if batch_results:
-                        with lock:
-                            for row in batch_results:
-                                try:
-                                    if isinstance(row, dict):
-                                        csv_writer.writerow(row.values())
-                                    elif isinstance(row, list):
-                                        csv_writer.writerow(row)
-                                    else:
-                                        logger.warning(f"Invalid row format: {row}")
-                                except Exception as e:
-                                    logger.error(f"Error writing row to CSV: {e}")
+                    processed_row = future.result()
+                    if processed_row is not None:
+                        with buffer_lock:
+                            csv_writer.writerow(processed_row)
                 except Exception as e:
-                    logger.error(f"Error occurred in batch processing: {e}")
+                    logger.error(f"Error writing row to CSV: {e}")
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         client.set(csv_key_name, csv_buffer.getvalue().encode(encoding), ex=3600)
@@ -300,6 +306,4 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
 
     except Exception as e:
         logger.error(f"Critical error generating CSV file: {e}")
-        if lock.locked():
-            lock.release()
         return None
