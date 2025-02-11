@@ -1,4 +1,5 @@
 import datetime
+import os
 import re
 import csv
 import json
@@ -9,6 +10,7 @@ import pandas as pd
 import jaconv
 from PyPDF2 import PdfReader
 from openpyxl import load_workbook
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,24 +44,60 @@ class DisplayData:
             return [], []
 
     @staticmethod
-    def get_list_data(redis_client, keys):
+    def get_list_data(redis_client, keys, hidden_formatted_header):
         try:
-            all_data = []
-            all_key = []
+            visible_indices = [
+                header.get('index_value') for header in hidden_formatted_header
+                if header.get('index_value', False)
+            ]
+
+            result = []
+            max_workers = os.cpu_count() or 4
+
             for key in keys:
                 try:
                     raw_data = redis_client.get(key)
                     if raw_data:
                         data = json.loads(raw_data.decode('utf-8'))
-                        all_data.append(data)
-                        all_key.append(key.decode('utf-8'))
+                        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                            filtered_rows = []
+                            futures = []
+
+                            def remove_columns(row):
+                                indices_to_remove = sorted(visible_indices, reverse=True)
+                                new_row = list(row)
+                                for idx in indices_to_remove:
+                                    if idx < len(new_row):
+                                        new_row.pop(idx)
+                                return new_row
+
+                            for row in data:
+                                futures.append(
+                                    executor.submit(remove_columns, row)
+                                )
+
+                            for future in futures:
+                                try:
+                                    filtered_row = future.result()
+                                    if filtered_row:
+                                        filtered_rows.append(filtered_row)
+                                except Exception as e:
+                                    logger.error(f"Error processing row: {e}")
+                                    continue
+
+                        if filtered_rows:
+                            result.append({
+                                "data": filtered_rows,
+                                "key": key.decode('utf-8')
+                            })
                 except Exception as e:
                     logger.error(f"Error reading formatted data from Redis key {key}: {e}")
-                    return [], []
-            return all_data, all_key
+                    return []
+
+            return result
         except Exception as e:
             logger.error(f"Error combining formatted data: {e}")
-            return [], []
+            return []
 
 
 class FileFormatMapper:
