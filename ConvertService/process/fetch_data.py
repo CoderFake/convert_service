@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class HeaderFetcher:
     @staticmethod
-    def get_headers(user: Account, type_name: str, display: any, edit=False):
+    def get_headers(user: Account, type_name: str, display: any, get_edit_header=False):
         """
         Fetch headers based on type_name and display flag.
         """
@@ -38,33 +38,36 @@ class HeaderFetcher:
 
             data_items = [
                 {
-                    'data_item_name': item.data_item.data_item_name,
-                    'sort_index': item.index_value
+                    'header_name': item.data_item.data_item_name,
+                    'index_value': item.index_value,
+                    'edit_value': item.edit_value,
+                    'format_value': item.format_value
                 }
                 for item in data_item_types
             ]
 
             sorted_headers = sorted(
                 data_items,
-                key=lambda x: (x['sort_index'] is None, x['sort_index'])
+                key=lambda x: (x['index_value'] is None, x['index_value'])
             )
 
-            headers = [item['data_item_name'] for item in sorted_headers]
+            headers = [item['header_name'] for item in sorted_headers]
 
-            if edit:
-                data_item_types = DataItemType.objects.filter(
-                    data_item__tenant_id=tenant_id,
-                    type_name=type_name,
-                    edit_value=True
-                ).select_related('data_item')
-
-                edit_headers = [
+            if get_edit_header:
+                headers = [
                     {
                         'header_name': item.data_item.data_item_name,
                         'format_value': item.format_value,
+                        'edit_value': item.edit_value,
+                        'index_value': item.index_value
                     } for item in data_item_types
                 ]
-                return headers, edit_headers
+                sorted_headers = sorted(
+                    headers,
+                    key=lambda x: (x['index_value'] is None, x['index_value'])
+                )
+
+                return sorted_headers
 
             return headers
 
