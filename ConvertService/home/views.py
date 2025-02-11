@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 def get_processed_files(request):
     try:
         if request.method == "POST":
-            process_and_display(request.session.session_key, request.user.id)
+            return process_and_display(request.session.session_key, request.user.id)
+
         return JsonResponse({'status': 'error', "message": "無効なHTTPメソッドです。"})
     except Exception as e:
         logger.error(f"Error fetching processed files: {e}")
