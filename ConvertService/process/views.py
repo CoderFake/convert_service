@@ -124,7 +124,7 @@ def format_data_processing(request):
     try:
         user = Account.objects.get(pk=request.user.id)
         before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
-        format_headers, edit_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, edit=True)
+        format_headers= HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
         rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
         fixed_values = FixedValueFetcher.get_fixed_values(user)
         
@@ -219,75 +219,47 @@ def download_csv(request, csv_key="output:*"):
 
 
 def process_and_display(session_id, user_id):
-    client = redis_client.get_client()
-    user = Account.objects.get(pk=user_id)
-    first_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
-    last_headers, edit_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, edit=True)
+    try:
+        client = redis_client.get_client()
+        user = Account.objects.get(pk=user_id)
 
-    first_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.HIDDEN.value)
-    last_hidden_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.HIDDEN.value)
-    
-    input_keys = client.keys(f"{session_id}-processed:*")
-    format_keys = client.keys(f"{session_id}-formatted:*")
+        show_formatted_header = HeaderFetcher.get_headers(
+            user,
+            HeaderType.FORMAT.value,
+            DisplayType.SHOW.value,
+            get_edit_header=True
+        )
 
-    if not input_keys or not format_keys:
-        logger.warning("No processed or formatted files found.")
-        return {'status': 'error', 'message': '処理されたファイルが見つかりません。'}
+        hidden_formatted_header = HeaderFetcher.get_headers(
+            user,
+            HeaderType.FORMAT.value,
+            DisplayType.HIDDEN.value,
+            get_edit_header=True
+        )
 
-    all_input_data, _ = DisplayData.get_list_data(client, input_keys)
-    all_formatted_data, formatted_keys = DisplayData.get_list_data(client, format_keys)
+        format_keys = client.keys(f"{session_id}-formatted:*")
 
-    processed_data = []
-    visible_headers = []
+        if not format_keys:
+            logger.warning("No processed or formatted files found.")
+            return JsonResponse({
+                'status': 'error',
+                'message': '処理されたファイルが見つかりません。'
+            }, status=404)
 
-    def process_pair(input_key, format_key):
-        try:
-            if all_input_data and all_formatted_data:
-                input_visible_headers, filtered_input_data = DisplayData.filter_list(
-                    first_headers, first_hidden_headers, all_input_data
-                )
+        processed_data = DisplayData.get_list_data(client, format_keys, hidden_formatted_header)
 
-                format_visible_headers, filtered_format_data = DisplayData.filter_list(
-                    last_headers, last_hidden_headers, all_formatted_data
-                )
+        return JsonResponse({
+            'status': "success",
+            'headers': show_formatted_header,
+            'data': processed_data,
+        }, status=200)
 
-                if not visible_headers:
-                    visible_headers.extend(input_visible_headers + format_visible_headers)
-
-                if filtered_input_data and filtered_format_data:
-                    combined_data = [
-                        input_row + format_row
-                        for input_row, format_row in zip(filtered_input_data, filtered_format_data)
-                    ]
-                    return combined_data
-                else:
-                    logger.warning(f"Skipping pair due to empty filtered data.")
-            return []
-        except Exception as e:
-            logger.error(f"Error reading or merging data from Redis keys {input_key} and {format_key}: {e}")
-            return []
-
-    max_workers = min(len(input_keys), os.cpu_count() or 1)
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(process_pair, input_key, format_key): (input_key, format_key)
-            for input_key, format_key in zip(input_keys, format_keys)
-        }
-        for future in as_completed(futures):
-            try:
-                combined_data = future.result()
-                processed_data.extend(combined_data)
-            except Exception as e:
-                logger.error(f"Error in parallel processing: {e}")
-
-    logger.info("Processed and formatted files combined successfully.")
-    return JsonResponse({
-        'status': "success",
-        'headers': visible_headers,
-        'processed_files': processed_data,
-        'formatted_keys': formatted_keys,
-        'edit_headers': edit_headers
-    }, status=200)
+    except Exception as e:
+        logger.error(f"Error in process_and_display: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 
 def save_format_field(request):
@@ -300,7 +272,13 @@ def save_format_field(request):
     if not key or not field_name:
         return JsonResponse({'status': 'error', 'message': 'キーまたはフィールド名が提供されていません。'})
 
-    raw_format_data = client.get(key)
+    try:
+        input_key = key.split(' ')[0]
+        index = int(key.split(' ')[1])
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': 'キーの解析中にエラーが発生しました。'})
+
+    raw_format_data = client.get(input_key)
     if not raw_format_data:
         return JsonResponse({'status': 'error', 'message': '指定されたキーが見つかりません。'})
 
@@ -311,19 +289,19 @@ def save_format_field(request):
             {'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
 
     user = Account.objects.get(pk=request.user.id)
-    header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+    header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.SHOW.value)
 
     if field_name not in header_names:
         return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
 
     header_index = header_names.index(field_name)
 
-    if len(format_data) > header_index:
-        format_data[header_index] = field_value
+    if len(format_data[index]) > header_index:
+        format_data[index][header_index] = field_value
     else:
         return JsonResponse({'status': 'error', 'message': 'データの更新中にエラーが発生しました。'})
     try:
-        redis_client.set(key, json.dumps(format_data))
+        client.set(input_key, json.dumps(format_data))
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'フォーマットデータの更新中にエラーが発生しました: {e}'})
 
