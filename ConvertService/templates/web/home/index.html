@@ -263,7 +263,7 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
             $(document).ready(function () {
-                let editHeaders = [];
+                let headerInfo = [];
                 function loadProcessedFiles() {
                     $.ajax({
                         url: "{% url 'get_data' %}",
@@ -272,58 +272,74 @@
                             'X-CSRFToken': getCookie('csrftoken'),
                             'Content-Type': 'application/json'
                         },
-                        success: function (response) {
-                            if (response.status === "success") {
-                                const headers = response.headers || [];
-                                const processedFiles = response.processed_files || [];
-                                const formattedKeys = response.formatted_keys || [];
-                                editHeaders = response.edit_headers || [];
+                        success: function(response) {
+                            if (response.status === 'success') {
+                                const processedData = response.data || [];
+                                headerInfo = response.headers || [];
 
-                                if ($.fn.DataTable.isDataTable("#inputData")) {
-                                    $("#inputData").DataTable().destroy();
+                                const table = $("#inputData");
+                                if ($.fn.DataTable.isDataTable(table)) {
+                                    table.DataTable().destroy();
                                 }
 
-                                const thead = $("#inputData thead tr");
-                                thead.empty();
-                                headers.forEach((header) => {
-                                    const isEditable = editHeaders.some(h => h.header_name === header);
-                                    const headerClass = isEditable ? 'bg-success' : '';
-                                    thead.append(`<th class="${headerClass}">${header}</th>`);
+                                const thead = table.find("thead");
+                                if (thead.length === 0) {
+                                    table.prepend("<thead><tr></tr></thead>");
+                                }
+
+                                const headerRow = table.find("thead tr");
+                                headerRow.empty();
+                                headerInfo.forEach(header => {
+                                    const headerClass = header.edit_value ? 'bg-success' : '';
+                                    headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
                                 });
-                                const tbody = $("#inputData tbody");
+                                const tbody = table.find("tbody");
+                                if (tbody.length === 0) {
+                                    table.append("<tbody></tbody>");
+                                }
                                 tbody.empty();
-
-                                processedFiles.forEach((row, rowIndex) => {
-                                    const rowHTML = row.map((cell, cellIndex) => {
-                                        const headerName = headers[cellIndex];
-                                        const editHeader = editHeaders.find(h => h.header_name === headerName);
-
-                                        const cellClass = editHeader
-                                            ? (editHeader.format_value === 'date' ? 'row-date'
-                                              : editHeader.format_value === 'time' ? 'row-time'
-                                              : '')
-                                            : '';
-
-                                        return `<td class="${cellClass} ${headerName}">${cell || ''}</td>`;
-                                    }).join('');
-
-                                    const formattedKey = formattedKeys[rowIndex] || '';
-                                    tbody.append(`<tr data-index="${formattedKey}">${rowHTML}</tr>`);
+                                processedData.forEach(dataSet => {
+                                    if (dataSet.data && Array.isArray(dataSet.data)) {
+                                        dataSet.data.forEach((row, index) => {
+                                            const rowKey = `${dataSet.key} ${index}`;
+                                            const rowHTML = row.map((cell, cellIndex) => {
+                                                const header = headerInfo[cellIndex];
+                                                const cellClass = header?.edit_value
+                                                    ? header.format_value === 'date' ? 'row-date'
+                                                    : header.format_value === 'time' ? 'row-time'
+                                                    : ''
+                                                    : '';
+                                                return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
+                                            }).join('');
+                                            tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
+                                        });
+                                    }
                                 });
 
-                                initDataTable($("#inputData"));
+                                if (headerInfo.length > 0) {
+                                    try {
+                                        initDataTable(table);
+                                    } catch (error) {
+                                        console.error('DataTable initialization error:', error);
+                                        createToast("error", "テーブルの初期化中にエラーが発生しました。");
+                                    }
+                                }
                             } else {
-                                createToast("error", response.message);
+                                createToast("error", response.message || "データの取得に失敗しました。");
                             }
                         },
                         error: function (error) {
-                            createToast(error.status, "エラーが発生しました。データを取得できませんでした。");
+                            createToast("error", "エラーが発生しました。データを取得できませんでした。");
                         }
                     });
                 }
 
                 function initDataTable(idTable) {
-                    idTable.DataTable({
+                    if ($.fn.DataTable.isDataTable(idTable)) {
+                        idTable.DataTable().destroy();
+                    }
+
+                    return idTable.DataTable({
                         scrollY: "200px",
                         scrollX: true,
                         scrollCollapse: true,
@@ -336,9 +352,9 @@
                             {
                                 targets: '_all',
                                 className: 'dt-center',
-                                orderable: false,
-                                render: function (data, type, row) {
-                                    return `<div class="truncate-text" title="${data}">${data}</div>`;
+                                render: function(data, type, row) {
+                                    const displayData = data || '';
+                                    return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
                                 }
                             }
                         ],
@@ -347,7 +363,7 @@
                         },
                         fixedHeader: true,
                         autoWidth: true,
-                        initComplete: function () {
+                        initComplete: function(settings, json) {
                             this.api().columns.adjust();
                         }
                     });
@@ -367,14 +383,6 @@
                     $('#inputData tbody tr').removeClass('active-row');
                     $(this).addClass('active-row');
 
-                    const headers = $('#inputData thead th').map(function () {
-                        return $(this).text();
-                    }).get();
-
-                    const headerClasses = $('#inputData thead th').map(function () {
-                        return $(this).hasClass('bg-success');
-                    }).get();
-
                     const cells = $(this).find('td').map(function () {
                         return $(this).text();
                     }).get();
@@ -389,27 +397,26 @@
                     let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
                     let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
 
-                    let nonBgSuccessHeaders = [];
-                    let bgSuccessHeaders = [];
-                    headers.forEach((header, index) => {
-                        if (!headerClasses[index]) {
-                            nonBgSuccessHeaders.push({ header, cell: cells[index] });
+                    let nonEditHeaders = [];
+                    let editHeaders = [];
+                    headerInfo.forEach((header, index) => {
+                        if (!header.edit_value) {
+                            nonEditHeaders.push({ header: header.header_name, cell: cells[index] });
                         } else {
-                            bgSuccessHeaders.push({ header, cell: cells[index] });
+                            editHeaders.push({ header: header.header_name, cell: cells[index], format: header.format_value });
                         }
                     });
-                    const midpoint = Math.ceil(nonBgSuccessHeaders.length / 2);
-                    nonBgSuccessHeaders.forEach((item, index) => {
+
+                    const midpoint = Math.ceil(nonEditHeaders.length / 2);
+                    nonEditHeaders.forEach((item, index) => {
                         let content;
                         const regex = /第\d+希望日付/;
-                        if (regex.test(item.header)  && item.cell) {
+                        if (regex.test(item.header) && item.cell) {
                             content = `
                                 <div class="mb-3 d-flex align-items-center w-100 position-relative">
                                     <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
-
                                     <input type="radio" name="preferred-date" class="position-absolute">
                                     <input type="text" class="form-control bg-white pl-4" value="${item.cell || ''}" readonly>
-
                                 </div>
                             `;
                         } else {
@@ -426,13 +433,11 @@
                             colLeft2 += content;
                         }
                     });
-                    bgSuccessHeaders.forEach((item) => {
-                        const editHeader = editHeaders.find(h => h.header_name === item.header);
-                        const cellClass = editHeader
-                            ? (editHeader.format_value === 'date' ? 'date-picker'
-                              : editHeader.format_value === 'time' ? 'time-picker'
-                              : '')
-                            : '';
+
+                    editHeaders.forEach((item) => {
+                        const cellClass = item.format === 'date' ? 'date-picker'
+                                       : item.format === 'time' ? 'time-picker'
+                                       : '';
                         let content = `
                             <div class="mb-3 d-flex align-items-center w-100">
                                 <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
@@ -441,6 +446,7 @@
                         `;
                         colRight += content;
                     });
+
                     colLeft1 += '</div>';
                     colLeft2 += '</div>';
                     colRight += '</div>';
