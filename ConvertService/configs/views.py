@@ -1,7 +1,10 @@
+from django.contrib import messages
 from django.db import transaction
+from django.db.models import F
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 
 from configs.models import ConvertRule
 from home.models import FileFormat, DataItemType, DataItem, DataFormat, DetailedInfo, DataConversionInfo
@@ -119,7 +122,8 @@ def rule_settings(request):
                 if detail_info:
                     detail_info.convert_rule = rule
                     detail_info.save()
-                    return JsonResponse({"status": "success", "message": "Rule updated successfully!"}, status=200)
+                    messages.success(request, "Rule updated successfully!")
+                    return redirect('rule_settings')
 
                 DetailedInfo.objects.create(
                     tenant=tenant,
@@ -128,27 +132,34 @@ def rule_settings(request):
                     data_item_id_after=data_item_format,
                     convert_rule=rule,
                 )
-
-            return JsonResponse({"status": "success", "message": "Rule saved successfully!"}, status=200)
+                messages.success(request, "Rule saved successfully!")
+                return redirect('rule_settings')
 
         except DataItem.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "Data item not found."}, status=404)
+            messages.error(request, "Data item not found.")
+            return redirect('rule_settings')
         except ConvertRule.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "Convert rule not found."}, status=404)
+            messages.error(request, "Convert rule not found.")
+            return redirect('rule_settings')
         except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+            messages.error(request, str(e))
+            return redirect('rule_settings')
 
     data_inputs = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
         data_item_types__type_name=HeaderType.FORMAT.value
-    )
+    ).annotate(
+        index_value=F('data_item_types__index_value')
+    ).order_by('index_value')
 
     data_formats = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
-        data_item_types__type_name=HeaderType.AFTER.value
-    )
+        data_item_types__type_name=HeaderType.BEFORE.value
+    ).annotate(
+        index_value=F('data_item_types__index_value')
+    ).order_by('index_value')
 
     rule_list = ConvertRule.objects.all()
 
