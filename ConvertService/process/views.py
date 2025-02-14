@@ -14,6 +14,7 @@ from process.fetch_data import (
     DisplayType,
     FixedValueFetcher
 )
+from .data_type import DownloadType
 from .file_tasks import (
     process_and_format_file,
     process_multiple_files_task,
@@ -123,7 +124,7 @@ def format_data_processing(request):
 
     try:
         user = Account.objects.get(pk=request.user.id)
-        before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
+        before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value, get_edit_header=True)
         format_headers= HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
         rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
         fixed_values = FixedValueFetcher.get_fixed_values(user)
@@ -175,15 +176,25 @@ def download_zip(request, zip_key="formatted:*"):
 
 
 @login_required
-def download_csv(request, csv_key="output:*"):
+def download(request, download_type=DownloadType.SYSTEM.value):
+
+    if download_type not in [down_type.value for down_type in DownloadType]:
+        messages.error(request, '無効なダウンロードタイプです。')
+        return redirect('home')
+
     try:
         client = redis_client.get_client()
 
         user = Account.objects.get(pk=request.user.id)
+        if download_type  == DownloadType.SYSTEM.value:
+            format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.SHOW.value, get_edit_header=True)
+            output_headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.ALL.value)
+            rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.AFTER.value)
+        else:
+            format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value, get_edit_header=True)
+            output_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
+            rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.BEFORE.value)
 
-        format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
-        output_headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.ALL.value)
-        rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.AFTER.value)
         file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
         fixed_values = FixedValueFetcher.get_fixed_values(user)
@@ -198,7 +209,7 @@ def download_csv(request, csv_key="output:*"):
             type_keys="formatted:*"
         )
 
-        csv_key = generate_csv_task(f"{request.session.session_key}-{csv_key}", output_headers, file_format)
+        csv_key = generate_csv_task(f"{request.session.session_key}-output:*", output_headers, file_format)
 
         if not csv_key:
             return redirect('home')
@@ -306,7 +317,6 @@ def save_format_field(request):
         return JsonResponse({'status': 'error', 'message': f'フォーマットデータの更新中にエラーが発生しました: {e}'})
 
     return JsonResponse({'status': 'success', 'message': 'データが正常に更新されました。'})
-
 
 
 def get_uploaded_files(request):
