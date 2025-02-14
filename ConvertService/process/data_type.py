@@ -12,3 +12,8 @@ class DisplayType(enum.Enum):
     HIDDEN = False
     ALL = None
 
+
+class DownloadType(enum.Enum):
+    SYSTEM = 'system'
+    AGENCY = 'agency'
+
