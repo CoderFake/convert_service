@@ -230,8 +230,9 @@
                         </div>
                     </div>
                 </div>
-                <div class="export position-fixed w-60">
-                    <button class="btn btn-export btn-primary border-0">基幹システム取り込みファイル出力</button>
+                <div class="export position-fixed d-flex flex-column w-60">
+                    <button id="system-csv" class="btn btn-export btn-primary m-0 mb-3 border-0">健診システム取り込みデータCSV出力</button>
+                    <button id="agency-csv" class="btn btn-export btn-primary m-0 border-0">予約代行業者取り込みデータCSV出力</button>
                 </div>
 
             {% endif %}
@@ -372,12 +373,16 @@
                 loadProcessedFiles();
 
                 $(".btn-export").on('click', function () {
-                    window.location.href = "{% url 'download_csv' 'output:*' %}";
-                    setInterval(function () {
-                        window.location.href = "{% url 'home' %}";
-                    }, 1000)
-                })
+                    if (this.attributes.id.value === 'system-csv') {
+                        window.location.href = "{% url 'download' 'system' %}";
+                    } else {
+                        window.location.href = "{% url 'download' 'agency' %}";
+                    }
 
+                    setTimeout(function () {
+                        window.location.href = "{% url 'home' %}";
+                    }, 1000);
+                });
 
                 $('#inputData').on('click', 'tbody tr', function () {
                     $('#inputData tbody tr').removeClass('active-row');
