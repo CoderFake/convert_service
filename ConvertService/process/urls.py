@@ -8,6 +8,6 @@ urlpatterns = [
     path('process-headers/', views.process_headers, name='process_headers'),
     path('file-format/', views.format_data_processing, name='format_data_processing'),
     path('download-zip/<str:zip_key>/', views.download_zip, name='download_zip'),
-    path('download-csv/<str:csv_key>/', views.download_csv, name='download_csv'),
+    path('download/<str:download_type>/', views.download, name='download'),
 
 ]
