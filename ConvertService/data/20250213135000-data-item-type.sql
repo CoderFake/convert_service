@@ -1,0 +1,25 @@
+INSERT INTO data_item_type (type_name, index_value, display, edit_value, format_value, data_item_id) VALUES
+('format', 35, 0, 0, 'string', 2),
+('format', 36, 0, 0, 'string', 3),
+('format', 37, 0, 0, 'string', 4),
+('format', 38, 0, 0, 'string', 14),
+('format', 39, 0, 0, 'string', 15),
+('format', 40, 0, 0, 'string', 16),
+('format', 41, 0, 0, 'string', 17),
+('format', 42, 0, 0, 'string', 18),
+('format', 43, 0, 0, 'string', 19),
+('format', 44, 0, 0, 'string', 20),
+('format', 45, 0, 0, 'string', 21),
+('format', 46, 0, 0, 'string', 22),
+('format', 47, 0, 0, 'string', 23),
+('format', 48, 0, 0, 'string', 24),
+('format', 49, 0, 0, 'string', 25),
+('format', 50, 0, 0, 'string', 26),
+('format', 51, 0, 0, 'string', 27),
+('format', 52, 0, 0, 'string', 28),
+('format', 53, 0, 0, 'string', 47),
+('format', 54, 0, 0, 'string', 49),
+('format', 55, 0, 0, 'string', 50),
+('format', 56, 0, 0, 'string', 51);
+
+UPDATE data_item_type SET index_value = 57 WHERE data_item_id = 148 and type_name = 'format';
