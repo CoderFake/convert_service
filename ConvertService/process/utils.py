@@ -351,13 +351,18 @@ class DataFormatter:
 
         try:
             mapped_row = [""] * len(after_headers)
+            before_indices = [h['index_value'] for h in before_headers]
+
             for rule_id, idx_before, idx_after in rules:
                 if idx_after < len(after_headers):
                     if idx_before < len(row):
-                        mapped_row[idx_after] = row[idx_before]
+                        value = row[idx_before]
+                        if idx_before in before_indices:
+                            mapped_row[idx_after] = value
+                        else:
+                            mapped_row[idx_after] = ""
                     else:
                         mapped_row[idx_after] = ""
-
 
             for rule_id, idx_before, idx_after in rules:
                 if idx_after < len(mapped_row):
