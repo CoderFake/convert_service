@@ -1,7 +1,7 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} Dashboard {% endblock title %}
+{% block title %} Rule Settings {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
@@ -22,7 +22,7 @@
                                 <select class="form-select" id="data_item_input" name="data_item_input">
                                     <option value="0">Select Data Item</option>
                                     {% for data_item in data_inputs %}
-                                        <option value="{{ data_item.id }}">{{ data_item.data_item_name }}</option>
+                                        <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -32,7 +32,7 @@
                                 <select class="form-select" id="data_item_format" name="data_item_format">
                                     <option value="0">Select Data Item</option>
                                     {% for data_item in data_formats %}
-                                        <option value="{{ data_item.id }}">{{ data_item.data_item_name }}</option>
+                                        <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -58,21 +58,14 @@
     </div>
 {% endblock content %}
 
-{% block scripts %}
+{% block javascripts %}
     <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
     <script>
         $(document).ready(function () {
-            $('#process-items').submit(function (e) {
-                e.preventDefault();
-                $.ajax({
-                    type: 'POST',
-                    url: '{% url 'rule_settings' %}',
-                    data: $(this).serialize(),
-                    success: function (response) {
-                        console.log(response);
-                    }
-                });
+            $('.alert-dismissible').each(function() {
+                createToast($(this).find('.message-tag').text(), $(this).find('.message').text());
+                $(this).remove();
             });
-        });
+        })
     </script>
-{% endblock scripts %}
+{% endblock javascripts %}
