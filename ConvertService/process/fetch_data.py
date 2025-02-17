@@ -107,51 +107,47 @@ class FileFormatFetcher:
 
 
 class RuleFetcher:
-
     @staticmethod
     def get_rules(user: Account, before_type: str, after_type: str):
         try:
             tenant_id = user.tenant.id if user.tenant else 1
 
-            data_convert_id = DataConversionInfo.objects.filter(
+            data_convert = DataConversionInfo.objects.filter(
                 tenant_id=tenant_id
-            ).values_list('data_convert_id', flat=True).first()
+            ).first()
 
-            if not data_convert_id:
-                raise ValueError("No data_convert_id found for this tenant.")
+            if not data_convert:
+                raise ValueError("No data conversion found for this tenant.")
 
             detailed_infos = DetailedInfo.objects.filter(
-                data_convert__data_convert_id=data_convert_id
-            ).select_related('data_item_id_before', 'data_item_id_after', 'convert_rule')
+                tenant_id=tenant_id,
+                data_convert=data_convert,
+                data_item_type_id_before__type_name=before_type,
+                data_item_type_id_after__type_name=after_type
+            ).select_related(
+                'data_item_type_id_before',
+                'data_item_type_id_after',
+                'convert_rule'
+            )
 
-            results = []
-            for detail in detailed_infos:
-
-                before_item_type = DataItemType.objects.filter(
-                    data_item__data_item_id=detail.data_item_id_before.data_item_id,
-                    type_name=before_type
-                ).first()
-
-                after_item_type = DataItemType.objects.filter(
-                    data_item__data_item_id=detail.data_item_id_after.data_item_id,
-                    type_name=after_type
-                ).first()
-
-                if not before_item_type or not after_item_type:
-                    continue
-
-                results.append({
+            results = [
+                {
                     'convert_rule_id': detail.convert_rule.convert_rule_id,
-                    'index_before': before_item_type.index_value,
-                    'index_after': after_item_type.index_value
-                })
+                    'index_before': detail.data_item_type_id_before.index_value,
+                    'index_after': detail.data_item_type_id_after.index_value
+                }
+                for detail in detailed_infos
+            ]
 
             sorted_results = sorted(
                 results,
                 key=lambda x: (x['index_after'] is None, x['index_after'])
             )
 
-            return [[item['convert_rule_id'], item['index_before'], item['index_after']] for item in sorted_results]
+            return [
+                [item['convert_rule_id'], item['index_before'], item['index_after']]
+                for item in sorted_results
+            ]
 
         except Exception as e:
             logger.error(f"Error fetching conversion rules: {e}")
