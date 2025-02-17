@@ -80,23 +80,6 @@ class DataConversionInfo(models.Model):
         return self.data_convert_name
 
 
-class DetailedInfo(models.Model):
-    id = models.AutoField(primary_key=True)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    data_convert = models.ForeignKey(DataConversionInfo, on_delete=models.CASCADE)
-    data_item_id_before = models.ForeignKey(DataItem, related_name='before', on_delete=models.CASCADE)
-    data_item_id_after = models.ForeignKey(DataItem, related_name='after', on_delete=models.CASCADE)
-    convert_rule = models.ForeignKey(ConvertRule, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "detailed_info"
-
-    def __str__(self):
-        return f"Detail for {self.data_convert}"
-
-
 class DataItemType(models.Model):
 
     class TypeName(models.TextChoices):
@@ -132,4 +115,21 @@ class DataItemType(models.Model):
     @staticmethod
     def get_all_format_values():
         return [{"value": choice[0], "display": choice[1]} for choice in DataItemType.FormatValue.choices]
+
+
+class DetailedInfo(models.Model):
+    id = models.AutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    data_convert = models.ForeignKey(DataConversionInfo, on_delete=models.CASCADE)
+    data_item_type_id_before = models.ForeignKey(DataItemType, related_name='before', on_delete=models.CASCADE, null=True, blank=True)
+    data_item_type_id_after = models.ForeignKey(DataItemType, related_name='after', on_delete=models.CASCADE,  null=True, blank=True)
+    convert_rule = models.ForeignKey(ConvertRule, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "detailed_info"
+
+    def __str__(self):
+        return f"Detail for {self.data_convert}"
 
