@@ -14,7 +14,7 @@ from process.fetch_data import HeaderType
 @login_required
 def configs(request):
     format_list =  list(FileFormat.objects.all())
-    return render(request, 'web/ settings/index.html', {'format_list': format_list})
+    return render(request, 'web/settings/index.html', {'format_list': format_list})
 
 
 def remove_bom(header_name):
@@ -98,6 +98,31 @@ def save_data_item(request):
 
 @login_required
 def rule_settings(request):
+    input = request.GET.get('before', 'input')
+    output = request.GET.get('after', 'output')
+
+    if input == HeaderType.BEFORE.value:
+        data_input = HeaderType.BEFORE.value
+    elif input == HeaderType.FORMAT.value:
+        data_input = HeaderType.FORMAT.value
+    else:
+        messages.error(request, "Data not found.")
+        return redirect(f"{reverse('rule_settings')}?before=input&after=format")
+
+    data_output = HeaderType.FORMAT.value
+    if output == HeaderType.BEFORE.value:
+        if input == HeaderType.FORMAT.value:
+            data_output = HeaderType.BEFORE.value
+        else:
+            messages.error(request, "Data not found.")
+            return redirect(f"{reverse('rule_settings')}?before=input&after=format")
+    elif output == HeaderType.AFTER.value:
+        if input == HeaderType.FORMAT.value:
+            data_output = HeaderType.AFTER.value
+        else:
+            messages.error(request, "Data not found.")
+            return redirect(f"{reverse('rule_settings')}?before=format&after=output")
+
     if request.method == "POST":
         try:
             with transaction.atomic():
@@ -110,45 +135,61 @@ def rule_settings(request):
                 rule = ConvertRule.objects.get(id=rule_id)
                 data_item_input = DataItem.objects.get(id=data_item_input_id, tenant=tenant)
                 data_item_format = DataItem.objects.get(id=data_item_format_id, tenant=tenant)
-                data_convert = DataConversionInfo.objects.filter(tenant=tenant, data_convert_id="C_001").first()
+                data_convert = DataConversionInfo.objects.filter(
+                    tenant=tenant,
+                    data_convert_id="C_001"
+                ).first()
+
+                data_item_type_before = DataItemType.objects.get(
+                    data_item=data_item_input,
+                    type_name=data_input
+                )
+
+                data_item_type_after = DataItemType.objects.get(
+                    data_item=data_item_format,
+                    type_name=data_output
+                )
 
                 detail_info = DetailedInfo.objects.filter(
                     tenant=tenant,
                     data_convert=data_convert,
-                    data_item_id_before=data_item_input,
-                    data_item_id_after=data_item_format,
+                    data_item_type_id_before=data_item_type_before,
+                    data_item_type_id_after=data_item_type_after,
                 ).first()
 
                 if detail_info:
                     detail_info.convert_rule = rule
                     detail_info.save()
                     messages.success(request, "Rule updated successfully!")
-                    return redirect('rule_settings')
+                    return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
 
                 DetailedInfo.objects.create(
                     tenant=tenant,
                     data_convert=data_convert,
-                    data_item_id_before=data_item_input,
-                    data_item_id_after=data_item_format,
+                    data_item_type_id_before=data_item_type_before,
+                    data_item_type_id_after=data_item_type_after,
                     convert_rule=rule,
                 )
                 messages.success(request, "Rule saved successfully!")
-                return redirect('rule_settings')
+                return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
 
         except DataItem.DoesNotExist:
             messages.error(request, "Data item not found.")
-            return redirect('rule_settings')
+            return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
+        except DataItemType.DoesNotExist:
+            messages.error(request, "Data item type not found.")
+            return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
         except ConvertRule.DoesNotExist:
             messages.error(request, "Convert rule not found.")
-            return redirect('rule_settings')
+            return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
         except Exception as e:
             messages.error(request, str(e))
-            return redirect('rule_settings')
+            return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
 
     data_inputs = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
-        data_item_types__type_name=HeaderType.FORMAT.value
+        data_item_types__type_name=data_input
     ).annotate(
         index_value=F('data_item_types__index_value')
     ).order_by('index_value')
@@ -156,7 +197,7 @@ def rule_settings(request):
     data_formats = DataItem.objects.filter(
         data_format__data_format_id="DF_003",
         tenant=request.user.tenant,
-        data_item_types__type_name=HeaderType.BEFORE.value
+        data_item_types__type_name=data_output
     ).annotate(
         index_value=F('data_item_types__index_value')
     ).order_by('index_value')
@@ -164,9 +205,9 @@ def rule_settings(request):
     rule_list = ConvertRule.objects.all()
 
     context = {
-        "data_inputs": data_inputs,
-        "data_formats": data_formats,
-        "rules": rule_list
+        'data_inputs': data_inputs,
+        'data_formats': data_formats,
+        'rules': rule_list,
     }
 
-    return render(request, 'web/ settings/rule_settings.html', context)
+    return render(request, 'web/settings/rule_settings.html', context)
