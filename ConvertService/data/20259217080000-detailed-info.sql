@@ -77,7 +77,7 @@ INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert
 (NOW(), NOW(), 2, 1, 1, 22, 23),
 (NOW(), NOW(), 2, 1, 1, 24, 91),
 (NOW(), NOW(), 1, 1, 1, 25, 92),
-(NOW(), NOW(), 11, 1, 1, 26, 92),
+(NOW(), NOW(), 1, 1, 1, 26, 92),
 (NOW(), NOW(), 1, 1, 1, 39, 40),
 (NOW(), NOW(), 1, 1, 1, 41, 42),
 (NOW(), NOW(), 1, 1, 1, 43, 44),
