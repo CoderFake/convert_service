@@ -80,7 +80,6 @@ def process_multiple_files_task(session_id, headers, file_format=None, mode='dic
 @shared_task
 def process_and_format_file(
     session_id,
-    fixed_values,
     rules,
     before_headers,
     after_headers,
@@ -118,7 +117,6 @@ def process_and_format_file(
                         for idx, row in enumerate(data_dict):
                             formatted_row = DataFormatter.format_data_with_rules(
                                 row,
-                                fixed_values,
                                 rules,
                                 before_headers,
                                 after_headers,
@@ -130,7 +128,6 @@ def process_and_format_file(
                         for row_key, row in data_dict.items():
                             formatted_row = DataFormatter.format_data_with_rules(
                                 row,
-                                fixed_values,
                                 rules,
                                 before_headers,
                                 after_headers,

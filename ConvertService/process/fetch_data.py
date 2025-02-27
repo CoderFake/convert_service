@@ -1,3 +1,4 @@
+from functools import lru_cache
 from accounts.models import Account
 from .data_type import HeaderType, DisplayType
 from configs.models import ConvertDataValue
@@ -154,18 +155,54 @@ class RuleFetcher:
             return []
 
 
+class RuleFixedID:
+    CR_GROUP_NO = "CR_GROUP_NO"
+    CR_TIME_CODE1 = "CR_TIME_CODE1"
+    CR_TIME_CODE2 = "CR_TIME_CODE2"
+    CR_CAUSE_CODE1 = "CR_CAUSE_CODE1"
+    CR_TIME_START = "CR_TIME_START"
+    CR_TIME_END = "CR_TIME_END"
+
+    @classmethod
+    def get_data(cls):
+        return {
+            attr: value for attr, value in cls.__dict__.items()
+            if not attr.startswith('__') and not callable(getattr(cls, attr))
+        }
+
+    @classmethod
+    def get_values(cls):
+        return [
+            value for attr, value in cls.__dict__.items()
+            if not attr.startswith('__') and not callable(getattr(cls, attr))
+        ]
+
+
 class FixedValueFetcher:
 
     @staticmethod
-    def get_fixed_values(user: Account):
+    @lru_cache(maxsize=128)
+    def _get_mapping_for_rule(tenant_id, rule_fixed_id):
         try:
-            tenant_id = user.tenant.id if user.tenant else 1
-            fixed_values = ConvertDataValue.objects.filter(tenant_id=tenant_id).values(
-                "data_value_before", "data_value_after"
-            )
+            fixed_values = ConvertDataValue.objects.filter(
+                tenant_id=tenant_id,
+                convert_rule_id=rule_fixed_id
+            ).values_list("data_value_before", "data_value_after")
 
-            return list(fixed_values)
+            return {f"{before}": after for before, after in fixed_values}
 
         except Exception as e:
-            logger.error(f"Error fetching fixed values: {e}")
-            return []
+            logger.error(f"Error fetching fixed values for rule {rule_fixed_id}: {e}")
+            return {}
+
+    @classmethod
+    def get_value_mapping(cls, tenant_id, rule_fixed_id, before_value=None):
+        mapping = cls._get_mapping_for_rule(tenant_id, rule_fixed_id)
+
+        if before_value is not None:
+            return mapping.get(f"{before_value}", '')
+        return mapping
+
+    @classmethod
+    def clear_cache(cls):
+        cls._get_mapping_for_rule.cache_clear()

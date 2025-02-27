@@ -127,11 +127,9 @@ def format_data_processing(request):
         before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value, get_edit_header=True)
         format_headers= HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
         rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
-        fixed_values = FixedValueFetcher.get_fixed_values(user)
         
         process_and_format_file.run(
             request.session.session_key,
-            fixed_values,
             rules,
             before_headers,
             format_headers,
@@ -197,11 +195,8 @@ def download(request, download_type=DownloadType.SYSTEM.value):
 
         file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
-        fixed_values = FixedValueFetcher.get_fixed_values(user)
-
         process_and_format_file.run(
             request.session.session_key,
-            fixed_values,
             rules,
             format_headers,
             output_headers,

@@ -12,6 +12,7 @@ from PyPDF2 import PdfReader
 from openpyxl import load_workbook
 from concurrent.futures import ThreadPoolExecutor
 import logging
+from .fetch_data import RuleFixedID, FixedValueFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -318,11 +319,13 @@ class FileProcessor:
         return data
 
 
-
 class DataFormatter:
     """
     A class to perform various data transformations and file formatting tasks.
     """
+    class RuleFixedMapping(RuleFixedID):
+        pass
+
     RULE_MAPPING = {
         "CR_NOT_CHANGE": lambda value: value,
         "CR_DATE1": lambda value: DataFormatter.convert_date(value, '%Y/%m/%d'),
@@ -337,7 +340,6 @@ class DataFormatter:
 
     @staticmethod
     def apply_rule(value, rule_id):
-
         try:
             rule_function = DataFormatter.RULE_MAPPING.get(rule_id, lambda v: v)
             transformed_value = rule_function(value)
@@ -347,8 +349,7 @@ class DataFormatter:
             return value
 
     @staticmethod
-    def format_data_with_rules(row, fixed_values, rules, before_headers, after_headers, tenant_id):
-
+    def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
         try:
             mapped_row = [""] * len(after_headers)
             before_indices = [h['index_value'] for h in before_headers]
@@ -366,9 +367,9 @@ class DataFormatter:
 
             for rule_id, idx_before, idx_after in rules:
                 if idx_after < len(mapped_row):
-                    if rule_id == "CR_FIXED_VALUE":
+                    if rule_id in [rule for rule in DataFormatter.RuleFixedMapping.__dict__.values()]:
                         mapped_row[idx_after] = DataFormatter.convert_fixed_value(
-                            fixed_values, mapped_row[idx_after], tenant_id
+                            mapped_row[idx_after], rule_id, tenant_id
                         )
                     else:
                         mapped_row[idx_after] = DataFormatter.apply_rule(
@@ -382,20 +383,16 @@ class DataFormatter:
             return []
 
     @staticmethod
-    def convert_fixed_value(fixed_values, value, tenant_id):
-        """
-        Convert the value based on fixed rules stored in fixed_values.
-        If the value exists in data_value_before, map it to data_value_after.
-        """
+    def convert_fixed_value(value, rule_id, tenant_id):
         try:
-            for fixed_value in fixed_values:
-                if fixed_value["data_value_before"] == value:
-                    return fixed_value["data_value_after"]
+            after_value = FixedValueFetcher.get_value_mapping(tenant_id, rule_id, value)
 
-            return value
+            return after_value if after_value else value
+
         except Exception as e:
-            logger.error(f"Error in convert_fixed_value for tenant {tenant_id}: {value} -> {e}")
+            logger.error(f"Error in convert_fixed_value for rule {rule_id}, tenant {tenant_id}: {value} -> {e}")
             return value
+
 
     @staticmethod
     def convert_date(value, target_format='%Y/%m/%d'):
