@@ -295,7 +295,7 @@ def save_format_field(request):
             {'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
 
     user = Account.objects.get(pk=request.user.id)
-    header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.SHOW.value)
+    header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
 
     if field_name not in header_names:
         return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
