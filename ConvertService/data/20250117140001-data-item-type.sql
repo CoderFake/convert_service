@@ -84,7 +84,7 @@ INSERT INTO data_item_type (type_name, index_value, display, edit_value, format_
 ('input', 50, 0, 0, 'string', 51),
 ('format', 29, 1, 1, 'string', 52),
 ('output', 0, 1, 0, 'string', 52),
-('format', 30, 1, 1, 'string', 53),
+('format', 30, 0, 0, 'string', 53),
 ('output', 5, 1, 0, 'string', 53),
 ('format', 31, 1, 1, 'string', 54),
 ('output', 29, 1, 0, 'string', 54),
