@@ -349,6 +349,10 @@ class DataFormatter:
             return value
 
     @staticmethod
+    def is_fixed_rule(rule_id):
+        return rule_id in DataFormatter.RuleFixedMapping.get_values()
+
+    @staticmethod
     def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
         try:
             mapped_row = [""] * len(after_headers)
@@ -367,7 +371,7 @@ class DataFormatter:
 
             for rule_id, idx_before, idx_after in rules:
                 if idx_after < len(mapped_row):
-                    if rule_id in [rule for rule in DataFormatter.RuleFixedMapping.__dict__.values()]:
+                    if DataFormatter.is_fixed_rule(rule_id):
                         mapped_row[idx_after] = DataFormatter.convert_fixed_value(
                             mapped_row[idx_after], rule_id, tenant_id
                         )
