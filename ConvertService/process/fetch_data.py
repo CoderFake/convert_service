@@ -166,15 +166,17 @@ class RuleFixedID:
     @classmethod
     def get_data(cls):
         return {
-            attr: value for attr, value in cls.__dict__.items()
+            attr: getattr(cls, attr) for attr in dir(cls)
             if not attr.startswith('__') and not callable(getattr(cls, attr))
+            and attr.isupper()
         }
 
     @classmethod
     def get_values(cls):
         return [
-            value for attr, value in cls.__dict__.items()
+            getattr(cls, attr) for attr in dir(cls)
             if not attr.startswith('__') and not callable(getattr(cls, attr))
+            and attr.isupper()
         ]
 
 
@@ -186,7 +188,7 @@ class FixedValueFetcher:
         try:
             fixed_values = ConvertDataValue.objects.filter(
                 tenant_id=tenant_id,
-                convert_rule_id=rule_fixed_id
+                convert_rule__convert_rule_id=rule_fixed_id
             ).values_list("data_value_before", "data_value_after")
 
             return {f"{before}": after for before, after in fixed_values}
