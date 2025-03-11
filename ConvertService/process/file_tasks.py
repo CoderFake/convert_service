@@ -21,10 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def process_multiple_files_task(session_id, headers, file_format=None, mode='dict'):
+def process_multiple_files_task(session_id, headers):
+
     try:
         client = redis_client.get_client()
-        redis_client.delete_key_batch(f'{session_id}-processed:*')
+        redis_client.delete_key_batch(client.keys(f'{session_id}-processed:*'))
 
         keys = client.keys(f'{session_id}-file:*')
         if not keys:
@@ -36,22 +37,16 @@ def process_multiple_files_task(session_id, headers, file_format=None, mode='dic
         def process_and_convert(file_path, key, file_index):
             try:
                 file_path = Path(file_path)
-                if mode == 'csv':
-                    output_csv_path = file_path.with_suffix('.csv')
-                    FileProcessor.process_file(file_path, headers, mode, file_format)
-                    client.delete(key)
-                    return {'type': 'csv', 'result': str(output_csv_path)}
-                elif mode == 'dict':
-                    result_dict = FileProcessor.process_file(file_path, headers, mode, file_format)
+                result_dict = FileProcessor.process_file(file_path, headers)
 
-                    redis_key = f"{session_id}-processed:{file_index}"
-                    client.set(redis_key, json.dumps(result_dict), ex=3600)
+                redis_key = f"{session_id}-processed:{file_index}"
+                client.set(redis_key, json.dumps(result_dict), ex=3600)
 
-                    client.delete(key)
-                    return {'type': 'dict', 'result': f"{len(result_dict)} rows processed."}
+                client.delete(key)
+                return {'type': 'dict', 'result': f"{len(result_dict)} rows processed."}
             except Exception as e:
                 logger.error(f"Error processing file {file_path}: {e}")
-                return None
+                return {'type': 'error', 'result': str(e)}
 
         max_workers = os.cpu_count() or 1
         logger.info(f"Processing files with {max_workers} workers.")
@@ -74,7 +69,7 @@ def process_multiple_files_task(session_id, headers, file_format=None, mode='dic
 
     except Exception as e:
         logger.error(f"Error in 'process_multiple_files_task': {e}")
-        return {"status": "error", "message": "An error occurred while processing files."}
+        return {"status": "error", "message": f"An error occurred while processing files: {str(e)}"}
 
 
 @shared_task
