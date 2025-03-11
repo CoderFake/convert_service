@@ -14,6 +14,7 @@ class DisplayType(enum.Enum):
 
 
 class DownloadType(enum.Enum):
-    SYSTEM = 'system'
-    AGENCY = 'agency'
+    SYSTEM = 'kenkoshisutemu'
+    AGENCY = 'yoyaku_daikou'
+
 
