@@ -118,46 +118,46 @@ class FileProcessor:
     Fallback_Encodings = ['utf-8', 'shift_jis', 'cp932', 'iso-8859-1']
 
     @staticmethod
-    def process_file(file_path, headers, mode='dict', file_format_id=None):
+    def process_file(file_path, headers):
         file_path = Path(file_path)
-        if file_path.suffix == '.csv':
-            return FileProcessor.process_csv(file_path, headers, mode, file_format_id)
-        elif file_path.suffix == '.json':
-            return FileProcessor.process_json(file_path, headers, mode)
-        elif file_path.suffix == '.xml':
-            return FileProcessor.process_xml(file_path, headers, mode)
-        elif file_path.suffix == '.xlsx':
-            return FileProcessor.process_excel(file_path, headers, mode)
-        elif file_path.suffix == '.pdf':
-            return FileProcessor.process_pdf(file_path, headers, mode)
+        if file_path.suffix.lower() in ['.csv', '.tsv', '.txt']:
+            return FileProcessor.process_csv(file_path, headers)
+        elif file_path.suffix.lower() in ['.json']:
+            return FileProcessor.process_json(file_path, headers)
+        elif file_path.suffix.lower() in ['.xml']:
+            return FileProcessor.process_xml(file_path, headers)
+        elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+            return FileProcessor.process_excel(file_path, headers)
+        elif file_path.suffix.lower() in ['.pdf']:
+            return FileProcessor.process_pdf(file_path, headers)
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
     @staticmethod
-    def process_csv(file_path, headers, mode, file_format_id):
+    def process_csv(file_path, headers):
         """
-        Process CSV files with fallback for different encodings.
+        Process CSV files with fallback for different encodings
         """
         try:
-            format_details = FileFormatMapper.get_format_details(file_format_id)
-            if not format_details:
-                raise ValueError(f"Unsupported file format: {file_format_id}")
+            encodings = ['utf-8', 'shift_jis', 'cp932', 'iso-8859-1']
 
-            delimiter = format_details['delimiter']
-            primary_encoding = format_details['encoding']
+            with open(file_path, 'r', encoding=encodings[0], errors='ignore') as f:
+                first_line = f.readline().strip()
+
+            delimiters = [',', ';', '\t', '|']
+            delimiter_counts = {d: first_line.count(d) for d in delimiters}
+            delimiter = max(delimiter_counts.items(), key=lambda x: x[1])[0]
 
             try:
-                return FileProcessor._read_csv(file_path, headers, mode, delimiter, primary_encoding)
-            except UnicodeDecodeError as e:
-                logger.warning(f"Primary encoding {primary_encoding} failed for CSV. Error: {e}")
+                return FileProcessor._read_csv(file_path, headers, delimiter, encodings[0])
+            except UnicodeDecodeError:
+                pass
 
-            for encoding in FileProcessor.Fallback_Encodings:
-                if encoding != primary_encoding:
-                    try:
-                        logger.info(f"Trying fallback encoding {encoding} for CSV.")
-                        return FileProcessor._read_csv(file_path, headers, mode, delimiter, encoding)
-                    except UnicodeDecodeError as e:
-                        logger.warning(f"Encoding {encoding} failed for CSV. Error: {e}")
+            for encoding in encodings[1:]:
+                try:
+                    return FileProcessor._read_csv(file_path, headers, delimiter, encoding)
+                except UnicodeDecodeError:
+                    continue
 
             raise ValueError("Failed to process CSV file with all attempted encodings.")
         except Exception as e:
@@ -165,106 +165,21 @@ class FileProcessor:
             raise
 
     @staticmethod
-    def process_json(file_path, headers, mode):
+    def _read_csv(file_path, headers, delimiter, encoding):
         """
-        Process JSON files with fallback for different encodings.
-        """
-        try:
-            for encoding in FileProcessor.Fallback_Encodings:
-                try:
-                    with open(file_path, 'r', encoding=encoding) as jsonfile:
-                        json_data = json.load(jsonfile)
-                        return FileProcessor._map_data(json_data, headers, mode)
-                except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                    logger.warning(f"Error decoding JSON with encoding {encoding}: {e}")
-            raise ValueError("Failed to process JSON file with all attempted encodings.")
-        except Exception as e:
-            logger.error(f"Error processing JSON file {file_path}: {e}")
-            raise
-
-    @staticmethod
-    def process_xml(file_path, headers, mode):
-        """
-        Process XML files with fallback for different encodings.
+        Helper method to read CSV files
         """
         try:
-            for encoding in FileProcessor.Fallback_Encodings:
-                try:
-                    with open(file_path, 'r', encoding=encoding) as xmlfile:
-                        tree = ET.parse(xmlfile)
-                        root = tree.getroot()
-                        return FileProcessor._map_xml(root, headers, mode)
-                except (ET.ParseError, UnicodeDecodeError) as e:
-                    logger.warning(f"Error parsing XML with encoding {encoding}: {e}")
-            raise ValueError("Failed to process XML file with all attempted encodings.")
-        except Exception as e:
-            logger.error(f"Error processing XML file {file_path}: {e}")
-            raise
-
-    @staticmethod
-    def process_excel(file_path, headers, mode):
-        """
-        Process Excel files.
-        """
-        try:
-            workbook = load_workbook(file_path)
-            sheet = workbook.active
-            return FileProcessor._map_excel(sheet, headers, mode)
-        except KeyError as e:
-            logger.error(f"Missing headers in Excel file: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing Excel file {file_path}: {e}")
-            raise
-
-    @staticmethod
-    def process_pdf(file_path, headers, mode):
-        """
-        Process PDF files with structured data extraction.
-        """
-        try:
-            pdf_document = fitz.open(file_path)
-            data = []
-            for page in pdf_document:
-                row = ["" for _ in headers]
-                form_fields = page.widgets()
-                if form_fields:
-                    for widget in form_fields:
-                        field_name = widget.field_name
-                        field_value = widget.field_value or ""
-                        if field_name in headers:
-                            index = headers.index(field_name)
-                            row[index] = field_value
-                if mode == 'dict':
-                    data.append({headers[i]: row[i] for i in range(len(headers))})
-                elif mode == 'csv':
-                    data.append(row)
-            pdf_document.close()
-            if mode == 'csv':
-                data.insert(0, headers)
-            return data
-        except Exception as e:
-            logger.error(f"Error processing PDF file {file_path}: {e}")
-            raise
-
-    @staticmethod
-    def _read_csv(file_path, headers, mode, delimiter, encoding):
-        """
-        Helper method to read CSV files with flexible encoding and handle row-level errors.
-        """
-        try:
-            with open(file_path, 'r', encoding=encoding) as csvfile:
+            with open(file_path, 'r', encoding=encoding, newline='') as csvfile:
                 reader = csv.DictReader(csvfile, delimiter=delimiter)
                 data = []
                 for row_idx, row in enumerate(reader):
                     try:
-                        data.append([row.get(header, "") for header in headers])
+                        filtered_row = {header: row.get(header, "") for header in headers}
+                        data.append(filtered_row)
                     except Exception as row_error:
                         logger.warning(f"Error processing row {row_idx + 1}: {row_error}. Skipping this row.")
                         continue
-
-                if mode == 'csv':
-                    data.insert(0, headers)
 
             logger.info(f"Successfully read CSV with encoding {encoding}.")
             return data
@@ -273,50 +188,149 @@ class FileProcessor:
             raise
 
     @staticmethod
-    def _map_data(data, headers, mode):
+    def process_excel(file_path, headers):
         """
-        Helper method to map data to headers for JSON and other formats.
+        Process Excel files (both .xls and .xlsx formats)
         """
-        mapped_data = []
-        for item in data:
-            if mode == 'dict':
-                mapped_data.append({header: item.get(header, "") for header in headers})
-            elif mode == 'csv':
-                mapped_data.append([item.get(header, "") for header in headers])
-        if mode == 'csv':
-            mapped_data.insert(0, headers)
-        return mapped_data
+        try:
+            file_extension = os.path.splitext(file_path)[1].lower()
+            if file_extension == '.xls':
+                try:
+
+                    import xlrd
+                    workbook = xlrd.open_workbook(file_path)
+                    sheet = workbook.sheet_by_index(0)
+
+                    header_row = [str(sheet.cell_value(0, col)) for col in range(sheet.ncols)]
+                    header_indices = {header: idx for idx, header in enumerate(header_row) if header in headers}
+
+                    data = []
+                    for row_idx in range(1, sheet.nrows):
+                        try:
+                            row_data = {}
+                            for header in headers:
+                                if header in header_indices:
+                                    cell_value = sheet.cell_value(row_idx, header_indices[header])
+                                    if sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_DATE:
+                                        cell_value = xlrd.xldate_as_datetime(cell_value, workbook.datemode).strftime(
+                                            "%Y-%m-%d")
+                                    row_data[header] = str(cell_value) if cell_value is not None else ""
+                                else:
+                                    row_data[header] = ""
+                            data.append(row_data)
+                        except Exception as e:
+                            logger.error(f"Error processing row {row_idx}: {e}")
+                            continue
+
+                    return data
+                except ImportError:
+                    logger.error("xlrd library not installed. Cannot process .xls files.")
+                    raise ImportError("xlrd library required for processing .xls files")
+            else:
+                workbook = load_workbook(file_path, read_only=True, data_only=True)
+                sheet = workbook.active
+
+                first_row = list(sheet.iter_rows(min_row=1, max_row=1))[0]
+                header_row = [str(cell.value).strip() if cell.value else "" for cell in first_row]
+                header_indices = {header: idx for idx, header in enumerate(header_row) if header in headers}
+
+                data = []
+                for row in list(sheet.iter_rows())[1:]:  # Skip header row
+                    try:
+                        row_data = {}
+                        for header in headers:
+                            if header in header_indices and header_indices[header] < len(row):
+                                cell_value = row[header_indices[header]].value
+                                row_data[header] = str(cell_value) if cell_value is not None else ""
+                            else:
+                                row_data[header] = ""
+                        data.append(row_data)
+                    except Exception as e:
+                        logger.error(f"Error processing row: {e}")
+                        continue
+
+                return data
+
+        except Exception as e:
+            logger.error(f"Error processing Excel file {file_path}: {e}")
+            return []
 
     @staticmethod
-    def _map_xml(root, headers, mode):
+    def process_json(file_path, headers):
         """
-        Helper method to map XML data to headers.
+        Process JSON files with fallback for different encodings
         """
-        data = []
-        for elem in root.findall('.//record'):
-            if mode == 'dict':
-                data.append({header: elem.find(header).text if elem.find(header) else "" for header in headers})
-            elif mode == 'csv':
-                data.append([elem.find(header).text if elem.find(header) else "" for header in headers])
-        if mode == 'csv':
-            data.insert(0, headers)
-        return data
+        try:
+            for encoding in ['utf-8', 'shift_jis', 'cp932', 'iso-8859-1']:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as jsonfile:
+                        json_data = json.load(jsonfile)
+                        # Map data to headers
+                        if isinstance(json_data, list):
+                            data = []
+                            for item in json_data:
+                                data.append({header: item.get(header, "") for header in headers})
+                        elif isinstance(json_data, dict):
+                            data = [{header: json_data.get(header, "") for header in headers}]
+                        else:
+                            data = []
+                        return data
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    logger.warning(f"Error decoding JSON with encoding {encoding}: {e}")
+            raise ValueError("Failed to process JSON file with all attempted encodings.")
+        except Exception as e:
+            logger.error(f"Error processing JSON file {file_path}: {e}")
+            raise
 
     @staticmethod
-    def _map_excel(sheet, headers, mode):
+    def process_xml(file_path, headers):
         """
-        Helper method to map Excel data to headers.
+        Process XML files with fallback for different encodings
         """
-        header_indices = {header: idx for idx, header in enumerate(sheet[1])}
-        data = []
-        for row in sheet.iter_rows(min_row=2, values_only=True):
-            if mode == 'dict':
-                data.append({header: row[header_indices[header]] if header in header_indices else "" for header in headers})
-            elif mode == 'csv':
-                data.append([row[header_indices[header]] if header in header_indices else "" for header in headers])
-        if mode == 'csv':
-            data.insert(0, headers)
-        return data
+        try:
+            for encoding in ['utf-8', 'shift_jis', 'cp932', 'iso-8859-1']:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as xmlfile:
+                        tree = ET.parse(xmlfile)
+                        root = tree.getroot()
+                        data = []
+                        for elem in root.findall('.//record'):
+                            data.append(
+                                {header: elem.find(header).text if elem.find(header) is not None else "" for header in
+                                 headers})
+                        return data
+                except (ET.ParseError, UnicodeDecodeError) as e:
+                    logger.warning(f"Error parsing XML with encoding {encoding}: {e}")
+            raise ValueError("Failed to process XML file with all attempted encodings.")
+        except Exception as e:
+            logger.error(f"Error processing XML file {file_path}: {e}")
+            raise
+
+    @staticmethod
+    def process_pdf(file_path, headers):
+        """
+        Process PDF files with structured data extraction
+        """
+        try:
+            pdf_document = fitz.open(file_path)
+            data = []
+            for page in pdf_document:
+                form_fields = page.widgets()
+                if form_fields:
+                    row_data = {}
+                    for widget in form_fields:
+                        field_name = widget.field_name
+                        field_value = widget.field_value or ""
+                        if field_name in headers:
+                            row_data[field_name] = field_value
+                        else:
+                            row_data[field_name] = ""
+                    data.append(row_data)
+            pdf_document.close()
+            return data
+        except Exception as e:
+            logger.error(f"Error processing PDF file {file_path}: {e}")
+            raise
 
 
 class DataFormatter:
@@ -356,35 +370,63 @@ class DataFormatter:
     def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
         try:
             mapped_row = [""] * len(after_headers)
-            before_indices = [h['index_value'] for h in before_headers]
+
+            if isinstance(row, dict):
+                index_to_header = {h['index_value']: h['header_name'] for h in before_headers}
+
+                for rule_id, idx_before, idx_after in rules:
+                    try:
+                        if idx_after < len(mapped_row):
+                            header_name = index_to_header.get(idx_before)
+                            if header_name and header_name in row:
+                                value = row[header_name]
+                                mapped_row[idx_after] = value
+                            else:
+                                logger.info(f"Header name {header_name} not found in row or is None")
+                    except Exception as e:
+                        logger.error(f"Error in rule mapping: {e}")
+
+            elif isinstance(row, list):
+                before_indices = [h['index_value'] for h in before_headers]
+                for rule_id, idx_before, idx_after in rules:
+                    try:
+                        if idx_after < len(mapped_row):
+                            if idx_before < len(row):
+                                value = row[idx_before]
+                                if idx_before in before_indices:
+                                    mapped_row[idx_after] = value
+                                else:
+                                    logger.info(f"Index {idx_before} not in before_indices")
+                            else:
+                                logger.info(f"Index {idx_before} out of range for row")
+                    except Exception as e:
+                        logger.error(f"Error in rule mapping: {e}")
+
+            else:
+                logger.error(f"Unsupported row type: {type(row)}")
+                return [""] * len(after_headers)
 
             for rule_id, idx_before, idx_after in rules:
-                if idx_after < len(after_headers):
-                    if idx_before < len(row):
-                        value = row[idx_before]
-                        if idx_before in before_indices:
-                            mapped_row[idx_after] = value
+                try:
+                    if idx_after < len(mapped_row):
+                        before_value = mapped_row[idx_after]
+                        if DataFormatter.is_fixed_rule(rule_id):
+                            mapped_row[idx_after] = DataFormatter.convert_fixed_value(
+                                before_value, rule_id, tenant_id
+                            )
                         else:
-                            mapped_row[idx_after] = ""
-                    else:
-                        mapped_row[idx_after] = ""
+                            mapped_row[idx_after] = DataFormatter.apply_rule(
+                                before_value, rule_id
+                            )
+                        after_value = mapped_row[idx_after]
 
-            for rule_id, idx_before, idx_after in rules:
-                if idx_after < len(mapped_row):
-                    if DataFormatter.is_fixed_rule(rule_id):
-                        mapped_row[idx_after] = DataFormatter.convert_fixed_value(
-                            mapped_row[idx_after], rule_id, tenant_id
-                        )
-                    else:
-                        mapped_row[idx_after] = DataFormatter.apply_rule(
-                            mapped_row[idx_after], rule_id
-                        )
-
+                except Exception as e:
+                    logger.error(f"Error applying rule: {e}")
             return mapped_row
 
         except Exception as e:
-            logger.error(f"Error formatting row with rules: {e}")
-            return []
+            logger.error(f"Error in format_data_with_rules: {e}", exc_info=True)
+            return [""] * len(after_headers)
 
     @staticmethod
     def convert_fixed_value(value, rule_id, tenant_id):
@@ -631,6 +673,9 @@ class DataFormatter:
 
     @staticmethod
     def write_csv(data, file_path, delimiter=',', encoding='utf-8'):
+        """
+        Write data to a CSV file with proper line endings based on the platform.
+        """
         try:
             with open(file_path, 'w', newline='', encoding=encoding) as csvfile:
                 writer = csv.writer(csvfile, delimiter=delimiter)
@@ -706,11 +751,33 @@ class ProcessHeader:
 
     @staticmethod
     def get_csv_header(file, delimiter, encoding):
+        """
+        Get headers from CSV file with support for different line endings.
+        """
         try:
             file.seek(0)
-            reader = csv.reader(file.read().decode(encoding).splitlines(), delimiter=delimiter)
-            header = next(reader)
-            return [col.strip() for col in header]
+            content = file.read().decode(encoding, errors='replace')
+            content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+            if not delimiter:
+                first_line = content.splitlines()[0] if content.splitlines() else ""
+                delimiters = [',', ';', '\t', '|']
+                delimiter_counts = {d: first_line.count(d) for d in delimiters}
+
+                if any(count > 0 for count in delimiter_counts.values()):
+                    delimiter = max(delimiter_counts.items(), key=lambda x: x[1])[0]
+                    logger.info(f"Auto-detected delimiter: {delimiter}")
+                else:
+                    delimiter = ','
+                    logger.warning(f"No delimiter found in CSV, using default: {delimiter}")
+
+            reader = csv.reader(content.splitlines(), delimiter=delimiter)
+            try:
+                header = next(reader)
+                return [col.strip() for col in header]
+            except StopIteration:
+                logger.warning("Empty CSV file or no header found")
+                return []
         except Exception as e:
             logger.error(f"Error reading CSV header: {e}")
             return []
@@ -730,8 +797,27 @@ class ProcessHeader:
     def get_excel_header(file):
         try:
             file.seek(0)
-            df = pd.read_excel(file, nrows=0)
-            return [col.strip() for col in df.columns]
+
+            file_name = getattr(file, 'name', '')
+            file_extension = os.path.splitext(file_name)[1].lower() if file_name else ''
+
+            if file_extension == '.xls':
+                try:
+                    import xlrd
+                    workbook = xlrd.open_workbook(file_contents=file.read())
+                    sheet = workbook.sheet_by_index(0)
+
+                    header_row = [str(sheet.cell_value(0, col)).strip() for col in range(sheet.ncols)]
+                    return header_row
+                except ImportError:
+                    logger.error("xlrd library not installed. Cannot process .xls files.")
+                    file.seek(0)
+                    df = pd.read_excel(file, engine='xlrd', nrows=0)
+                    return [col.strip() for col in df.columns]
+            else:
+                df = pd.read_excel(file, nrows=0)
+                return [col.strip() for col in df.columns]
+
         except Exception as e:
             logger.error(f"Error reading Excel header: {e}")
             return []
@@ -763,25 +849,48 @@ class ProcessHeader:
 
     @staticmethod
     def get_header(file, file_type):
-        format_details = FileFormatMapper.get_format_details(file_type)
-        if not format_details:
-            logger.error(f"Unsupported file type: {file_type}")
-            return []
+        """
+        Get headers from file based on file type
+        """
+        try:
+            if not file_type:
+                file_name = getattr(file, 'name', '')
+                if file_name:
+                    file_extension = os.path.splitext(file_name)[1].lower()
+                    if file_extension in ['.csv', '.tsv', '.txt']:
+                        file_type = 'CSV_C_UTF-8'
+                    elif file_extension in ['.xlsx', '.xls']:
+                        file_type = 'EXCEL'
+                    elif file_extension == '.json':
+                        file_type = 'JSON'
+                    elif file_extension == '.xml':
+                        file_type = 'XML'
+                    elif file_extension == '.pdf':
+                        file_type = 'PDF'
+                    else:
+                        logger.error(f"Cannot determine file type from extension: {file_extension}")
+                        return []
 
-        if file_type.startswith("CSV"):
-            return ProcessHeader.get_csv_header(
-                file,
-                delimiter=format_details['delimiter'],
-                encoding=format_details['encoding']
-            )
-        elif file_type == "PDF":
-            return ProcessHeader.get_pdf_header(file)
-        elif file_type == "Excel":
-            return ProcessHeader.get_excel_header(file)
-        elif file_type == "JSON":
-            return ProcessHeader.get_json_header(file)
-        elif file_type == "XML":
-            return ProcessHeader.get_xml_header(file)
-        else:
-            logger.error(f"Unsupported file type: {file_type}")
+            format_details = None
+            if hasattr(FileFormatMapper, 'get_format_details'):
+                format_details = FileFormatMapper.get_format_details(file_type)
+
+            if file_type.startswith("CSV"):
+                delimiter = format_details.get('delimiter', ',') if format_details else ','
+                encoding = format_details.get('encoding', 'utf-8') if format_details else 'utf-8'
+
+                return ProcessHeader.get_csv_header(file, delimiter=delimiter, encoding=encoding)
+            elif file_type == "EXCEL":
+                return ProcessHeader.get_excel_header(file)
+            elif file_type == "PDF":
+                return ProcessHeader.get_pdf_header(file)
+            elif file_type == "JSON":
+                return ProcessHeader.get_json_header(file)
+            elif file_type == "XML":
+                return ProcessHeader.get_xml_header(file)
+            else:
+                logger.error(f"Unsupported file type: {file_type}")
+                return []
+        except Exception as e:
+            logger.error(f"Error in get_header: {e}")
             return []
