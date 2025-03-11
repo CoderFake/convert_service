@@ -1,34 +1,25 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import F
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
 from django.urls import reverse
-
+from django.views import View
 from configs.models import ConvertRule
+from configs.utils import remove_bom
 from home.models import FileFormat, DataItemType, DataItem, DataFormat, DetailedInfo, DataConversionInfo
 from process.fetch_data import HeaderType
 
 
-@login_required
-def configs(request):
-    format_list =  list(FileFormat.objects.all())
-    return render(request, 'web/settings/index.html', {'format_list': format_list})
+class ConfigsView(LoginRequiredMixin, View):
+    def get(self, request):
+        format_list = list(FileFormat.objects.all())
+        return render(request, 'web/settings/index.html', {'format_list': format_list})
 
 
-def remove_bom(header_name):
-    try:
-        header = header_name.lstrip('\ufeff')
-        header = header.replace("\ufeff", "")
-    except Exception as e:
-        return header_name
-    return header
-
-
-@login_required
-def save_data_item(request):
-    if request.method == 'POST':
+class SaveDataItemView(LoginRequiredMixin, View):
+    def post(self, request):
         try:
             data = request.POST
 
@@ -70,7 +61,7 @@ def save_data_item(request):
                 if data_item_type.type_name == 'input':
                     data_item_type.index_value = int(data_list.get(f"input[{header_name}][index]", "0"))
                     data_item_type.display = bool(int(data_list.get(f"input[{header_name}][display]", "0")))
-                    data_item_type.edit_value =  bool(int(data_list.get(f"input[{header_name}][edit_value]", "0")))
+                    data_item_type.edit_value = bool(int(data_list.get(f"input[{header_name}][edit_value]", "0")))
                     data_item_type.format_value = data_list.get(f"input[{header_name}][format_value]", "string")
                 elif data_item_type.type_name == 'format':
                     data_item_type.index_value = int(data_list.get(f"format[{header_name}][index]", "0"))
@@ -88,42 +79,69 @@ def save_data_item(request):
                     print("Saved successfully")
                 except Exception as e:
                     print(f"Save error: {e}")
+
+            return JsonResponse({"status": "success", "message": "Data saved successfully!"}, status=200)
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-        return JsonResponse({"status": "success", "message": "Data saved successfully!"}, status=200)
 
-    return JsonResponse({"status": "error", "message": "Invalid request method"}, status=405)
+class RuleSettingsView(LoginRequiredMixin, View):
+    def get(self, request):
+        input = request.GET.get('before', 'input')
+        output = request.GET.get('after', 'output')
 
-
-@login_required
-def rule_settings(request):
-    input = request.GET.get('before', 'input')
-    output = request.GET.get('after', 'output')
-
-    if input == HeaderType.BEFORE.value:
-        data_input = HeaderType.BEFORE.value
-    elif input == HeaderType.FORMAT.value:
-        data_input = HeaderType.FORMAT.value
-    else:
-        messages.error(request, "Data not found.")
-        return redirect(f"{reverse('rule_settings')}?before=input&after=format")
-
-    data_output = HeaderType.FORMAT.value
-    if output == HeaderType.BEFORE.value:
-        if input == HeaderType.FORMAT.value:
-            data_output = HeaderType.BEFORE.value
+        if input == HeaderType.BEFORE.value:
+            data_input = HeaderType.BEFORE.value
+        elif input == HeaderType.FORMAT.value:
+            data_input = HeaderType.FORMAT.value
         else:
             messages.error(request, "Data not found.")
             return redirect(f"{reverse('rule_settings')}?before=input&after=format")
-    elif output == HeaderType.AFTER.value:
-        if input == HeaderType.FORMAT.value:
-            data_output = HeaderType.AFTER.value
-        else:
-            messages.error(request, "Data not found.")
-            return redirect(f"{reverse('rule_settings')}?before=format&after=output")
 
-    if request.method == "POST":
+        data_output = HeaderType.FORMAT.value
+        if output == HeaderType.BEFORE.value:
+            if input == HeaderType.FORMAT.value:
+                data_output = HeaderType.BEFORE.value
+            else:
+                messages.error(request, "Data not found.")
+                return redirect(f"{reverse('rule_settings')}?before=input&after=format")
+        elif output == HeaderType.AFTER.value:
+            if input == HeaderType.FORMAT.value:
+                data_output = HeaderType.AFTER.value
+            else:
+                messages.error(request, "Data not found.")
+                return redirect(f"{reverse('rule_settings')}?before=format&after=output")
+
+        data_inputs = DataItem.objects.filter(
+            data_format__data_format_id="DF_003",
+            tenant=request.user.tenant,
+            data_item_types__type_name=data_input
+        ).annotate(
+            index_value=F('data_item_types__index_value')
+        ).order_by('index_value')
+
+        data_formats = DataItem.objects.filter(
+            data_format__data_format_id="DF_003",
+            tenant=request.user.tenant,
+            data_item_types__type_name=data_output
+        ).annotate(
+            index_value=F('data_item_types__index_value')
+        ).order_by('index_value')
+
+        rule_list = ConvertRule.objects.all()
+
+        context = {
+            'data_inputs': data_inputs,
+            'data_formats': data_formats,
+            'rules': rule_list,
+        }
+
+        return render(request, 'web/settings/rule_settings.html', context)
+
+    def post(self, request):
+        input = request.GET.get('before', 'input')
+        output = request.GET.get('after', 'output')
+
         try:
             with transaction.atomic():
                 data = request.POST
@@ -139,6 +157,28 @@ def rule_settings(request):
                     tenant=tenant,
                     data_convert_id="C_001"
                 ).first()
+
+                if input == HeaderType.BEFORE.value:
+                    data_input = HeaderType.BEFORE.value
+                elif input == HeaderType.FORMAT.value:
+                    data_input = HeaderType.FORMAT.value
+                else:
+                    messages.error(request, "Data not found.")
+                    return redirect(f"{reverse('rule_settings')}?before=input&after=format")
+
+                data_output = HeaderType.FORMAT.value
+                if output == HeaderType.BEFORE.value:
+                    if input == HeaderType.FORMAT.value:
+                        data_output = HeaderType.BEFORE.value
+                    else:
+                        messages.error(request, "Data not found.")
+                        return redirect(f"{reverse('rule_settings')}?before=input&after=format")
+                elif output == HeaderType.AFTER.value:
+                    if input == HeaderType.FORMAT.value:
+                        data_output = HeaderType.AFTER.value
+                    else:
+                        messages.error(request, "Data not found.")
+                        return redirect(f"{reverse('rule_settings')}?before=format&after=output")
 
                 data_item_type_before = DataItemType.objects.get(
                     data_item=data_item_input,
@@ -185,29 +225,3 @@ def rule_settings(request):
         except Exception as e:
             messages.error(request, str(e))
             return redirect(f"{reverse('rule_settings')}?before={input}&after={output}")
-
-    data_inputs = DataItem.objects.filter(
-        data_format__data_format_id="DF_003",
-        tenant=request.user.tenant,
-        data_item_types__type_name=data_input
-    ).annotate(
-        index_value=F('data_item_types__index_value')
-    ).order_by('index_value')
-
-    data_formats = DataItem.objects.filter(
-        data_format__data_format_id="DF_003",
-        tenant=request.user.tenant,
-        data_item_types__type_name=data_output
-    ).annotate(
-        index_value=F('data_item_types__index_value')
-    ).order_by('index_value')
-
-    rule_list = ConvertRule.objects.all()
-
-    context = {
-        'data_inputs': data_inputs,
-        'data_formats': data_formats,
-        'rules': rule_list,
-    }
-
-    return render(request, 'web/settings/rule_settings.html', context)
