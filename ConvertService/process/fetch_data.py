@@ -1,8 +1,11 @@
+import csv
 from functools import lru_cache
+import json
 from accounts.models import Account
 from .data_type import HeaderType, DisplayType
 from configs.models import ConvertDataValue
-from home.models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType
+from home.models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType, FileFormat
+from .redis import redis_client
 import logging
 
 logger = logging.getLogger(__name__)
@@ -79,10 +82,112 @@ class HeaderFetcher:
 
 class FileFormatFetcher:
 
+    CONTENT_TYPE_MAP = {
+
+        'text/csv': 'CSV_C_UTF-8',
+        'application/csv': 'CSV_C_UTF-8',
+        'text/plain': 'CSV_C_UTF-8',
+
+        # Excel formats (new and old)
+        'application/vnd.ms-excel': 'EXCEL',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'EXCEL',
+        'application/excel': 'EXCEL',
+        'application/x-excel': 'EXCEL',
+        'application/x-msexcel': 'EXCEL',
+        'application/vnd.ms-office': 'EXCEL',
+        'application/msexcel': 'EXCEL',
+
+        # JSON format
+        'application/json': 'JSON',
+        'text/json': 'JSON',
+
+        # XML format
+        'application/xml': 'XML',
+        'text/xml': 'XML',
+    }
+
+    EXTENSION_MAP = {
+        '.csv': 'CSV_C_UTF-8',
+        '.tsv': 'CSV_T_UTF-8',
+        '.xlsx': 'EXCEL',
+        '.xls': 'EXCEL',
+        '.json': 'JSON',
+        '.xml': 'XML',
+    }
+
+    CACHE_TIMEOUT = 3600
+
     @staticmethod
-    def get_file_format_id(user: Account, before= True):
+    def get_allowed_formats_for_tenant(tenant_id):
+        client = redis_client.get_client()
+        cache_key = f'tenant:{tenant_id}:allowed_formats'
+
+        cached_formats = client.get(cache_key)
+        if cached_formats:
+            return json.loads(cached_formats.decode('utf-8'))
+
+        try:
+            formats = DataFormat.objects.filter(
+                tenant_id=tenant_id
+            ).values_list(
+                'file_format__file_format_id', flat=True
+            ).distinct()
+
+            allowed_formats = list(formats)
+
+            if not allowed_formats:
+                allowed_formats = []
+
+            client.set(cache_key, json.dumps(allowed_formats), ex=FileFormatFetcher.CACHE_TIMEOUT)
+
+            return allowed_formats
+        except Exception as e:
+            logger.error(f"Error fetching allowed file formats for tenant {tenant_id}: {e}")
+            return []
+
+    @staticmethod
+    def is_valid_file_type(content_type, file_extension, allowed_formats=None):
+        """
+        Validate if the file type is allowed for this tenant
+        """
+        if not allowed_formats:
+            allowed_formats = ['CSV_C_SJIS', 'CSV_C_UTF-8', 'CSV_T_SJIS', 'CSV_T_UTF-8', 'XML', 'JSON', 'EXCEL']
+
+        format_by_content = FileFormatFetcher.CONTENT_TYPE_MAP.get(content_type)
+        if format_by_content and format_by_content in allowed_formats:
+            return True
+
+        format_by_extension = FileFormatFetcher.EXTENSION_MAP.get(file_extension.lower())
+        if format_by_extension and format_by_extension in allowed_formats:
+            return True
+
+        return False
+
+    @staticmethod
+    def get_file_format_for_content_type(content_type, file_extension):
+
+        format_id = FileFormatFetcher.CONTENT_TYPE_MAP.get(content_type)
+        if not format_id:
+            format_id = FileFormatFetcher.EXTENSION_MAP.get(file_extension.lower())
+
+        return format_id or 'CSV_C_UTF-8'
+
+    @staticmethod
+    def get_file_format_id(user: Account, before=True, use_cache=True):
+        """
+        Get file format ID from Redis cache or database
+        """
         try:
             tenant_id = user.tenant.id if user.tenant else 1
+            session_key = getattr(user, 'session', {}).get('session_key', '')
+
+            if session_key and use_cache:
+                client = redis_client.get_client()
+                cache_key = f'{session_key}-file-format-{"before" if before else "after"}'
+
+                cached_format = client.get(cache_key)
+                if cached_format:
+                    return cached_format.decode('utf-8')
 
             data_format_column = 'data_format_before_id' if before else 'data_format_after_id'
 
@@ -100,11 +205,29 @@ class FileFormatFetcher:
             if not file_format:
                 raise ValueError("No file format found for the specified data_format.")
 
+            if session_key and use_cache:
+                client = redis_client.get_client()
+                cache_key = f'{session_key}-file-format-{"before" if before else "after"}'
+                client.set(cache_key, file_format, ex=FileFormatFetcher.CACHE_TIMEOUT)
+
             return file_format
 
         except Exception as e:
             logger.error(f"Error fetching file format ID: {e}")
             return None
+
+    @staticmethod
+    def clear_format_cache():
+        """
+        Clear all file format cache entries
+        """
+        client = redis_client.get_client()
+        keys = client.keys('*-file-format-*')
+        keys.extend(client.keys('tenant:*:allowed_formats'))
+
+        if keys:
+            client.delete(*keys)
+            logger.info(f"Cleared {len(keys)} file format cache entries")
 
 
 class RuleFetcher:
@@ -168,7 +291,7 @@ class RuleFixedID:
         return {
             attr: getattr(cls, attr) for attr in dir(cls)
             if not attr.startswith('__') and not callable(getattr(cls, attr))
-            and attr.isupper()
+               and attr.isupper()
         }
 
     @classmethod
@@ -176,12 +299,11 @@ class RuleFixedID:
         return [
             getattr(cls, attr) for attr in dir(cls)
             if not attr.startswith('__') and not callable(getattr(cls, attr))
-            and attr.isupper()
+               and attr.isupper()
         ]
 
 
 class FixedValueFetcher:
-
     @staticmethod
     @lru_cache(maxsize=128)
     def _get_mapping_for_rule(tenant_id, rule_fixed_id):
