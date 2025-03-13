@@ -19,6 +19,7 @@
                     <div class="card-body px-lg-5 py-lg-5">
                         <form method="POST" id="login-form">
                             {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.GET.next|default:'/' }}">
                             <div class="form-group mb-3">
                                 <label class="form-check-label text-gray" for="username">ユーザーID</label>
                                 <div class="input-group input-group-alternative">
@@ -125,7 +126,7 @@
                             if (re_password && re_username) {
                                 localStorage.setItem("hash_password", response.hash_password);
                             }
-                            window.location.href = '/';
+                            window.location.href = response.redirect_url || '/';
                         } else {
                             createToast(response.status, response.message);
                         }

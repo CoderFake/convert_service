@@ -1,8 +1,8 @@
 from django.urls import path
-from . import views
+from .views import ConfigsView, SaveDataItemView, RuleSettingsView
 
 urlpatterns = [
-    path('settings/', views.configs, name='settings'),
-    path('settings/save-data-item/', views.save_data_item, name='save_data_item'),
-    path('rule-settings/', views.rule_settings, name='rule_settings'),
+    path('settings/', ConfigsView.as_view(), name='settings'),
+    path('settings/save-data-item/', SaveDataItemView.as_view(), name='save_data_item'),
+    path('rule-settings/', RuleSettingsView.as_view(), name='rule_settings'),
 ]

@@ -374,9 +374,9 @@
 
                 $(".btn-export").on('click', function () {
                     if (this.attributes.id.value === 'system-csv') {
-                        window.location.href = "{% url 'download' 'system' %}";
+                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
                     } else {
-                        window.location.href = "{% url 'download' 'agency' %}";
+                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
                     }
 
                     setTimeout(function () {

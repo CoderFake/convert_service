@@ -1,10 +1,11 @@
 import base64
 import time
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.views import View
 from .forms import SignUpForm
 import logging
 
@@ -50,22 +51,28 @@ def decrypt_password(encrypted_password, max_age=43200):
         return None
 
 
+class LoginView(View):
+    template_name = "web/accounts/login.html"
 
-def login_view(request):
-    if request.user.is_authenticated:
-        return render(request, "web/home/index.html")
+    def get(self, request):
+        if request.user.is_authenticated:
+            return redirect('home')
+        return render(request, self.template_name)
 
-    if request.method == "POST":
+    def post(self, request):
         username = request.POST.get("username")
         password = request.POST.get("password")
         remember_password = request.POST.get("remember_pass", None)
         saved_password = request.POST.get("remember_password", None)
 
+        next_url = request.POST.get('next', request.GET.get('next', '/'))
+
         try:
             if remember_password not in ["null", None, ""]:
                 password = decrypt_password(remember_password)
                 if password is None:
-                    return JsonResponse({'status': "error", "message": "自動保存されたパスワードの有効期限が切れました。再度パスワードを入力してください。"})
+                    return JsonResponse({'status': "error",
+                                         "message": "自動保存されたパスワードの有効期限が切れました。再度パスワードを入力してください。"})
 
             user = authenticate(username=username, password=password)
             if user:
@@ -76,41 +83,45 @@ def login_view(request):
                     else:
                         encrypted_password = encrypt_password(password)
 
-                    return JsonResponse({'status': "success", "hash_password": encrypted_password})
-                return JsonResponse({'status': "success", "hash_password": None})
+                    return JsonResponse({
+                        'status': "success",
+                        "hash_password": encrypted_password,
+                        "redirect_url": next_url
+                    })
+                return JsonResponse({
+                    'status': "success",
+                    "hash_password": None,
+                    "redirect_url": next_url
+                })
             else:
                 return JsonResponse({'status': "error", "message": "IDまたはパスワードをもう一度確認してください。"})
         except Exception as e:
             logger.error(f"Login error: {str(e)}")
             return JsonResponse({'status': "error", "message": "ログイン中にエラーが発生しました。"})
 
-    return render(request, "web/accounts/login.html")
 
+class RegisterView(View):
+    template_name = "web/accounts/register.html"
 
+    def get(self, request):
+        form = SignUpForm()
+        return render(request, self.template_name, {"form": form, "msg": None, "success": False})
 
-def register_user(request):
-    msg = None
-    success = False
-
-    if request.method == "POST":
+    def post(self, request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             form.save()
             username = form.cleaned_data.get("username")
             raw_password = form.cleaned_data.get("password1")
             user = authenticate(username=username, password=raw_password)
-
             success = True
-
+            return render(request, self.template_name, {"form": form, "msg": None, "success": success})
         else:
             msg = 'Form is not valid'
-    else:
-        form = SignUpForm()
-
-    return render(request, "web/accounts/register.html", {"form": form, "msg": msg, "success": success})
+            return render(request, self.template_name, {"form": form, "msg": msg, "success": False})
 
 
-@login_required
-def logout_user(request):
-    logout(request)
-    return redirect("home")
+class LogoutView(LoginRequiredMixin, View):
+    def get(self, request):
+        logout(request)
+        return redirect("home")
