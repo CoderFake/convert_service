@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         .table-responsive {
-            max-height: 250px;
+            padding-bottom: 20px !important;
         }
 
         table.dataTable th,
@@ -18,7 +18,7 @@
             cursor: default;
         }
 
-         table.dataTable .truncate-text {
+        table.dataTable .truncate-text {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -27,6 +27,31 @@
             display: inline-block;
             vertical-align: middle;
         }
+
+        table.dataTable tbody tr td {
+            min-height: 30px;
+            height: 30px;
+        }
+
+        #loadingRow td, #endMessage td {
+            min-height: 30px;
+            height: 30px;
+            line-height: 30px;
+            vertical-align: middle;
+        }
+
+        table.dataTable tbody tr {
+            min-height: 30px;
+        }
+
+        table.dataTable tbody tr td,
+        table.dataTable tbody tr td .truncate-text {
+            line-height: 30px;
+            vertical-align: middle;
+        }
+         table.dataTable tbody tr td{
+            padding: 0 5px;
+         }
 
         .active-row {
             background-color: yellow !important;
@@ -44,6 +69,7 @@
             bottom: 30px;
             right: 30px;
         }
+
         input[type="radio"] {
             left: 35%;
             top: 50%;
@@ -61,6 +87,71 @@
             .btn-export {
                 bottom: 25px;
             }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #loadingRow {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        #endMessage {
+            animation: fadeIn 0.3s ease-in-out;
+            background-color: #f8f9fa !important;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #007bff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .dataTables_scrollBody {
+            overflow-x: auto !important;
+            margin-bottom: 5px !important;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        #paginationInfo {
+            display: block;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            text-align: right;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
         }
     </style>
 {% endblock stylesheets %}
@@ -222,11 +313,12 @@
                                 {% endif %}
                                 </tbody>
                             </table>
+                            <div id="paginationInfo" class="d-none">0/0 行表示中</div>
                         </div>
 
                     </div>
-                    <div class="col-12 mt-4 w-100">
-                        <div class="show-data pr-0 mb-5 mb-sm-0 w-100">
+                    <div class="col-12 mt-4 w-100 overflow-hidden" style="height: calc(100vh - 400px)">
+                        <div class="show-data pr-0 mb-5 mb-sm-0 w-100 h-100" style="overflow-x: hidden !important;">
                         </div>
                     </div>
                 </div>
@@ -265,7 +357,25 @@
         <script>
             $(document).ready(function () {
                 let headerInfo = [];
-                function loadProcessedFiles() {
+                let currentPage = 1;
+                let loading = false;
+                let hasMoreData = true;
+                let endMessageAdded = false;
+                const PAGE_SIZE = 20;
+
+                function loadProcessedFiles(page = 1, append = false) {
+                    if (loading) return;
+
+                    loading = true;
+
+                    if (!append) {
+                        $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
+                    } else {
+                        $("#endMessage").remove();
+                        $("#loadingRow").remove();
+                        $("#inputData tbody").append('<tr id="loadingRow"><td colspan="100%" class="text-center"><div class="loading-spinner"></div> 追加データを読み込み中...</td></tr>');
+                    }
+
                     $.ajax({
                         url: "{% url 'get_data' %}",
                         type: "POST",
@@ -273,32 +383,49 @@
                             'X-CSRFToken': getCookie('csrftoken'),
                             'Content-Type': 'application/json'
                         },
+                        data: JSON.stringify({
+                            page: page,
+                            page_size: PAGE_SIZE
+                        }),
                         success: function(response) {
+                            loading = false;
+                            $("#loadingRow").remove();
+
                             if (response.status === 'success') {
                                 const processedData = response.data || [];
                                 headerInfo = response.headers || [];
 
+                                currentPage = response.pagination.page;
+                                hasMoreData = currentPage < response.pagination.total_pages;
+
                                 const table = $("#inputData");
-                                if ($.fn.DataTable.isDataTable(table)) {
-                                    table.DataTable().destroy();
+
+                                if (!append) {
+                                    if ($.fn.DataTable.isDataTable(table)) {
+                                        table.DataTable().destroy();
+                                    }
+
+                                    const thead = table.find("thead");
+                                    if (thead.length === 0) {
+                                        table.prepend("<thead><tr></tr></thead>");
+                                    }
+
+                                    const headerRow = table.find("thead tr");
+                                    headerRow.empty();
+                                    headerInfo.forEach(header => {
+                                        const headerClass = header.edit_value ? 'bg-success' : '';
+                                        headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
+                                    });
+
+                                    table.find("tbody").empty();
+                                    endMessageAdded = false;
                                 }
 
-                                const thead = table.find("thead");
-                                if (thead.length === 0) {
-                                    table.prepend("<thead><tr></tr></thead>");
-                                }
-
-                                const headerRow = table.find("thead tr");
-                                headerRow.empty();
-                                headerInfo.forEach(header => {
-                                    const headerClass = header.edit_value ? 'bg-success' : '';
-                                    headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
-                                });
                                 const tbody = table.find("tbody");
                                 if (tbody.length === 0) {
                                     table.append("<tbody></tbody>");
                                 }
-                                tbody.empty();
+                                let rowsAdded = 0;
                                 processedData.forEach(dataSet => {
                                     if (dataSet.data && Array.isArray(dataSet.data)) {
                                         dataSet.data.forEach((row, index) => {
@@ -313,23 +440,45 @@
                                                 return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
                                             }).join('');
                                             tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
+                                            rowsAdded++;
                                         });
                                     }
                                 });
 
-                                if (headerInfo.length > 0) {
+                                if (headerInfo.length > 0 && !append) {
                                     try {
                                         initDataTable(table);
                                     } catch (error) {
-                                        console.error('DataTable initialization error:', error);
                                         createToast("error", "テーブルの初期化中にエラーが発生しました。");
                                     }
+                                } else if (append && rowsAdded > 0) {
+                                    table.find('tbody tr').slice(-rowsAdded).find('td').addClass('dt-center');
+
+                                    if ($.fn.DataTable.isDataTable(table)) {
+                                        table.DataTable().columns.adjust();
+                                    }
                                 }
+
+                                const currentRows = $("table#inputData tbody tr").length;
+                                const totalRows = response.pagination.total_rows;
+                                $("#paginationInfo").html(`${currentRows}/${totalRows} 行表示中`);
+
+                                if (!hasMoreData && !endMessageAdded) {
+                                    $("#inputData tbody").append('<tr id="endMessage" class="text-center text-muted"><td colspan="100%">すべてのデータが読み込まれました</td></tr>');
+                                    endMessageAdded = true;
+                                }
+
+                                if (rowsAdded > 0) {
+                                    checkIfMoreContentNeeded();
+                                }
+
                             } else {
                                 createToast("error", response.message || "データの取得に失敗しました。");
                             }
                         },
                         error: function (error) {
+                            loading = false;
+                            $("#loadingRow").remove();
                             createToast("error", "エラーが発生しました。データを取得できませんでした。");
                         }
                     });
@@ -340,8 +489,8 @@
                         idTable.DataTable().destroy();
                     }
 
-                    return idTable.DataTable({
-                        scrollY: "200px",
+                    const dataTable = idTable.DataTable({
+                        scrollY: "250px",
                         scrollX: true,
                         scrollCollapse: true,
                         paging: false,
@@ -366,26 +515,74 @@
                         autoWidth: true,
                         initComplete: function(settings, json) {
                             this.api().columns.adjust();
+
+                            $(".dataTables_scrollBody").css("overflow-x", "auto");
+
+                            setupScrollEvents();
                         }
                     });
+
+                    return dataTable;
                 }
+
+                function setupScrollEvents() {
+
+                    const scrollBodySelector = ".dataTables_scrollBody";
+
+                    $(scrollBodySelector).off("scroll.infiniteScroll");
+
+                    $(scrollBodySelector).on("scroll.infiniteScroll", function() {
+
+                        const scrollTop = $(this).scrollTop();
+                        const viewportHeight = $(this).height();
+                        const scrollHeight = $(this)[0].scrollHeight;
+
+                        const denominator = Math.max(1, scrollHeight - viewportHeight);
+                        const scrollPercent = (scrollTop / denominator) * 100;
+
+                        if (!loading && hasMoreData && scrollPercent >= 80 && !endMessageAdded) {
+                            currentPage++;
+                            loadProcessedFiles(currentPage, true);
+                        }
+                    });
+
+                    setTimeout(function() {
+                        checkIfMoreContentNeeded();
+                    }, 300);
+                }
+
+                function checkIfMoreContentNeeded() {
+                    const scrollBody = $(".dataTables_scrollBody");
+                    if (scrollBody.length > 0) {
+                        const scrollHeight = scrollBody[0].scrollHeight;
+                        const clientHeight = scrollBody.height();
+
+                        if (scrollHeight <= clientHeight && hasMoreData && !loading && !endMessageAdded) {
+                            console.log("Auto loading more because content is not enough to scroll");
+                            setTimeout(function() {
+                                currentPage++;
+                                loadProcessedFiles(currentPage, true);
+                            }, 300);
+                        }
+                    }
+                }
+
+                $(window).on('resize', function() {
+                    if ($.fn.DataTable.isDataTable("#inputData")) {
+                        $("#inputData").DataTable().columns.adjust();
+                    }
+                });
 
                 loadProcessedFiles();
 
-                $(".btn-export").on('click', function () {
-                    if (this.attributes.id.value === 'system-csv') {
-                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
-                    } else {
-                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+                $('#inputData').on('click', 'tbody tr', function () {
+
+                    if ($(this).attr('id') === 'endMessage' || $(this).attr('id') === 'loadingRow') {
+                        return;
                     }
 
-                    setTimeout(function () {
-                        window.location.href = "{% url 'home' %}";
-                    }, 1000);
-                });
-
-                $('#inputData').on('click', 'tbody tr', function () {
                     $('#inputData tbody tr').removeClass('active-row');
+
                     $(this).addClass('active-row');
 
                     const cells = $(this).find('td').map(function () {
@@ -400,7 +597,7 @@
                     let rowHTML = '<div class="row">';
                     let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
                     let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
+                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-start align-items-center">';
 
                     let nonEditHeaders = [];
                     let editHeaders = [];
@@ -482,7 +679,7 @@
                     });
                 });
 
-                function UpdateFormatData(Input){
+                function UpdateFormatData(Input) {
                     const dataIndex = $('.show-data').attr('data-index');
                     const fieldName = Input.attr('name');
                     const fieldValue = Input.val();
@@ -505,9 +702,8 @@
                 }
 
                 $(document).on('blur change', '.edit-input', function () {
-                    new UpdateFormatData($(this));
+                    UpdateFormatData($(this));
                 });
-
 
                 $(document).on('change', 'input[type="radio"]', function () {
                     const name = $(this).attr('name');
@@ -518,7 +714,7 @@
                     targetRow.find('td.row-date').text(selectedDate);
 
                     $(`input[name="${name}"]`).not(this).prop('checked', false);
-                    new UpdateFormatData($(".date-picker"));
+                    UpdateFormatData($(".date-picker"));
                 });
 
                 $(document).on('change', '.edit-input', function () {
@@ -529,10 +725,20 @@
 
                     targetRow.find(`td.${name}`).text(newText);
                 });
+
+                $(".btn-export").on('click', function () {
+                    if (this.attributes.id.value === 'system-csv') {
+                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
+                    } else {
+                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+                    }
+
+                    setTimeout(function () {
+                        window.location.href = "{% url 'home' %}";
+                    }, 1000);
+                });
             });
-
         </script>
-
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}
