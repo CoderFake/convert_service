@@ -100,6 +100,70 @@ class DisplayData:
             logger.error(f"Error combining formatted data: {e}")
             return []
 
+    @staticmethod
+    def get_paginated_data(redis_client, keys, hidden_formatted_header, page=1, page_size=20):
+        try:
+            visible_indices = [
+                header.get('index_value') for header in hidden_formatted_header
+                if header.get('index_value', False)
+            ]
+
+            result = []
+
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+
+            processed_rows = 0
+            total_rows = 0
+
+            for key in keys:
+                try:
+                    raw_data = redis_client.get(key)
+                    if not raw_data:
+                        continue
+
+                    data = json.loads(raw_data.decode('utf-8'))
+                    data_rows_count = len(data)
+                    total_rows += data_rows_count
+
+                    if processed_rows + data_rows_count <= start_idx:
+                        processed_rows += data_rows_count
+                        continue
+
+                    local_start = max(0, start_idx - processed_rows)
+                    local_end = min(data_rows_count, end_idx - processed_rows)
+
+                    current_page_data = data[local_start:local_end]
+
+                    filtered_rows = []
+                    for row in current_page_data:
+                        if isinstance(row, list):
+                            new_row = list(row)
+                            for idx in sorted(visible_indices, reverse=True):
+                                if idx < len(new_row):
+                                    new_row.pop(idx)
+                            filtered_rows.append(new_row)
+
+                    if filtered_rows:
+                        result.append({
+                            "data": filtered_rows,
+                            "key": key.decode('utf-8')
+                        })
+
+                    processed_rows += data_rows_count
+                    if processed_rows >= end_idx:
+                        break
+
+                except Exception as e:
+                    logger.error(f"Reading Rdis key failed {key}: {e}")
+                    continue
+
+            return result, total_rows
+
+        except Exception as e:
+            logger.error(f"Failed to get pagination: {e}")
+            return [], 0
+
 
 class FileFormatMapper:
     FORMAT_MAPPING = {

@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'web/css/drag-drop-file.css' %}"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
+        /* Style hiện tại của bạn */
         .table-responsive {
             max-height: 250px;
         }
@@ -18,7 +19,7 @@
             cursor: default;
         }
 
-         table.dataTable .truncate-text {
+        table.dataTable .truncate-text {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -27,6 +28,31 @@
             display: inline-block;
             vertical-align: middle;
         }
+
+        table.dataTable tbody tr td {
+            min-height: 30px;
+            height: 30px;
+        }
+
+        #loadingRow td, #endMessage td {
+            min-height: 30px;
+            height: 30px;
+            line-height: 30px;
+            vertical-align: middle;
+        }
+
+        table.dataTable tbody tr {
+            min-height: 30px;
+        }
+
+        table.dataTable tbody tr td,
+        table.dataTable tbody tr td .truncate-text {
+            line-height: 30px;
+            vertical-align: middle;
+        }
+         table.dataTable tbody tr td{
+            padding: 0 5px;
+         }
 
         .active-row {
             background-color: yellow !important;
@@ -44,6 +70,7 @@
             bottom: 30px;
             right: 30px;
         }
+
         input[type="radio"] {
             left: 35%;
             top: 50%;
@@ -61,6 +88,77 @@
             .btn-export {
                 bottom: 25px;
             }
+        }
+
+        /* Style mới thêm vào */
+        /* Hiệu ứng loading mượt mà */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #loadingRow {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        #endMessage {
+            animation: fadeIn 0.3s ease-in-out;
+            background-color: #f8f9fa !important;
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #007bff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tối ưu thanh cuộn */
+        .dataTables_scrollBody {
+            overflow-x: auto !important; /* Buộc hiển thị thanh cuộn ngang */
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Hiển thị thông tin số dòng */
+        #paginationInfo {
+            display: block;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            text-align: right;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        /* Đảm bảo datatable responsive */
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
         }
     </style>
 {% endblock stylesheets %}
@@ -222,6 +320,7 @@
                                 {% endif %}
                                 </tbody>
                             </table>
+                            <div id="paginationInfo">0/0 行表示中</div>
                         </div>
 
                     </div>
@@ -263,276 +362,437 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
-            $(document).ready(function () {
-                let headerInfo = [];
-                function loadProcessedFiles() {
-                    $.ajax({
-                        url: "{% url 'get_data' %}",
-                        type: "POST",
-                        headers: {
-                            'X-CSRFToken': getCookie('csrftoken'),
-                            'Content-Type': 'application/json'
-                        },
-                        success: function(response) {
-                            if (response.status === 'success') {
-                                const processedData = response.data || [];
-                                headerInfo = response.headers || [];
+$(document).ready(function () {
+    let headerInfo = [];
+    let currentPage = 1;
+    let loading = false;
+    let hasMoreData = true;
+    let endMessageAdded = false;
+    const PAGE_SIZE = 20;
 
-                                const table = $("#inputData");
-                                if ($.fn.DataTable.isDataTable(table)) {
-                                    table.DataTable().destroy();
-                                }
+    // Hàm tải dữ liệu từ server
+    function loadProcessedFiles(page = 1, append = false) {
+        if (loading) return;
 
-                                const thead = table.find("thead");
-                                if (thead.length === 0) {
-                                    table.prepend("<thead><tr></tr></thead>");
-                                }
+        loading = true;
 
-                                const headerRow = table.find("thead tr");
-                                headerRow.empty();
-                                headerInfo.forEach(header => {
-                                    const headerClass = header.edit_value ? 'bg-success' : '';
-                                    headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
-                                });
-                                const tbody = table.find("tbody");
-                                if (tbody.length === 0) {
-                                    table.append("<tbody></tbody>");
-                                }
-                                tbody.empty();
-                                processedData.forEach(dataSet => {
-                                    if (dataSet.data && Array.isArray(dataSet.data)) {
-                                        dataSet.data.forEach((row, index) => {
-                                            const rowKey = `${dataSet.key} ${index}`;
-                                            const rowHTML = row.map((cell, cellIndex) => {
-                                                const header = headerInfo[cellIndex];
-                                                const cellClass = header?.edit_value
-                                                    ? header.format_value === 'date' ? 'row-date'
-                                                    : header.format_value === 'time' ? 'row-time'
-                                                    : ''
-                                                    : '';
-                                                return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
-                                            }).join('');
-                                            tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
-                                        });
-                                    }
-                                });
+        // Hiển thị indicator loading
+        if (!append) {
+            $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
+        } else {
+            // Xóa thông báo đã tải hết (nếu có) trước khi thêm loading mới
+            $("#endMessage").remove();
+            $("#loadingRow").remove();
+            $("#inputData tbody").append('<tr id="loadingRow"><td colspan="100%" class="text-center"><div class="loading-spinner"></div> 追加データを読み込み中...</td></tr>');
+        }
 
-                                if (headerInfo.length > 0) {
-                                    try {
-                                        initDataTable(table);
-                                    } catch (error) {
-                                        console.error('DataTable initialization error:', error);
-                                        createToast("error", "テーブルの初期化中にエラーが発生しました。");
-                                    }
-                                }
-                            } else {
-                                createToast("error", response.message || "データの取得に失敗しました。");
-                            }
-                        },
-                        error: function (error) {
-                            createToast("error", "エラーが発生しました。データを取得できませんでした。");
+        $.ajax({
+            url: "{% url 'get_data' %}",
+            type: "POST",
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            data: JSON.stringify({
+                page: page,
+                page_size: PAGE_SIZE
+            }),
+            success: function(response) {
+                loading = false;
+                $("#loadingRow").remove();
+
+                if (response.status === 'success') {
+                    const processedData = response.data || [];
+                    headerInfo = response.headers || [];
+
+                    // Cập nhật thông tin phân trang
+                    currentPage = response.pagination.page;
+                    hasMoreData = currentPage < response.pagination.total_pages;
+
+                    const table = $("#inputData");
+
+                    if (!append) {
+                        if ($.fn.DataTable.isDataTable(table)) {
+                            table.DataTable().destroy();
                         }
-                    });
-                }
 
-                function initDataTable(idTable) {
-                    if ($.fn.DataTable.isDataTable(idTable)) {
-                        idTable.DataTable().destroy();
+                        // Xóa bảng cũ
+                        const thead = table.find("thead");
+                        if (thead.length === 0) {
+                            table.prepend("<thead><tr></tr></thead>");
+                        }
+
+                        const headerRow = table.find("thead tr");
+                        headerRow.empty();
+                        headerInfo.forEach(header => {
+                            const headerClass = header.edit_value ? 'bg-success' : '';
+                            headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
+                        });
+
+                        // Xóa nội dung tbody
+                        table.find("tbody").empty();
+                        // Đặt lại trạng thái
+                        endMessageAdded = false;
                     }
 
-                    return idTable.DataTable({
-                        scrollY: "200px",
-                        scrollX: true,
-                        scrollCollapse: true,
-                        paging: false,
-                        searching: false,
-                        ordering: false,
-                        info: false,
-                        lengthChange: false,
-                        columnDefs: [
-                            {
-                                targets: '_all',
-                                className: 'dt-center',
-                                render: function(data, type, row) {
-                                    const displayData = data || '';
-                                    return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
-                                }
-                            }
-                        ],
-                        language: {
-                            url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
-                        },
-                        fixedHeader: true,
-                        autoWidth: true,
-                        initComplete: function(settings, json) {
-                            this.api().columns.adjust();
-                        }
-                    });
-                }
-
-                loadProcessedFiles();
-
-                $(".btn-export").on('click', function () {
-                    if (this.attributes.id.value === 'system-csv') {
-                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
-                    } else {
-                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+                    const tbody = table.find("tbody");
+                    if (tbody.length === 0) {
+                        table.append("<tbody></tbody>");
                     }
 
-                    setTimeout(function () {
-                        window.location.href = "{% url 'home' %}";
-                    }, 1000);
-                });
-
-                $('#inputData').on('click', 'tbody tr', function () {
-                    $('#inputData tbody tr').removeClass('active-row');
-                    $(this).addClass('active-row');
-
-                    const cells = $(this).find('td').map(function () {
-                        return $(this).text();
-                    }).get();
-
-                    const formattedKey = $(this).data('index');
-                    const showDataDiv = $('.show-data');
-                    showDataDiv.empty();
-                    showDataDiv.attr('data-index', formattedKey);
-
-                    let rowHTML = '<div class="row">';
-                    let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
-
-                    let nonEditHeaders = [];
-                    let editHeaders = [];
-                    headerInfo.forEach((header, index) => {
-                        if (!header.edit_value) {
-                            nonEditHeaders.push({ header: header.header_name, cell: cells[index] });
-                        } else {
-                            editHeaders.push({ header: header.header_name, cell: cells[index], format: header.format_value });
+                    // Thêm dữ liệu mới
+                    let rowsAdded = 0;
+                    processedData.forEach(dataSet => {
+                        if (dataSet.data && Array.isArray(dataSet.data)) {
+                            dataSet.data.forEach((row, index) => {
+                                const rowKey = `${dataSet.key} ${index}`;
+                                const rowHTML = row.map((cell, cellIndex) => {
+                                    const header = headerInfo[cellIndex];
+                                    const cellClass = header?.edit_value
+                                        ? header.format_value === 'date' ? 'row-date'
+                                        : header.format_value === 'time' ? 'row-time'
+                                        : ''
+                                        : '';
+                                    return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
+                                }).join('');
+                                tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
+                                rowsAdded++;
+                            });
                         }
                     });
 
-                    const midpoint = Math.ceil(nonEditHeaders.length / 2);
-                    nonEditHeaders.forEach((item, index) => {
-                        let content;
-                        const regex = /第\d+希望日付/;
-                        if (regex.test(item.header) && item.cell) {
-                            content = `
-                                <div class="mb-3 d-flex align-items-center w-100 position-relative">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                    <input type="radio" name="preferred-date" class="position-absolute">
-                                    <input type="text" class="form-control bg-white pl-4" value="${item.cell || ''}" readonly>
-                                </div>
-                            `;
-                        } else {
-                            content = `
-                                <div class="mb-3 d-flex align-items-center w-100">
-                                    <label class="text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                    <input type="text" id="${item.header}" class="form-control bg-white" value="${item.cell || ''}" readonly>
-                                </div>
-                            `;
+                    if (headerInfo.length > 0 && !append) {
+                        try {
+                            initDataTable(table);
+                        } catch (error) {
+                            console.error('DataTable initialization error:', error);
+                            createToast("error", "テーブルの初期化中にエラーが発生しました。");
                         }
-                        if (index < midpoint) {
-                            colLeft1 += content;
-                        } else {
-                            colLeft2 += content;
+                    } else if (append && rowsAdded > 0) {
+                        // Áp dụng lại class dt-center cho các ô mới thêm vào
+                        table.find('tbody tr').slice(-rowsAdded).find('td').addClass('dt-center');
+
+                        // Sau khi thêm dữ liệu mới, điều chỉnh lại các cột
+                        if ($.fn.DataTable.isDataTable(table)) {
+                            table.DataTable().columns.adjust();
                         }
-                    });
+                    }
 
-                    editHeaders.forEach((item) => {
-                        const cellClass = item.format === 'date' ? 'date-picker'
-                                       : item.format === 'time' ? 'time-picker'
-                                       : '';
-                        let content = `
-                            <div class="mb-3 d-flex align-items-center w-100">
-                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
-                            </div>
-                        `;
-                        colRight += content;
-                    });
+                    // Hiển thị thông tin về số dòng đã hiển thị
+                    const currentRows = $("table#inputData tbody tr").length;
+                    const totalRows = response.pagination.total_rows;
+                    $("#paginationInfo").html(`${currentRows}/${totalRows} 行表示中`);
 
-                    colLeft1 += '</div>';
-                    colLeft2 += '</div>';
-                    colRight += '</div>';
+                    // Nếu không còn dữ liệu để tải và chưa hiển thị thông báo
+                    if (!hasMoreData && !endMessageAdded) {
+                        $("#inputData tbody").append('<tr id="endMessage" class="text-center text-muted"><td colspan="100%">すべてのデータが読み込まれました</td></tr>');
+                        endMessageAdded = true;
+                    }
 
-                    rowHTML += `
-                        <div class="row col-12 col-md-6 col-lg-9">
-                            ${colLeft1}
-                            ${colLeft2}
-                        </div>
-                        <div class="row col-12 col-md-6 col-lg-3">
-                            ${colRight}
-                        </div>
-                    `;
+                    // Kiểm tra xem có cần tải thêm dữ liệu không
+                    if (rowsAdded > 0) {
+                        checkIfMoreContentNeeded();
+                    }
 
-                    showDataDiv.append(rowHTML);
-
-                    flatpickr(".date-picker", {
-                        locale: "ja",
-                        dateFormat: "Y/m/d",
-                    });
-
-                    flatpickr(".time-picker", {
-                        locale: "ja",
-                        enableTime: true,
-                        noCalendar: true,
-                        dateFormat: "H:i",
-                        time_24hr: true,
-                    });
-                });
-
-                function UpdateFormatData(Input){
-                    const dataIndex = $('.show-data').attr('data-index');
-                    const fieldName = Input.attr('name');
-                    const fieldValue = Input.val();
-
-                    const postData = {
-                        key: dataIndex,
-                        field_name: fieldName,
-                        field_value: fieldValue,
-                        csrfmiddlewaretoken: getCookie('csrftoken')
-                    };
-
-                    $.ajax({
-                        url: "{% url 'update_format_data' %}",
-                        type: "POST",
-                        data: postData,
-                        error: function (error) {
-                            createToast('error', 'データ送信中にエラーが発生しました。');
-                        }
-                    });
+                } else {
+                    createToast("error", response.message || "データの取得に失敗しました。");
                 }
+            },
+            error: function (error) {
+                loading = false;
+                $("#loadingRow").remove();
+                createToast("error", "エラーが発生しました。データを取得できませんでした。");
+            }
+        });
+    }
 
-                $(document).on('blur change', '.edit-input', function () {
-                    new UpdateFormatData($(this));
-                });
+    // Khởi tạo DataTable
+    function initDataTable(idTable) {
+        if ($.fn.DataTable.isDataTable(idTable)) {
+            idTable.DataTable().destroy();
+        }
 
+        const dataTable = idTable.DataTable({
+            scrollY: "250px",
+            scrollX: true,
+            scrollCollapse: true,
+            paging: false,
+            searching: false,
+            ordering: false,
+            info: false,
+            lengthChange: false,
+            columnDefs: [
+                {
+                    targets: '_all',
+                    className: 'dt-center',
+                    render: function(data, type, row) {
+                        const displayData = data || '';
+                        return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
+                    }
+                }
+            ],
+            language: {
+                url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+            },
+            fixedHeader: true,
+            autoWidth: true,
+            initComplete: function(settings, json) {
+                this.api().columns.adjust();
 
-                $(document).on('change', 'input[type="radio"]', function () {
-                    const name = $(this).attr('name');
-                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
-                    $(".date-picker").val(selectedDate);
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-                    targetRow.find('td.row-date').text(selectedDate);
+                // Đảm bảo thanh cuộn ngang có thể hoạt động
+                $(".dataTables_scrollBody").css("overflow-x", "auto");
 
-                    $(`input[name="${name}"]`).not(this).prop('checked', false);
-                    new UpdateFormatData($(".date-picker"));
-                });
+                // Thiết lập các sự kiện cuộn sau khi bảng đã tải hoàn tất
+                setupScrollEvents();
+            }
+        });
 
-                $(document).on('change', '.edit-input', function () {
-                    const newText = $(this).val();
-                    const name = $(this).attr('name');
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+        return dataTable;
+    }
 
-                    targetRow.find(`td.${name}`).text(newText);
-                });
-            });
+    // Thiết lập các sự kiện cuộn
+    function setupScrollEvents() {
+        // Đảm bảo sự kiện scroll được gán đúng cho container
+        const scrollBodySelector = ".dataTables_scrollBody";
 
+        // Xóa các sự kiện cũ để tránh trùng lặp
+        $(scrollBodySelector).off("scroll.infiniteScroll");
+
+        // Thiết lập sự kiện cuộn cho container của DataTable
+        $(scrollBodySelector).on("scroll.infiniteScroll", function() {
+            // Lấy thông tin vị trí cuộn
+            const scrollTop = $(this).scrollTop();
+            const viewportHeight = $(this).height();
+            const scrollHeight = $(this)[0].scrollHeight;
+
+            // Tính toán phần trăm đã cuộn
+            // Tránh chia cho 0 nếu không có thanh cuộn
+            const denominator = Math.max(1, scrollHeight - viewportHeight);
+            const scrollPercent = (scrollTop / denominator) * 100;
+
+            // Tải thêm dữ liệu nếu đã cuộn tới 80% hoặc hơn
+            if (!loading && hasMoreData && scrollPercent >= 80 && !endMessageAdded) {
+                console.log("Loading more data at scroll position: " + scrollPercent.toFixed(2) + "%");
+                currentPage++;
+                loadProcessedFiles(currentPage, true);
+            }
+        });
+
+        // Kích hoạt kiểm tra cuộn ngay sau khi thiết lập
+        setTimeout(function() {
+            checkIfMoreContentNeeded();
+        }, 300);
+    }
+
+    // Kiểm tra và tải thêm dữ liệu nếu cần
+    function checkIfMoreContentNeeded() {
+        const scrollBody = $(".dataTables_scrollBody");
+        if (scrollBody.length > 0) {
+            const scrollHeight = scrollBody[0].scrollHeight;
+            const clientHeight = scrollBody.height();
+
+            // Nếu nội dung chưa đủ để tạo thanh cuộn và còn dữ liệu để tải
+            if (scrollHeight <= clientHeight && hasMoreData && !loading && !endMessageAdded) {
+                console.log("Auto loading more because content is not enough to scroll");
+                setTimeout(function() {
+                    currentPage++;
+                    loadProcessedFiles(currentPage, true);
+                }, 300);
+            }
+        }
+    }
+
+    // Xử lý resize cửa sổ - đảm bảo thanh cuộn hoạt động đúng
+    $(window).on('resize', function() {
+        if ($.fn.DataTable.isDataTable("#inputData")) {
+            $("#inputData").DataTable().columns.adjust();
+        }
+    });
+
+    // Tải dữ liệu ban đầu
+    loadProcessedFiles();
+
+    // Xử lý khi click vào dòng để hiển thị chi tiết
+    $('#inputData').on('click', 'tbody tr', function () {
+        // Bỏ qua hàng thông báo cuối
+        if ($(this).attr('id') === 'endMessage' || $(this).attr('id') === 'loadingRow') {
+            return;
+        }
+
+        // Bỏ chọn dòng hiện tại (nếu có)
+        $('#inputData tbody tr').removeClass('active-row');
+        // Đánh dấu dòng được chọn
+        $(this).addClass('active-row');
+
+        // Lấy dữ liệu của dòng
+        const cells = $(this).find('td').map(function () {
+            return $(this).text();
+        }).get();
+
+        // Lấy key của dòng
+        const formattedKey = $(this).data('index');
+        const showDataDiv = $('.show-data');
+        showDataDiv.empty();
+        showDataDiv.attr('data-index', formattedKey);
+
+        // Tạo layout cho form hiển thị chi tiết
+        let rowHTML = '<div class="row">';
+        let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
+        let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
+        let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
+
+        // Phân loại các trường theo khả năng chỉnh sửa
+        let nonEditHeaders = [];
+        let editHeaders = [];
+        headerInfo.forEach((header, index) => {
+            if (!header.edit_value) {
+                nonEditHeaders.push({ header: header.header_name, cell: cells[index] });
+            } else {
+                editHeaders.push({ header: header.header_name, cell: cells[index], format: header.format_value });
+            }
+        });
+
+        // Phân chia các trường không thể chỉnh sửa vào 2 cột
+        const midpoint = Math.ceil(nonEditHeaders.length / 2);
+        nonEditHeaders.forEach((item, index) => {
+            let content;
+            const regex = /第\d+希望日付/;
+            if (regex.test(item.header) && item.cell) {
+                content = `
+                    <div class="mb-3 d-flex align-items-center w-100 position-relative">
+                        <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                        <input type="radio" name="preferred-date" class="position-absolute">
+                        <input type="text" class="form-control bg-white pl-4" value="${item.cell || ''}" readonly>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div class="mb-3 d-flex align-items-center w-100">
+                        <label class="text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                        <input type="text" id="${item.header}" class="form-control bg-white" value="${item.cell || ''}" readonly>
+                    </div>
+                `;
+            }
+            if (index < midpoint) {
+                colLeft1 += content;
+            } else {
+                colLeft2 += content;
+            }
+        });
+
+        // Tạo các trường có thể chỉnh sửa
+        editHeaders.forEach((item) => {
+            const cellClass = item.format === 'date' ? 'date-picker'
+                           : item.format === 'time' ? 'time-picker'
+                           : '';
+            let content = `
+                <div class="mb-3 d-flex align-items-center w-100">
+                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                    <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                </div>
+            `;
+            colRight += content;
+        });
+
+        // Đóng các div
+        colLeft1 += '</div>';
+        colLeft2 += '</div>';
+        colRight += '</div>';
+
+        // Tạo layout cuối cùng
+        rowHTML += `
+            <div class="row col-12 col-md-6 col-lg-9">
+                ${colLeft1}
+                ${colLeft2}
+            </div>
+            <div class="row col-12 col-md-6 col-lg-3">
+                ${colRight}
+            </div>
+        `;
+
+        // Thêm vào container
+        showDataDiv.append(rowHTML);
+
+        // Khởi tạo date/time picker cho các trường có thể chỉnh sửa
+        flatpickr(".date-picker", {
+            locale: "ja",
+            dateFormat: "Y/m/d",
+        });
+
+        flatpickr(".time-picker", {
+            locale: "ja",
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i",
+            time_24hr: true,
+        });
+    });
+
+    // Hàm cập nhật dữ liệu khi thay đổi
+    function UpdateFormatData(Input) {
+        const dataIndex = $('.show-data').attr('data-index');
+        const fieldName = Input.attr('name');
+        const fieldValue = Input.val();
+
+        const postData = {
+            key: dataIndex,
+            field_name: fieldName,
+            field_value: fieldValue,
+            csrfmiddlewaretoken: getCookie('csrftoken')
+        };
+
+        $.ajax({
+            url: "{% url 'update_format_data' %}",
+            type: "POST",
+            data: postData,
+            error: function (error) {
+                createToast('error', 'データ送信中にエラーが発生しました。');
+            }
+        });
+    }
+
+    // Xử lý sự kiện khi người dùng thay đổi dữ liệu
+    $(document).on('blur change', '.edit-input', function () {
+        UpdateFormatData($(this));
+    });
+
+    // Xử lý sự kiện khi người dùng chọn ngày tham khảo
+    $(document).on('change', 'input[type="radio"]', function () {
+        const name = $(this).attr('name');
+        const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+        $(".date-picker").val(selectedDate);
+        const formattedKey = $('.show-data').attr('data-index');
+        const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+        targetRow.find('td.row-date').text(selectedDate);
+
+        $(`input[name="${name}"]`).not(this).prop('checked', false);
+        UpdateFormatData($(".date-picker"));
+    });
+
+    // Cập nhật dữ liệu trong bảng khi người dùng thay đổi
+    $(document).on('change', '.edit-input', function () {
+        const newText = $(this).val();
+        const name = $(this).attr('name');
+        const formattedKey = $('.show-data').attr('data-index');
+        const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+        targetRow.find(`td.${name}`).text(newText);
+    });
+
+    // Xử lý các nút xuất dữ liệu
+    $(".btn-export").on('click', function () {
+        if (this.attributes.id.value === 'system-csv') {
+            window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
+        } else {
+            window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+        }
+
+        setTimeout(function () {
+            window.location.href = "{% url 'home' %}";
+        }, 1000);
+    });
+});
         </script>
-
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}
