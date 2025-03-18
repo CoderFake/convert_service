@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ProcessedFilesView(LoginRequiredMixin, View):
     def post(self, request):
         try:
-            return process_and_display(request.session.session_key, request.user.id)
+            return process_and_display(request.session.session_key, request.user.id, request)
         except Exception as e:
             logger.error(f"Error fetching processed files: {e}")
             return JsonResponse({'status': 'error', 'message': 'エラーが発生しました。'})
