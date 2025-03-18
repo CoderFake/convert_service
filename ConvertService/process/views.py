@@ -1,5 +1,4 @@
 import json
-import math
 import os
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -207,26 +206,9 @@ class DownloadView(LoginRequiredMixin, View):
 
 class ProcessAndDisplayView:
     @staticmethod
-    def process_and_display(session_id, user_id, request=None):
+    def process_and_display(session_id, user_id):
         try:
-            page = 1
-            page_size = 20
-
-            if request and request.method == 'POST':
-                try:
-                    data = json.loads(request.body.decode('utf-8'))
-                    page = int(data.get('page', 1))
-                    page_size = int(data.get('page_size', 20))
-                except json.JSONDecodeError:
-                    pass
-                except ValueError:
-                    pass
-
-            page = max(1, page)
-            page_size = max(10, min(100, page_size))
-
             client = redis_client.get_client()
-
             user = Account.objects.get(pk=user_id)
 
             show_formatted_header = HeaderFetcher.get_headers(
@@ -246,36 +228,22 @@ class ProcessAndDisplayView:
             format_keys = client.keys(f"{session_id}-formatted:*")
 
             if not format_keys:
-                logger.warning("Không tìm thấy dữ liệu đã được xử lý.")
+                logger.warning("No processed or formatted files found.")
                 return JsonResponse({
                     'status': 'error',
                     'message': '処理されたファイルが見つかりません。'
                 }, status=404)
 
-            processed_data, total_rows = DisplayData.get_paginated_data(
-                client,
-                format_keys,
-                hidden_formatted_header,
-                page,
-                page_size
-            )
-
-            total_pages = math.ceil(total_rows / page_size) if total_rows > 0 else 0
+            processed_data = DisplayData.get_list_data(client, format_keys, hidden_formatted_header)
 
             return JsonResponse({
                 'status': "success",
                 'headers': show_formatted_header,
                 'data': processed_data,
-                'pagination': {
-                    'page': page,
-                    'page_size': page_size,
-                    'total_pages': total_pages,
-                    'total_rows': total_rows
-                }
             }, status=200)
 
         except Exception as e:
-            logger.error(f"Lỗi trong process_and_display: {e}")
+            logger.error(f"Error in process_and_display: {e}")
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
@@ -403,8 +371,8 @@ class ProcessHeadersView(LoginRequiredMixin, View):
         return uploaded_files, None
 
 
-def process_and_display(session_id, user_id, request=None):
-    return ProcessAndDisplayView.process_and_display(session_id, user_id, request)
+def process_and_display(session_id, user_id):
+    return ProcessAndDisplayView.process_and_display(session_id, user_id)
 
 
 def save_format_field(request):
