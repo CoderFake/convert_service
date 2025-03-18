@@ -246,7 +246,7 @@ class ProcessAndDisplayView:
             format_keys = client.keys(f"{session_id}-formatted:*")
 
             if not format_keys:
-                logger.warning("No processed or formatted files found.")
+                logger.warning("Không tìm thấy dữ liệu đã được xử lý.")
                 return JsonResponse({
                     'status': 'error',
                     'message': '処理されたファイルが見つかりません。'
@@ -275,7 +275,7 @@ class ProcessAndDisplayView:
             }, status=200)
 
         except Exception as e:
-            logger.error(f"Error in process_and_display: {e}")
+            logger.error(f"Lỗi trong process_and_display: {e}")
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
