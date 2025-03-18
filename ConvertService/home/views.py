@@ -45,4 +45,4 @@ class HomeView(View):
 
             return render(request, 'web/home/index.html', context)
 
-        return render(request, 'web/home/index.html')
+        return render(request, 'web/accounts/login.html')

@@ -6,66 +6,542 @@
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+    <style>
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+        .tab-content {
+            padding: 20px 0;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            color: #5e72e4;
+        }
+        .fixed-data-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .fixed-data-row:hover {
+            background-color: #f1f1f1;
+        }
+        .badge-rule {
+            font-size: 85%;
+            font-weight: normal;
+            padding: 5px 8px;
+        }
+        .existing-rule {
+            background-color: rgba(94, 114, 228, 0.1);
+            border: 1px solid #5e72e4;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .delete-btn {
+            color: #f5365c;
+            cursor: pointer;
+        }
+        .rule-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+    </style>
 {% endblock stylesheets %}
 
 {% block content %}
-    <div class="container-fluid h-100 position-relative">
-        <div class="row h-100">
-            <div class="col-12 col">
-                <form id="process-items" method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">設定ルール</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="rule-settings-tab" data-toggle="tab" href="#rule-settings" role="tab"
+                               aria-controls="rule-settings" aria-selected="true">ルール設定</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="fixed-data-tab" data-toggle="tab" href="#fixed-data" role="tab"
+                               aria-controls="fixed-data" aria-selected="false">固定値データ</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="display-settings-tab" data-toggle="tab" href="#display-settings" role="tab"
+                               aria-controls="display-settings" aria-selected="false">表示設定</a>
+                        </li>
+                    </ul>
 
-                    <div id="setting-rules-container">
-                        <div class="setting-rule">
-                            <div class="form-group">
-                                <label for="data_item_input">Data Item Input</label>
-                                <select class="form-select" id="data_item_input" name="data_item_input">
-                                    <option value="0">Select Data Item</option>
-                                    {% for data_item in data_inputs %}
-                                        <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
-                                    {% endfor %}
-                                </select>
+                    <div class="tab-content" id="myTabContent">
+                        <div class="tab-pane fade show active" id="rule-settings" role="tabpanel" aria-labelledby="rule-settings-tab">
+                            <div class="row">
+                                <div class="col-12 col-lg-8">
+                                    <form id="rule-settings-form" method="post">
+                                        {% csrf_token %}
+                                        <div class="form-group">
+                                            <label for="data_item_input">入力データ項目</label>
+                                            <select class="form-select select2" id="data_item_input" name="data_item_input">
+                                                <option value="0">データ項目を選択</option>
+                                                {% for data_item in data_inputs %}
+                                                    <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label for="data_item_format">出力データ項目</label>
+                                            <select class="form-select select2" id="data_item_format" name="data_item_format">
+                                                <option value="0">データ項目を選択</option>
+                                                {% for data_item in data_formats %}
+                                                    <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label for="rule_name">ルール名</label>
+                                            <select class="form-select select2" id="rule_name" name="rule_name">
+                                                <option value="0">ルールを選択</option>
+                                                {% for rule in rules %}
+                                                    <option value="{{ rule.id }}"
+                                                        data-rule-id="{{ rule.convert_rule_id }}"
+                                                        data-category="{{ rule.convert_rule_category.convert_rule_category_name }}">
+                                                        {{ rule.convert_rule_name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="form-text text-muted">
+                                                <span id="rule_category" class="badge badge-info"></span>
+                                                <span id="rule_id" class="badge badge-light"></span>
+                                            </small>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-primary">登録</button>
+                                    </form>
+                                </div>
+
+                                <div class="col-12 col-lg-4">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="m-0 font-weight-bold">既存のルール</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="existing-rules-container">
+                                                <!-- 既存ルールがここに表示される -->
+                                                {% for rule in existing_rules %}
+                                                <div class="existing-rule">
+                                                    <div class="rule-header d-flex justify-content-between">
+                                                        <span>{{ rule.input_item }} → {{ rule.output_item }}</span>
+                                                        <i class="fas fa-trash delete-btn" data-rule-id="{{ rule.id }}"></i>
+                                                    </div>
+                                                    <div>
+                                                        <span class="badge badge-rule">{{ rule.rule_name }}</span>
+                                                        <small class="text-muted">{{ rule.rule_category }}</small>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="fixed-data" role="tabpanel" aria-labelledby="fixed-data-tab">
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <form id="add-fixed-data-form" class="form-inline">
+                                        {% csrf_token %}
+                                        <div class="form-group mr-2">
+                                            <label for="fixed_rule" class="mr-2">ルール:</label>
+                                            <select class="form-select" id="fixed_rule" name="fixed_rule">
+                                                <option value="">ルールを選択</option>
+                                                <option value="CR_GROUP_NO">顧客名→団体番号１</option>
+                                                <option value="CR_TIME_CODE1">予約時間→（必須）時間帯コード</option>
+                                                <option value="CR_CAUSE_CODE1">顧客コース名→予約コース１</option>
+                                                <option value="CR_TIME_START">予約時間→受付時間開始</option>
+                                                <option value="CR_TIME_END">予約時間→受付時間終了</option>
+                                                <option value="CR_FIXED_VALUE">固定データ用の規則</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group mr-2">
+                                            <label for="fixed_before" class="mr-2">変換前:</label>
+                                            <input type="text" class="form-control" id="fixed_before" name="fixed_before">
+                                        </div>
+                                        <div class="form-group mr-2">
+                                            <label for="fixed_after" class="mr-2">変換後:</label>
+                                            <input type="text" class="form-control" id="fixed_after" name="fixed_after">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">追加</button>
+                                    </form>
+                                </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="data_item_format_0">Data Item Format</label>
-                                <select class="form-select" id="data_item_format" name="data_item_format">
-                                    <option value="0">Select Data Item</option>
-                                    {% for data_item in data_formats %}
-                                        <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                            <h6 class="m-0 font-weight-bold text-primary">固定値データ一覧</h6>
+                                            <div class="form-inline">
+                                                <select id="filter-fixed-rule" class="form-select form-control-sm mr-2">
+                                                    <option value="">全てのルール</option>
+                                                    <option value="CR_GROUP_NO">顧客名→団体番号１</option>
+                                                    <option value="CR_TIME_CODE1">予約時間→（必須）時間帯コード</option>
+                                                    <option value="CR_CAUSE_CODE1">顧客コース名→予約コース１</option>
+                                                    <option value="CR_TIME_START">予約時間→受付時間開始</option>
+                                                    <option value="CR_TIME_END">予約時間→受付時間終了</option>
+                                                    <option value="CR_FIXED_VALUE">固定データ用の規則</option>
+                                                </select>
+                                                <input type="text" id="search-fixed-data" class="form-control form-control-sm" placeholder="検索...">
+                                            </div>
+                                        </div>
+                                        <div class="card-body fixed-data-table">
+                                            <table class="table table-bordered table-hover" id="fixed-data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>ID</th>
+                                                        <th>ルール</th>
+                                                        <th>変換前の値</th>
+                                                        <th>変換後の値</th>
+                                                        <th>操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in fixed_data_values %}
+                                                    <tr class="fixed-data-row" data-rule="{{ item.convert_rule.convert_rule_id }}">
+                                                        <td>{{ item.id }}</td>
+                                                        <td>{{ item.convert_rule.convert_rule_name }}</td>
+                                                        <td>{{ item.data_value_before }}</td>
+                                                        <td>{{ item.data_value_after }}</td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-danger delete-fixed-data" data-id="{{ item.id }}">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="display-settings" role="tabpanel" aria-labelledby="display-settings-tab">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> 各データ項目の表示設定や編集可能設定を管理します。
                             </div>
 
-                            <div class="form-group">
-                                <label for="rule_name">Rule Name</label>
-                                <select class="form-select" id="rule_name" name="rule_name">
-                                    <option value="0">Select Rule</option>
-                                    {% for rule in rules %}
-                                        <option value="{{ rule.id }}">{{ rule.convert_rule_name }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                            <h6 class="m-0 font-weight-bold text-primary">ヘッダー設定</h6>
+                                            <div class="form-inline">
+                                                <select id="header-type-filter" class="form-select form-control-sm mr-2">
+                                                    <option value="input">入力データ</option>
+                                                    <option value="format">フォーマットデータ</option>
+                                                    <option value="output">出力データ</option>
+                                                </select>
+                                                <input type="text" id="search-headers" class="form-control form-control-sm" placeholder="検索...">
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="header-settings-form">
+                                                {% csrf_token %}
+                                                <table class="table table-bordered table-hover" id="header-settings-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>項目名</th>
+                                                            <th>表示</th>
+                                                            <th>編集可能</th>
+                                                            <th>データ型</th>
+                                                            <th>インデックス</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for header in headers %}
+                                                        <tr class="header-row" data-type="{{ header.type_name }}">
+                                                            <td>{{ header.data_item.data_item_name }}</td>
+                                                            <td>
+                                                                <div class="custom-control custom-switch">
+                                                                    <input type="checkbox" class="custom-control-input"
+                                                                        id="display_{{ header.id }}" name="display_{{ header.id }}"
+                                                                        {% if header.display %}checked{% endif %}>
+                                                                    <label class="custom-control-label" for="display_{{ header.id }}"></label>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="custom-control custom-switch">
+                                                                    <input type="checkbox" class="custom-control-input"
+                                                                        id="edit_{{ header.id }}" name="edit_{{ header.id }}"
+                                                                        {% if header.edit_value %}checked{% endif %}>
+                                                                    <label class="custom-control-label" for="edit_{{ header.id }}"></label>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-control-sm" name="format_{{ header.id }}">
+                                                                    <option value="string" {% if header.format_value == 'string' %}selected{% endif %}>文字列</option>
+                                                                    <option value="number" {% if header.format_value == 'number' %}selected{% endif %}>数値</option>
+                                                                    <option value="date" {% if header.format_value == 'date' %}selected{% endif %}>日付</option>
+                                                                    <option value="time" {% if header.format_value == 'time' %}selected{% endif %}>時間</option>
+                                                                    <option value="datetime" {% if header.format_value == 'datetime' %}selected{% endif %}>日時</option>
+                                                                    <option value="boolean" {% if header.format_value == 'boolean' %}selected{% endif %}>真偽値</option>
+                                                                    <option value="period" {% if header.format_value == 'period' %}selected{% endif %}>時間帯</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="index_{{ header.id }}" value="{{ header.index_value }}" min="0">
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                                <button type="submit" class="btn btn-primary mt-3">設定を保存</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary mt-4">Submit</button>
-                </form>
-
-                <div id="response-container" class="mt-4">
                 </div>
             </div>
         </div>
     </div>
+</div>
+
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">削除確認</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>この項目を削除してもよろしいですか？</p>
+                <p class="text-danger">この操作は元に戻せません。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block javascripts %}
-    <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
-    <script>
-        $(document).ready(function () {
-            $('.alert-dismissible').each(function() {
-                createToast($(this).find('.message-tag').text(), $(this).find('.message').text());
-                $(this).remove();
+<script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('.select2').select2({
+            placeholder: "選択してください",
+            allowClear: true
+        });
+
+        $('#fixed-data-table').DataTable({
+            "paging": true,
+            "ordering": true,
+            "info": true,
+            "searching": true,
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Japanese.json"
+            }
+        });
+
+        $('#rule_name').on('change', function() {
+            const selectedOption = $(this).find('option:selected');
+            const ruleId = selectedOption.data('rule-id');
+            const category = selectedOption.data('category');
+
+            $('#rule_id').text(ruleId);
+            $('#rule_category').text(category);
+        });
+
+        $('#filter-fixed-rule').on('change', function() {
+            const value = $(this).val();
+            if (value === '') {
+                $('.fixed-data-row').show();
+            } else {
+                $('.fixed-data-row').hide();
+                $(`.fixed-data-row[data-rule="${value}"]`).show();
+            }
+        });
+
+        $('#search-fixed-data').on('keyup', function() {
+            const value = $(this).val().toLowerCase();
+            $('.fixed-data-row').filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
             });
-        })
-    </script>
+        });
+
+        $('#header-type-filter').on('change', function() {
+            const value = $(this).val();
+            $('.header-row').hide();
+            $(`.header-row[data-type="${value}"]`).show();
+        });
+
+        $('#search-headers').on('keyup', function() {
+            const value = $(this).val().toLowerCase();
+            $('.header-row:visible').filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+            });
+        });
+
+        $('#add-fixed-data-form').on('submit', function(e) {
+            e.preventDefault();
+
+            const rule = $('#fixed_rule').val();
+            const before = $('#fixed_before').val();
+            const after = $('#fixed_after').val();
+
+            if (!rule || !before || !after) {
+                alert('すべての項目を入力してください。');
+                return;
+            }
+
+            $.ajax({
+                url: '{% url "add_fixed_data" %}',
+                type: 'POST',
+                data: {
+                    'rule': rule,
+                    'before': before,
+                    'after': after,
+                    'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const newRow = `
+                            <tr class="fixed-data-row" data-rule="${rule}">
+                                <td>${response.id}</td>
+                                <td>${response.rule_name}</td>
+                                <td>${before}</td>
+                                <td>${after}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger delete-fixed-data" data-id="${response.id}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        $('#fixed-data-table tbody').append(newRow);
+
+                        $('#add-fixed-data-form')[0].reset();
+
+                        createToast('success', '固定データが追加されました');
+                    } else {
+                        createToast('error', response.message);
+                    }
+                },
+                error: function() {
+                    createToast('error', 'エラーが発生しました');
+                }
+            });
+        });
+
+        $(document).on('click', '.delete-fixed-data', function() {
+            const id = $(this).data('id');
+            $('#deleteConfirmModal').modal('show');
+
+            $('#confirmDelete').off('click').on('click', function() {
+                $.ajax({
+                    url: '{% url "delete_fixed_data" %}',
+                    type: 'POST',
+                    data: {
+                        'id': id,
+                        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            // 行を削除
+                            $(`button.delete-fixed-data[data-id="${id}"]`).closest('tr').remove();
+                            createToast('success', '固定データが削除されました');
+                        } else {
+                            createToast('error', response.message);
+                        }
+                        $('#deleteConfirmModal').modal('hide');
+                    },
+                    error: function() {
+                        createToast('error', 'エラーが発生しました');
+                        $('#deleteConfirmModal').modal('hide');
+                    }
+                });
+            });
+        });
+
+        $('#header-settings-form').on('submit', function(e) {
+            e.preventDefault();
+
+            const formData = $(this).serialize();
+
+            $.ajax({
+                url: '{% url "save_header_settings" %}',
+                type: 'POST',
+                data: formData,
+                success: function(response) {
+                    if (response.status === 'success') {
+                        createToast('success', 'ヘッダー設定が保存されました');
+                    } else {
+                        createToast('error', response.message);
+                    }
+                },
+                error: function() {
+                    createToast('error', 'エラーが発生しました');
+                }
+            });
+        });
+
+        // 既存のルール削除
+        $(document).on('click', '.delete-btn', function() {
+            const ruleId = $(this).data('rule-id');
+            $('#deleteConfirmModal').modal('show');
+
+            $('#confirmDelete').off('click').on('click', function() {
+                $.ajax({
+                    url: '{% url "delete_rule" %}',
+                    type: 'POST',
+                    data: {
+                        'rule_id': ruleId,
+                        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        if (response.status === 'success') {
+
+                            $(`.delete-btn[data-rule-id="${ruleId}"]`).closest('.existing-rule').remove();
+                            createToast('success', 'ルールが削除されました');
+                        } else {
+                            createToast('error', response.message);
+                        }
+                        $('#deleteConfirmModal').modal('hide');
+                    },
+                    error: function() {
+                        createToast('error', 'エラーが発生しました');
+                        $('#deleteConfirmModal').modal('hide');
+                    }
+                });
+            });
+        });
+
+        // 最初に表示するフィルター適用
+        $('#header-type-filter').trigger('change');
+    });
+</script>
 {% endblock javascripts %}
