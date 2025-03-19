@@ -25,41 +25,22 @@
             </ul>
             {% if request.user.is_authenticated %}
                 <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true"
-                           aria-expanded="false">
-                            <div class="media align-items-center">
-                              <span class="avatar avatar-sm bg-white rounded-circle p-0">
-                                <img alt="Image placeholder" src="{% static 'web/img/theme/Sample_User_Icon.png' %}">
-                              </span>
-                                <div class="media-body  ml-2  d-none d-lg-block">
-                                    <span class="mb-0 text-sm  font-weight-bold">
-                                      {{ request.user.username }}
-                                    </span>
-                                </div>
-                            </div>
+                     <li class="nav-item">
+                        <a class="nav-link" href="" data-bs-toggle="modal" data-bs-target="#logoutModal">
+                            <span class="nav-link-text">ログアウト</span>
                         </a>
-{#                        <div class="dropdown-menu  dropdown-menu-right ">#}
-{#                            <div class="dropdown-header noti-title">#}
-{#                                <h6 class="text-overflow m-0">ようこそ！</h6>#}
-{#                            </div>#}
-{#                            <a href="" class="dropdown-item">#}
-{#                                <i class="ni ni-single-02"></i>#}
-{#                                <span>マイプロフィール</span>#}
-{#                            </a>#}
-{#                            <a target="_blank" href="" class="dropdown-item">#}
-{#                                <i class="ni ni-support-16"></i>#}
-{#                                <span>サポート</span>#}
-{#                            </a>#}
-{#                            <div class="dropdown-divider"></div>#}
-{#                            <a href="{% url 'logout' %}" class="dropdown-item">#}
-{#                                <i class="ni ni-user-run text-red"></i>#}
-{#                                <span>ログアウト</span>#}
-{#                            </a>#}
-{#                        </div>#}
                     </li>
                 </ul>
             {% endif %}
         </div>
     </div>
+</nav>
+<nav class="navbar navbar-top navbar-expand navbar-dark border-bottom d-none d-xl-flex justify-content-end align-content-start position-absolute pt-2" style="top:0; right: 0; z-index: 999; min-height: 45px; background: #f8f9fe">
+     <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
+         <li class="nav-item">
+            <a class="nav-link btn btn-primary py-1" href="" data-bs-toggle="modal" data-bs-target="#logoutModal" style="margin-right: 30px;">
+                <span class="nav-link-text">ログアウト</span>
+            </a>
+        </li>
+    </ul>
 </nav>
