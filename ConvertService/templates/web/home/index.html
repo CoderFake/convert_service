@@ -165,7 +165,6 @@
             border-bottom: 2px solid #4e73df;
         }
 
-
         .show-data {
             height: 100%;
             overflow-y: auto;
@@ -180,9 +179,8 @@
             background-color: transparent;
         }
 
-
         #paginationInfo {
-            display: block !important;
+            display: none !important;
             margin-top: 8px;
             margin-bottom: 12px;
             text-align: right;
@@ -193,6 +191,20 @@
         .dataTables_wrapper {
             width: 100%;
             overflow-x: auto;
+        }
+        .table-resize-handle {
+            width: 100%;
+            height: 10px;
+            background-color: transparent;
+            cursor: ns-resize;
+            position: absolute;
+            bottom: 20px !important;
+            left: 0;
+            z-index: 100;
+        }
+
+        .table-resize-handle:hover {
+            background-color: rgba(78, 115, 223, 0.3);
         }
     </style>
 {% endblock stylesheets %}
@@ -210,8 +222,9 @@
             {% if tab and tab == "upload-file" %}
                 <div class="container compact drag-drop-file reservation w-90">
                     <div class="header-section">
-                        <h1 class="text-center text-dark font-weight-bold">
-                            予約情報ファイルを各施設様配布用ファイルに一括変換</h1>
+                        <h1 class="text-center text-dark font-weight-bold" style="font-size: 3rem;">
+                            変換する予約情報ファイルの選択
+                        </h1>
                     </div>
                     <div class="row">
                         <div class="col-lg-12 form-file w-100">
@@ -355,10 +368,11 @@
                                 </tbody>
                             </table>
                             <div id="paginationInfo" class="d-none">0/0 行表示中</div>
+                            <div class="table-resize-handle"></div>
                         </div>
 
                     </div>
-                    <div class="col-12 mt-4 w-100 overflow-hidden" style="height: calc(100vh - 400px)">
+                    <div class="col-12 mt-4 w-100 overflow-hidden" style="height: calc(100vh - 400px); max-height: 500px;">
                         <div class="show-data pr-0 mb-5 mb-sm-0 w-100 h-100" style="overflow-x: hidden !important;">
                         </div>
                     </div>
@@ -526,6 +540,8 @@
                 }
 
                 function initDataTable(idTable) {
+                    $('.table-responsive').css('height', '250px');
+
                     if ($.fn.DataTable.isDataTable(idTable)) {
                         idTable.DataTable().destroy();
                     }
@@ -558,6 +574,10 @@
                             this.api().columns.adjust();
 
                             $(".dataTables_scrollBody").css("overflow-x", "auto");
+                            setInterval(function (){
+                               $('.table-responsive').css('height', 'auto');
+                            }, 500)
+
 
                             setupScrollEvents();
                         }
@@ -773,149 +793,142 @@
                     } else {
                         window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
                     }
-
-                    setTimeout(function () {
-                        window.location.href = "{% url 'home' %}";
-                    }, 1000);
                 });
             });
-        </script>
-    <script>
-        $(document).ready(function() {
 
-            let isResizing = false;
-            let startY, startHeight;
-            const minHeight = 200;
-            let maxHeight = window.innerHeight * 0.8;
+            $(document).ready(function() {
+                let isResizing = false;
+                let startY, startHeight;
+                const minHeight = 200;
+                let maxHeight = window.innerHeight * 0.8;
 
-            function setupResizeHandle() {
-                $('.dataTables_resize_handle').remove();
+                function setupResizeHandle() {
+                    $('.table-resize-handle').remove();
 
-                if ($('.dataTables_scrollBody').length) {
-                    $('.dataTables_scrollBody').css('position', 'relative');
-                    $('<div class="dataTables_resize_handle"></div>').appendTo('.dataTables_scrollBody');
+                    if ($('.dataTables_scrollBody').length) {
+                        $('.table-responsive').css('position', 'relative');
+                        $('<div class="table-resize-handle"></div>').appendTo('.table-responsive');
 
-                    $('.dataTables_resize_handle').css({
-                        'position': 'absolute',
-                        'bottom': '0',
-                        'left': '0',
-                        'right': '0',
-                        'height': '5px',
-                        'background-color': 'transparent',
-                        'cursor': 'ns-resize',
-                        'z-index': '100'
+                        $('.table-resize-handle').css({
+                            'position': 'absolute',
+                            'bottom': '0',
+                            'left': '0',
+                            'right': '0',
+                            'height': '10px',
+                            'background-color': 'transparent',
+                            'cursor': 'ns-resize',
+                            'z-index': '100'
+                        });
+
+                        initResizeEvents();
+                    }
+                }
+
+                function initResizeEvents() {
+                    $('.table-resize-handle').on('mousedown', function(e) {
+                        isResizing = true;
+                        startY = e.clientY;
+                        startHeight = $('.dataTables_scrollBody').height();
+
+                        $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+
+                        $('.dataTables_scrollBody').addClass('resize-active');
+
+                        e.preventDefault();
                     });
 
-                    initResizeEvents();
+                    $(document).on('mousemove', function(e) {
+                        if (!isResizing) return;
+
+                        const newHeight = startHeight + (e.clientY - startY);
+
+                        if (newHeight >= minHeight && newHeight <= maxHeight) {
+                            $('.dataTables_scrollBody').height(newHeight);
+
+                            adjustDataContainer();
+
+                            // Re-adjust the DataTable
+                            if ($.fn.DataTable.isDataTable("#inputData")) {
+                                $("#inputData").DataTable().columns.adjust();
+                            }
+                        }
+                    });
+
+                    $(document).on('mouseup', function() {
+                        if (isResizing) {
+                            isResizing = false;
+                            $('#resize-overlay').remove();
+                            $('.dataTables_scrollBody').removeClass('resize-active');
+
+                            // Store the height preference if needed
+                            const newHeight = $('.dataTables_scrollBody').height();
+                            localStorage.setItem('preferredTableHeight', newHeight);
+                        }
+                    });
                 }
-            }
 
-            function initResizeEvents() {
-                $('.dataTables_resize_handle').on('mousedown', function(e) {
-                    isResizing = true;
-                    startY = e.clientY;
-                    startHeight = $('.dataTables_scrollBody').height();
+                function adjustDataContainer() {
+                    const scrollBodyHeight = $('.dataTables_scrollBody').height();
+                    const tableContainerHeight = scrollBodyHeight + 150;
 
-                    $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+                    const windowHeight = window.innerHeight;
+                    const tableOffset = $('.table-responsive').offset().top;
+                    const footerHeight = 50;
 
-                    $('.dataTables_scrollBody').addClass('resize-active');
+                    const availableSpace = windowHeight - tableOffset - footerHeight;
+                    $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
+                }
 
-                    e.preventDefault();
-                });
+                function applyStoredHeight() {
+                    const storedHeight = localStorage.getItem('preferredTableHeight');
+                    if (storedHeight && $('.dataTables_scrollBody').length) {
+                        $('.dataTables_scrollBody').height(parseInt(storedHeight));
+                        adjustDataContainer();
+                    }
+                }
 
-                $(document).on('mousemove', function(e) {
-                    if (!isResizing) return;
+                function handleTableSetup() {
+                    if ($('.dataTables_scrollBody').length) {
+                        setupResizeHandle();
+                        applyStoredHeight();
+                        adjustDataContainer();
+                    } else {
+                        setTimeout(handleTableSetup, 500);
+                    }
+                }
 
-                    const newHeight = startHeight + (e.clientY - startY);
+                handleTableSetup();
 
-                    if (newHeight >= minHeight && newHeight <= maxHeight) {
-                        $('.dataTables_scrollBody').height(newHeight);
+                $(window).on('resize', function() {
+                    if ($('.dataTables_scrollBody').length) {
+                        maxHeight = window.innerHeight * 0.8;
+
+                        const currentHeight = $('.dataTables_scrollBody').height();
+                        if (currentHeight > maxHeight) {
+                            $('.dataTables_scrollBody').height(maxHeight);
+                        }
 
                         adjustDataContainer();
+                    }
+                });
 
-                        if ($.fn.DataTable.isDataTable("#inputData")) {
-                            $("#inputData").DataTable().columns.adjust();
+                $('<style>')
+                    .prop('type', 'text/css')
+                    .html(`
+                        .dataTables_scrollBody {
+                            transition: height 0.1s ease;
+                            border-bottom: 1px solid #e3e6f0;
                         }
-                    }
-                });
-
-                $(document).on('mouseup', function() {
-                    if (isResizing) {
-                        isResizing = false;
-                        $('#resize-overlay').remove();
-                        $('.dataTables_scrollBody').removeClass('resize-active');
-
-                        const newHeight = $('.dataTables_scrollBody').height();
-                        localStorage.setItem('preferredTableHeight', newHeight);
-                    }
-                });
-            }
-
-            function adjustDataContainer() {
-                const scrollBodyHeight = $('.dataTables_scrollBody').height();
-                const tableContainerHeight = scrollBodyHeight + 150;
-
-                const windowHeight = window.innerHeight;
-                const tableOffset = $('.table-responsive').offset().top;
-                const footerHeight = 50;
-
-                const availableSpace = windowHeight - tableOffset - tableContainerHeight - footerHeight;
-
-                $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
-            }
-
-            function applyStoredHeight() {
-                const storedHeight = localStorage.getItem('preferredTableHeight');
-                if (storedHeight && $('.dataTables_scrollBody').length) {
-                    $('.dataTables_scrollBody').height(parseInt(storedHeight));
-                    adjustDataContainer();
-                }
-            }
-
-            function handleTableSetup() {
-                if ($('.dataTables_scrollBody').length) {
-
-                    setupResizeHandle();
-                    applyStoredHeight();
-                    adjustDataContainer();
-                } else {
-                    setTimeout(handleTableSetup, 500);
-                }
-            }
-
-            handleTableSetup();
-
-            $(window).on('resize', function() {
-                if ($('.dataTables_scrollBody').length) {
-
-                    maxHeight = window.innerHeight * 0.8;
-
-                    const currentHeight = $('.dataTables_scrollBody').height();
-                    if (currentHeight > maxHeight) {
-                        $('.dataTables_scrollBody').height(maxHeight);
-                    }
-
-                    adjustDataContainer();
-                }
+                        .dataTables_scrollBody.resize-active {
+                            border-bottom: 2px solid #4e73df;
+                        }
+                        .table-resize-handle:hover {
+                            background-color: rgba(78, 115, 223, 0.3);
+                        }
+                    `)
+                    .appendTo('head');
             });
-
-            $('<style>')
-                .prop('type', 'text/css')
-                .html(`
-                    .dataTables_scrollBody {
-                        transition: height 0.1s ease;
-                        border-bottom: 1px solid #e3e6f0;
-                    }
-                    .dataTables_scrollBody.resize-active {
-                        border-bottom: 2px solid #4e73df;
-                    }
-                    .dataTables_resize_handle:hover {
-                        background-color: rgba(78, 115, 223, 0.3);
-                    }
-                `)
-                .appendTo('head');
-            });
-    </script>
+        </script>
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}
