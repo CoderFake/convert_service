@@ -120,6 +120,11 @@
         .dataTables_scrollBody {
             overflow-x: auto !important;
             margin-bottom: 5px !important;
+            resize: vertical;
+            min-height: 200px;
+            max-height: 80vh !important;
+            position: relative;
+            transition: height 0.2s ease;
         }
 
         .dataTables_scrollBody::-webkit-scrollbar {
@@ -140,10 +145,46 @@
             background: #555;
         }
 
+        .dataTables_resize_handle {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: transparent;
+            cursor: ns-resize;
+            z-index: 100;
+        }
+
+        .dataTables_resize_handle:hover,
+        .dataTables_resize_handle:active {
+            background-color: rgba(78, 115, 223, 0.3);
+        }
+
+        .dataTables_scrollBody.resize-active {
+            border-bottom: 2px solid #4e73df;
+        }
+
+
+        .show-data {
+            height: 100%;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .col-12.mt-4.w-100.overflow-hidden {
+            transition: height 0.2s ease;
+        }
+
+        #resize-overlay {
+            background-color: transparent;
+        }
+
+
         #paginationInfo {
-            display: block;
-            margin-top: 5px;
-            margin-bottom: 10px;
+            display: block !important;
+            margin-top: 8px;
+            margin-bottom: 12px;
             text-align: right;
             color: #6c757d;
             font-size: 0.9rem;
@@ -739,6 +780,142 @@
                 });
             });
         </script>
+    <script>
+        $(document).ready(function() {
+
+            let isResizing = false;
+            let startY, startHeight;
+            const minHeight = 200;
+            let maxHeight = window.innerHeight * 0.8;
+
+            function setupResizeHandle() {
+                $('.dataTables_resize_handle').remove();
+
+                if ($('.dataTables_scrollBody').length) {
+                    $('.dataTables_scrollBody').css('position', 'relative');
+                    $('<div class="dataTables_resize_handle"></div>').appendTo('.dataTables_scrollBody');
+
+                    $('.dataTables_resize_handle').css({
+                        'position': 'absolute',
+                        'bottom': '0',
+                        'left': '0',
+                        'right': '0',
+                        'height': '5px',
+                        'background-color': 'transparent',
+                        'cursor': 'ns-resize',
+                        'z-index': '100'
+                    });
+
+                    initResizeEvents();
+                }
+            }
+
+            function initResizeEvents() {
+                $('.dataTables_resize_handle').on('mousedown', function(e) {
+                    isResizing = true;
+                    startY = e.clientY;
+                    startHeight = $('.dataTables_scrollBody').height();
+
+                    $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+
+                    $('.dataTables_scrollBody').addClass('resize-active');
+
+                    e.preventDefault();
+                });
+
+                $(document).on('mousemove', function(e) {
+                    if (!isResizing) return;
+
+                    const newHeight = startHeight + (e.clientY - startY);
+
+                    if (newHeight >= minHeight && newHeight <= maxHeight) {
+                        $('.dataTables_scrollBody').height(newHeight);
+
+                        adjustDataContainer();
+
+                        if ($.fn.DataTable.isDataTable("#inputData")) {
+                            $("#inputData").DataTable().columns.adjust();
+                        }
+                    }
+                });
+
+                $(document).on('mouseup', function() {
+                    if (isResizing) {
+                        isResizing = false;
+                        $('#resize-overlay').remove();
+                        $('.dataTables_scrollBody').removeClass('resize-active');
+
+                        const newHeight = $('.dataTables_scrollBody').height();
+                        localStorage.setItem('preferredTableHeight', newHeight);
+                    }
+                });
+            }
+
+            function adjustDataContainer() {
+                const scrollBodyHeight = $('.dataTables_scrollBody').height();
+                const tableContainerHeight = scrollBodyHeight + 150;
+
+                const windowHeight = window.innerHeight;
+                const tableOffset = $('.table-responsive').offset().top;
+                const footerHeight = 50;
+
+                const availableSpace = windowHeight - tableOffset - tableContainerHeight - footerHeight;
+
+                $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
+            }
+
+            function applyStoredHeight() {
+                const storedHeight = localStorage.getItem('preferredTableHeight');
+                if (storedHeight && $('.dataTables_scrollBody').length) {
+                    $('.dataTables_scrollBody').height(parseInt(storedHeight));
+                    adjustDataContainer();
+                }
+            }
+
+            function handleTableSetup() {
+                if ($('.dataTables_scrollBody').length) {
+
+                    setupResizeHandle();
+                    applyStoredHeight();
+                    adjustDataContainer();
+                } else {
+                    setTimeout(handleTableSetup, 500);
+                }
+            }
+
+            handleTableSetup();
+
+            $(window).on('resize', function() {
+                if ($('.dataTables_scrollBody').length) {
+
+                    maxHeight = window.innerHeight * 0.8;
+
+                    const currentHeight = $('.dataTables_scrollBody').height();
+                    if (currentHeight > maxHeight) {
+                        $('.dataTables_scrollBody').height(maxHeight);
+                    }
+
+                    adjustDataContainer();
+                }
+            });
+
+            $('<style>')
+                .prop('type', 'text/css')
+                .html(`
+                    .dataTables_scrollBody {
+                        transition: height 0.1s ease;
+                        border-bottom: 1px solid #e3e6f0;
+                    }
+                    .dataTables_scrollBody.resize-active {
+                        border-bottom: 2px solid #4e73df;
+                    }
+                    .dataTables_resize_handle:hover {
+                        background-color: rgba(78, 115, 223, 0.3);
+                    }
+                `)
+                .appendTo('head');
+            });
+    </script>
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}
