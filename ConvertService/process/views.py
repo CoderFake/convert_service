@@ -198,7 +198,6 @@ class DownloadView(LoginRequiredMixin, View):
             response = HttpResponse(csv_data, content_type='text/csv')
             response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d_%H%M%S")}_{download_type}_output.csv"'
 
-            redis_client.delete_all_keys()
             return response
         except Exception as e:
             logger.error(f"Error downloading CSV file: {e}")
