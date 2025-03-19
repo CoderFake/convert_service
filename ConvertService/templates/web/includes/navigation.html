@@ -35,6 +35,7 @@
         </div>
     </div>
 </nav>
+{% if request.user.is_authenticated %}
 <nav class="navbar navbar-top navbar-expand navbar-dark border-bottom d-none d-xl-flex justify-content-end align-content-start position-absolute pt-2" style="top:0; right: 0; z-index: 999; min-height: 45px; background: #f8f9fe">
      <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
          <li class="nav-item">
@@ -44,3 +45,4 @@
         </li>
     </ul>
 </nav>
+{% endif %}
