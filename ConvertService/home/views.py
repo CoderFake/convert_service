@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse
 from django.views import View
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from process.redis import redis_client
 import logging
@@ -45,4 +46,4 @@ class HomeView(View):
 
             return render(request, 'web/home/index.html', context)
 
-        return render(request, 'web/accounts/login.html')
+        return redirect(reverse('login'))
