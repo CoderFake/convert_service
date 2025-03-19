@@ -136,9 +136,6 @@ def process_and_format_file(
                 except Exception as e:
                     logger.error(f"Error processing key {key}: {e}")
 
-            if type_key == "output":
-                redis_client.delete_key_batch(batch_keys)
-
         batches = [keys[i:i + batch_size] for i in range(0, len(keys), batch_size)]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
