@@ -1,48 +1,50 @@
 {% load static %}
-<nav class="navbar navbar-top navbar-expand navbar-dark bg-dark border-bottom d-xl-none" style="min-height: 45px;">
-    <div class="container-fluid">
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <!-- Search form -->
-            <div class="navbar-search navbar-search-light form-inline mr-sm-3" id="navbar-search-main">
-                <button type="button" class="close" data-action="search-close" data-target="#navbar-search-main"
-                        aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
-            </div>
-            <!-- Navbar links -->
-            <ul class="navbar-nav align-items-center ml-md-auto ">
-                <li class="nav-item d-xl-none">
-                    <!-- Sidenav toggler -->
-                    <div class="pr-3 sidenav-toggler sidenav-toggler-dark" data-action="sidenav-pin"
-                         data-target="#sidenav-main">
-                        <div class="sidenav-toggler-inner">
-                            <i class="sidenav-toggler-line bg-white"></i>
-                            <i class="sidenav-toggler-line bg-white"></i>
-                            <i class="sidenav-toggler-line bg-white"></i>
-                        </div>
+{#<nav class="navbar navbar-top navbar-expand navbar-dark bg-dark border-bottom d-xl-none" style="min-height: 45px;">#}
+{#    <div class="container-fluid">#}
+{#        <div class="collapse navbar-collapse" id="navbarSupportedContent">#}
+{#            <!-- Search form -->#}
+{#            <div class="navbar-search navbar-search-light form-inline mr-sm-3" id="navbar-search-main">#}
+{#                <button type="button" class="close" data-action="search-close" data-target="#navbar-search-main"#}
+{#                        aria-label="Close">#}
+{#                    <span aria-hidden="true">×</span>#}
+{#                </button>#}
+{#            </div>#}
+{#            <!-- Navbar links -->#}
+{#            #}
+{#            {% if request.user.is_authenticated %}#}
+{#                <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">#}
+{#                     <li class="nav-item">#}
+{#                        <a class="nav-link" href="" data-bs-toggle="modal" data-bs-target="#logoutModal">#}
+{#                            <span class="nav-link-text">ログアウト</span>#}
+{#                        </a>#}
+{#                    </li>#}
+{#                </ul>#}
+{#            {% endif %}#}
+{#        </div>#}
+{#    </div>#}
+{#</nav>#}
+
+<nav class="navbar navbar-top navbar-expand navbar-dark border-bottom d-flex flex-row gap-3 justify-content-end align-content-start position-absolute pt-2" style="top:0; right: 0; z-index: 999; min-height: 45px; background: none;">
+        <ul class="navbar-nav align-items-center ml-md-auto ">
+            <li class="nav-item d-xl-none">
+                <!-- Sidenav toggler -->
+                <div class="pr-3 sidenav-toggler sidenav-toggler-dark" data-action="sidenav-pin"
+                     data-target="#sidenav-main">
+                    <div class="sidenav-toggler-inner">
+                        <i class="sidenav-toggler-line bg-primary"></i>
+                        <i class="sidenav-toggler-line bg-primary"></i>
+                        <i class="sidenav-toggler-line bg-primary"></i>
                     </div>
-                </li>
-            </ul>
-            {% if request.user.is_authenticated %}
-                <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
-                     <li class="nav-item">
-                        <a class="nav-link" href="" data-bs-toggle="modal" data-bs-target="#logoutModal">
-                            <span class="nav-link-text">ログアウト</span>
-                        </a>
-                    </li>
-                </ul>
-            {% endif %}
-        </div>
-    </div>
+                </div>
+            </li>
+        </ul>
+    {% if request.user.is_authenticated %}
+         <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
+             <li class="nav-item">
+                <a class="nav-link btn btn-primary py-1" href="" data-bs-toggle="modal" data-bs-target="#logoutModal" style="margin-right: 30px;">
+                    <span class="nav-link-text">ログアウト</span>
+                </a>
+            </li>
+        </ul>
+    {% endif %}
 </nav>
-{% if request.user.is_authenticated %}
-<nav class="navbar navbar-top navbar-expand navbar-dark border-bottom d-none d-xl-flex justify-content-end align-content-start position-absolute pt-2" style="top:0; right: 0; z-index: 999; min-height: 45px; background: #f8f9fe">
-     <ul class="navbar-nav align-items-center  ml-auto ml-md-0 ">
-         <li class="nav-item">
-            <a class="nav-link btn btn-primary py-1" href="" data-bs-toggle="modal" data-bs-target="#logoutModal" style="margin-right: 30px;">
-                <span class="nav-link-text">ログアウト</span>
-            </a>
-        </li>
-    </ul>
-</nav>
-{% endif %}
