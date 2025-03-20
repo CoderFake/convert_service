@@ -222,7 +222,7 @@
             {% if tab and tab == "upload-file" %}
                 <div class="container compact drag-drop-file reservation w-90">
                     <div class="header-section">
-                        <h1 class="text-center text-dark font-weight-bold" style="font-size: 3rem;">
+                        <h1 class="text-center text-dark font-weight-bold mt-3" style="font-size: 3rem;">
                             変換する予約情報ファイルの選択
                         </h1>
                     </div>
@@ -540,14 +540,14 @@
                 }
 
                 function initDataTable(idTable) {
-                    $('.table-responsive').css('height', '250px');
+                    $('.table-responsive').css('height', '220px');
 
                     if ($.fn.DataTable.isDataTable(idTable)) {
                         idTable.DataTable().destroy();
                     }
 
                     const dataTable = idTable.DataTable({
-                        scrollY: "250px",
+                        scrollY: "220px",
                         scrollX: true,
                         scrollCollapse: true,
                         paging: false,
@@ -656,9 +656,9 @@
                     showDataDiv.attr('data-index', formattedKey);
 
                     let rowHTML = '<div class="row">';
-                    let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-start align-items-center">';
+                    let colLeft1 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colLeft2 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colRight = '<div class="col-12 col-xl-12 col-lg-12 col-sm-12 d-flex flex-column justify-content-start align-items-center">';
 
                     let nonEditHeaders = [];
                     let editHeaders = [];
@@ -715,11 +715,11 @@
                     colRight += '</div>';
 
                     rowHTML += `
-                        <div class="row col-12 col-md-6 col-lg-9">
+                        <div class="row col-12 col-lg-6 col-xl-9">
                             ${colLeft1}
                             ${colLeft2}
                         </div>
-                        <div class="row col-12 col-md-6 col-lg-3">
+                        <div class="row col-12 col-lg-6 col-xl-3">
                             ${colRight}
                         </div>
                     `;
@@ -846,8 +846,6 @@
                             $('.dataTables_scrollBody').height(newHeight);
 
                             adjustDataContainer();
-
-                            // Re-adjust the DataTable
                             if ($.fn.DataTable.isDataTable("#inputData")) {
                                 $("#inputData").DataTable().columns.adjust();
                             }
@@ -860,7 +858,6 @@
                             $('#resize-overlay').remove();
                             $('.dataTables_scrollBody').removeClass('resize-active');
 
-                            // Store the height preference if needed
                             const newHeight = $('.dataTables_scrollBody').height();
                             localStorage.setItem('preferredTableHeight', newHeight);
                         }
