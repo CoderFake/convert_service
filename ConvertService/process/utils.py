@@ -260,7 +260,6 @@ class FileProcessor:
             file_extension = os.path.splitext(file_path)[1].lower()
             if file_extension == '.xls':
                 try:
-
                     import xlrd
                     workbook = xlrd.open_workbook(file_path)
                     sheet = workbook.sheet_by_index(0)
@@ -271,6 +270,9 @@ class FileProcessor:
                     data = []
                     for row_idx in range(1, sheet.nrows):
                         try:
+                            if all(sheet.cell_value(row_idx, col) == '' for col in range(sheet.ncols)):
+                                continue
+
                             row_data = {}
                             for header in headers:
                                 if header in header_indices:
@@ -299,8 +301,11 @@ class FileProcessor:
                 header_indices = {header: idx for idx, header in enumerate(header_row) if header in headers}
 
                 data = []
-                for row in list(sheet.iter_rows())[1:]:  # Skip header row
+                for row in list(sheet.iter_rows())[1:]:
                     try:
+                        if all(cell.value is None or str(cell.value).strip() == '' for cell in row):
+                            continue
+
                         row_data = {}
                         for header in headers:
                             if header in header_indices and header_indices[header] < len(row):
