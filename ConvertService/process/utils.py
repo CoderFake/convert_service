@@ -278,8 +278,8 @@ class FileProcessor:
                                 if header in header_indices:
                                     cell_value = sheet.cell_value(row_idx, header_indices[header])
                                     if sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_DATE:
-                                        cell_value = xlrd.xldate_as_datetime(cell_value, workbook.datemode).strftime(
-                                            "%Y-%m-%d")
+                                        datetime_obj = xlrd.xldate_as_datetime(cell_value, workbook.datemode)
+                                        cell_value = datetime_obj.strftime("%Y/%m/%d")
                                     row_data[header] = str(cell_value) if cell_value is not None else ""
                                 else:
                                     row_data[header] = ""
@@ -301,7 +301,7 @@ class FileProcessor:
                 header_indices = {header: idx for idx, header in enumerate(header_row) if header in headers}
 
                 data = []
-                for row in list(sheet.iter_rows())[1:]:
+                for row in list(sheet.iter_rows())[1:]:  # Skip header row
                     try:
                         if all(cell.value is None or str(cell.value).strip() == '' for cell in row):
                             continue
@@ -310,6 +310,10 @@ class FileProcessor:
                         for header in headers:
                             if header in header_indices and header_indices[header] < len(row):
                                 cell_value = row[header_indices[header]].value
+
+                                if isinstance(cell_value, datetime.datetime) or isinstance(cell_value, datetime.date):
+                                    cell_value = cell_value.strftime("%Y/%m/%d")
+
                                 row_data[header] = str(cell_value) if cell_value is not None else ""
                             else:
                                 row_data[header] = ""
@@ -334,7 +338,6 @@ class FileProcessor:
                 try:
                     with open(file_path, 'r', encoding=encoding) as jsonfile:
                         json_data = json.load(jsonfile)
-                        # Map data to headers
                         if isinstance(json_data, list):
                             data = []
                             for item in json_data:
