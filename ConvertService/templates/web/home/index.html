@@ -426,7 +426,6 @@
                     if (!append) {
                         $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
                     } else {
-                        $("#endMessage").remove();
                         $("#loadingRow").remove();
                         $("#inputData tbody").append('<tr id="loadingRow"><td colspan="100%" class="text-center"><div class="loading-spinner"></div> 追加データを読み込み中...</td></tr>');
                     }
@@ -518,11 +517,6 @@
                                 const totalRows = response.pagination.total_rows;
                                 $("#paginationInfo").html(`${currentRows}/${totalRows} 行表示中`);
 
-                                if (!hasMoreData && !endMessageAdded) {
-                                    $("#inputData tbody").append('<tr id="endMessage" class="text-center text-muted"><td colspan="100%">すべてのデータが読み込まれました</td></tr>');
-                                    endMessageAdded = true;
-                                }
-
                                 if (rowsAdded > 0) {
                                     checkIfMoreContentNeeded();
                                 }
@@ -578,7 +572,7 @@
                                $('.table-responsive').css('height', 'auto');
                             }, 500)
 
-
+                            $(".dataTables_scrollBody").css({"height": "220px", "min-height": "220px"});
                             setupScrollEvents();
                         }
                     });
