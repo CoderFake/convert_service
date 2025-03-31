@@ -32,6 +32,9 @@
             min-height: 30px;
             height: 30px;
         }
+        table.dataTable .truncate-text {
+            text-overflow: clip !important;
+        }
 
         #loadingRow td, #endMessage td {
             min-height: 30px;
@@ -506,7 +509,7 @@
                                         createToast("error", "テーブルの初期化中にエラーが発生しました。");
                                     }
                                 } else if (append && rowsAdded > 0) {
-                                    table.find('tbody tr').slice(-rowsAdded).find('td').addClass('dt-center');
+                                    table.find('tbody tr').slice(-rowsAdded).find('td').addClass('dt-start');
 
                                     if ($.fn.DataTable.isDataTable(table)) {
                                         table.DataTable().columns.adjust();
