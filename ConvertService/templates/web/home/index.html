@@ -32,9 +32,6 @@
             min-height: 30px;
             height: 30px;
         }
-        table.dataTable .truncate-text {
-            text-overflow: clip !important;
-        }
 
         #loadingRow td, #endMessage td {
             min-height: 30px;
@@ -51,6 +48,8 @@
         table.dataTable tbody tr td .truncate-text {
             line-height: 30px;
             vertical-align: middle;
+            overflow: hidden;
+
         }
          table.dataTable tbody tr td{
             padding: 0 5px;
@@ -509,7 +508,16 @@
                                         createToast("error", "テーブルの初期化中にエラーが発生しました。");
                                     }
                                 } else if (append && rowsAdded > 0) {
-                                    table.find('tbody tr').slice(-rowsAdded).find('td').addClass('dt-start');
+                                    const newRows = table.find('tbody tr').slice(-rowsAdded);
+                                    newRows.find('td').addClass('dt-start');
+
+                                    newRows.find('td').each(function() {
+                                        const $cell = $(this);
+                                        const cellContent = $cell.text();
+                                        if (!$cell.find('.truncate-text').length) {
+                                            $cell.html(`<div class="truncate-text" title="${cellContent}">${cellContent}</div>`);
+                                        }
+                                    });
 
                                     if ($.fn.DataTable.isDataTable(table)) {
                                         table.DataTable().columns.adjust();
