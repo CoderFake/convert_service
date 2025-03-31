@@ -695,10 +695,20 @@
                         const cellClass = item.format === 'date' ? 'date-picker'
                                        : item.format === 'time' ? 'time-picker'
                                        : '';
+
+                        const showClearIcon = item.format === 'time' && item.cell.trim() !== '';
+
                         let content = `
                             <div class="mb-3 d-flex align-items-center w-100">
                                 <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                                <div class="position-relative w-100">
+                                    <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                                    ${item.format === 'time' ? `
+                                    <span class="time-clear-icon position-absolute${showClearIcon ? '' : ' d-none'}"
+                                          style="right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;">
+                                        <i class="fas fa-times-circle"></i>
+                                    </span>` : ''}
+                                </div>
                             </div>
                         `;
                         colRight += content;
@@ -755,6 +765,41 @@
                         }
                     });
                 }
+                $(document).ready(function() {
+                    $(document).on('input', '.time-picker', function() {
+                        const clearIcon = $(this).siblings('.time-clear-icon');
+                        if ($(this).val().trim() !== '') {
+                            clearIcon.removeClass('d-none');
+                        } else {
+                            clearIcon.addClass('d-none');
+                        }
+                    });
+                    $(document).on('click', '.time-clear-icon', function() {
+                        const input = $(this).siblings('.time-picker');
+                        input.val('');
+                        $(this).addClass('d-none');
+
+                        input.trigger('change');
+                    });
+                });
+
+                $('<style>')
+                .prop('type', 'text/css')
+                .html(`
+                    .time-clear-icon {
+                        opacity: 0.7;
+                        transition: opacity 0.2s;
+                        z-index: 10;
+                    }
+                    .time-clear-icon:hover {
+                        opacity: 1;
+                    }
+                    .time-picker {
+                        padding-right: 30px;
+                    }
+                `)
+                .appendTo('head');
+
 
                 $(document).on('blur change', '.edit-input', function () {
                     UpdateFormatData($(this));
