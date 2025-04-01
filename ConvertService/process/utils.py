@@ -643,20 +643,22 @@ class DataFormatter:
             if not value:
                 return ""
 
-            # Convert Hiragana (or mixed Hiragana + Katakana) to Katakana
             value = jaconv.hira2kata(value)
 
             if kana_type == 'full_to_half':
-                return jaconv.z2h(value, kana=True)
+                result = jaconv.z2h(value, kana=True)
+                result = result.replace('\u3000', ' ')
+                return result
             elif kana_type == 'half_to_full':
-                return jaconv.h2z(value, kana=True)
+                result = jaconv.h2z(value, kana=True)
+                result = result.replace(' ', '\u3000')
+                return result
             else:
                 logger.warning(f"Unsupported kana type: {kana_type}")
                 return value
         except Exception as e:
             logger.error(f"Error in convert_kana: {e}")
             return ""
-
 
     @staticmethod
     def convert_postal_code(value):
