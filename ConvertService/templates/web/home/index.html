@@ -33,13 +33,6 @@
             height: 30px;
         }
 
-        #loadingRow td, #endMessage td {
-            min-height: 30px;
-            height: 30px;
-            line-height: 30px;
-            vertical-align: middle;
-        }
-
         table.dataTable tbody tr {
             min-height: 30px;
         }
@@ -97,11 +90,6 @@
 
         #loadingRow {
             animation: fadeIn 0.3s ease-in-out;
-        }
-
-        #endMessage {
-            animation: fadeIn 0.3s ease-in-out;
-            background-color: #f8f9fa !important;
         }
 
         .loading-spinner {
@@ -413,12 +401,62 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
             $(document).ready(function () {
+
                 let headerInfo = [];
                 let currentPage = 1;
                 let loading = false;
                 let hasMoreData = true;
                 let endMessageAdded = false;
                 const PAGE_SIZE = 20;
+
+                window.editOptions = window.editOptions || [];
+
+                function loadEditOptions() {
+                    if (window.editOptions && window.editOptions.length > 0) {
+                        return Promise.resolve(window.editOptions);
+                    }
+
+                    return new Promise((resolve) => {
+                        $.ajax({
+                            url: '/get-edit-options/',
+                            type: 'GET',
+                            success: function(response) {
+                                if (response.status === 'success') {
+                                    window.editOptions = response.options;
+                                    resolve(response.options);
+                                } else {
+                                    console.error('Error loading options:', response.message);
+                                    resolve([]);
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                console.error('Error loading options:', error);
+                                resolve([]);
+                            }
+                        });
+                    });
+                }
+
+                function renderOptionField(headerName, currentValue, options) {
+
+                    const optionsList = options || [];
+
+                    let selectHTML = `<select class="form-control edit-input-select" name="${headerName}">`;
+                    selectHTML += `<option value="">選択してください</option>`;
+
+                    optionsList.forEach(option => {
+
+                        const value = Array.isArray(option) ? option[1] : option.value;
+                        const label = Array.isArray(option) ? option[0] : option.label;
+                        const selected = currentValue === value ? 'selected' : '';
+                        selectHTML += `<option value="${value}" ${selected}>${label}</option>`;
+                    });
+
+                    selectHTML += `</select>`;
+                    return selectHTML;
+                }
+
+                window.renderOptionField = renderOptionField;
 
                 function loadProcessedFiles(page = 1, append = false) {
                     if (loading) return;
@@ -481,6 +519,7 @@
                                 if (tbody.length === 0) {
                                     table.append("<tbody></tbody>");
                                 }
+
                                 let rowsAdded = 0;
                                 processedData.forEach(dataSet => {
                                     if (dataSet.data && Array.isArray(dataSet.data)) {
@@ -491,6 +530,7 @@
                                                 const cellClass = header?.edit_value
                                                     ? header.format_value === 'date' ? 'row-date'
                                                     : header.format_value === 'time' ? 'row-time'
+                                                    : header.format_value === 'option' ? 'row-option'
                                                     : ''
                                                     : '';
                                                 return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
@@ -509,7 +549,7 @@
                                     }
                                 } else if (append && rowsAdded > 0) {
                                     const newRows = table.find('tbody tr').slice(-rowsAdded);
-                                    newRows.find('td').addClass('dt-start');
+                                    newRows.find('td').addClass('dt-center');
 
                                     newRows.find('td').each(function() {
                                         const $cell = $(this);
@@ -524,19 +564,22 @@
                                     }
                                 }
 
-                                const currentRows = $("table#inputData tbody tr").length;
+                                const currentRows = $("table#inputData tbody tr").length - (endMessageAdded ? 1 : 0);
                                 const totalRows = response.pagination.total_rows;
-                                $("#paginationInfo").html(`${currentRows}/${totalRows} 行表示中`);
+                                $("#paginationInfo").removeClass('d-none').html(`${currentRows}/${totalRows} 行表示中`);
+
+                                if (!hasMoreData && !endMessageAdded) {
+                                    endMessageAdded = true;
+                                }
 
                                 if (rowsAdded > 0) {
                                     checkIfMoreContentNeeded();
                                 }
-
                             } else {
                                 createToast("error", response.message || "データの取得に失敗しました。");
                             }
                         },
-                        error: function (error) {
+                        error: function(error) {
                             loading = false;
                             $("#loadingRow").remove();
                             createToast("error", "エラーが発生しました。データを取得できませんでした。");
@@ -551,6 +594,8 @@
                         idTable.DataTable().destroy();
                     }
 
+                    $(".table-responsive").css({"height": "220px"});
+
                     const dataTable = idTable.DataTable({
                         scrollY: "220px",
                         scrollX: true,
@@ -563,7 +608,7 @@
                         columnDefs: [
                             {
                                 targets: '_all',
-                                className: 'dt-start',
+                                className: 'dt-center',
                                 render: function(data, type, row) {
                                     const displayData = data || '';
                                     return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
@@ -579,11 +624,10 @@
                             this.api().columns.adjust();
 
                             $(".dataTables_scrollBody").css("overflow-x", "auto");
-                            setInterval(function (){
-                               $('.table-responsive').css('height', 'auto');
-                            }, 500)
-
                             $(".dataTables_scrollBody").css({"height": "220px", "min-height": "220px"});
+                            $(".table-responsive").css({"height": "auto"});
+
+                            setupResizeHandle();
                             setupScrollEvents();
                         }
                     });
@@ -592,13 +636,10 @@
                 }
 
                 function setupScrollEvents() {
-
                     const scrollBodySelector = ".dataTables_scrollBody";
-
                     $(scrollBodySelector).off("scroll.infiniteScroll");
 
                     $(scrollBodySelector).on("scroll.infiniteScroll", function() {
-
                         const scrollTop = $(this).scrollTop();
                         const viewportHeight = $(this).height();
                         const scrollHeight = $(this)[0].scrollHeight;
@@ -633,25 +674,119 @@
                     }
                 }
 
-                $(window).on('resize', function() {
-                    if ($.fn.DataTable.isDataTable("#inputData")) {
-                        $("#inputData").DataTable().columns.adjust();
+                function UpdateFormatData(input) {
+                    const dataIndex = $('.show-data').attr('data-index');
+                    const fieldName = input.attr('name');
+                    const fieldValue = input.val();
+
+                    const postData = {
+                        key: dataIndex,
+                        field_name: fieldName,
+                        field_value: fieldValue,
+                        csrfmiddlewaretoken: getCookie('csrftoken')
+                    };
+
+                    $.ajax({
+                        url: "{% url 'update_format_data' %}",
+                        type: "POST",
+                        data: postData,
+                        error: function(error) {
+                            createToast('error', 'データ送信中にエラーが発生しました。');
+                        }
+                    });
+                }
+
+                function setupResizeHandle() {
+                    $('.table-resize-handle').remove();
+
+                    if ($('.dataTables_scrollBody').length) {
+                        $('.table-responsive').css('position', 'relative');
+                        $('<div class="table-resize-handle"></div>').appendTo('.table-responsive');
+
+                        $('.table-resize-handle').css({
+                            'position': 'absolute',
+                            'bottom': '0',
+                            'left': '0',
+                            'right': '0',
+                            'height': '10px',
+                            'background-color': 'transparent',
+                            'cursor': 'ns-resize',
+                            'z-index': '100'
+                        });
+
+                        initResizeEvents();
                     }
-                });
+                }
 
-                loadProcessedFiles();
+                let isResizing = false;
+                let startY, startHeight;
+                const minHeight = 200;
+                let maxHeight = window.innerHeight * 0.8;
 
-                $('#inputData').on('click', 'tbody tr', function () {
+                function initResizeEvents() {
+                    $('.table-resize-handle').on('mousedown', function(e) {
+                        isResizing = true;
+                        startY = e.clientY;
+                        startHeight = $('.dataTables_scrollBody').height();
 
+                        $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+                        $('.dataTables_scrollBody').addClass('resize-active');
+                        e.preventDefault();
+                    });
+
+                    $(document).on('mousemove', function(e) {
+                        if (!isResizing) return;
+
+                        const newHeight = startHeight + (e.clientY - startY);
+                        if (newHeight >= minHeight && newHeight <= maxHeight) {
+                            $('.dataTables_scrollBody').height(newHeight);
+                            adjustDataContainer();
+
+                            if ($.fn.DataTable.isDataTable("#inputData")) {
+                                $("#inputData").DataTable().columns.adjust();
+                            }
+                        }
+                    });
+
+                    $(document).on('mouseup', function() {
+                        if (isResizing) {
+                            isResizing = false;
+                            $('#resize-overlay').remove();
+                            $('.dataTables_scrollBody').removeClass('resize-active');
+
+                            const newHeight = $('.dataTables_scrollBody').height();
+                            localStorage.setItem('preferredTableHeight', newHeight);
+                        }
+                    });
+                }
+
+                function adjustDataContainer() {
+                    const scrollBodyHeight = $('.dataTables_scrollBody').height();
+                    const windowHeight = window.innerHeight;
+                    const tableOffset = $('.table-responsive').offset().top;
+                    const footerHeight = 50;
+
+                    const availableSpace = windowHeight - tableOffset - scrollBodyHeight - footerHeight;
+                    $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
+                }
+
+                function applyStoredHeight() {
+                    const storedHeight = localStorage.getItem('preferredTableHeight');
+                    if (storedHeight && $('.dataTables_scrollBody').length) {
+                        $('.dataTables_scrollBody').height(parseInt(storedHeight));
+                        adjustDataContainer();
+                    }
+                }
+
+                $('#inputData').on('click', 'tbody tr', function() {
                     if ($(this).attr('id') === 'endMessage' || $(this).attr('id') === 'loadingRow') {
                         return;
                     }
 
                     $('#inputData tbody tr').removeClass('active-row');
-
                     $(this).addClass('active-row');
 
-                    const cells = $(this).find('td').map(function () {
+                    const cells = $(this).find('td').map(function() {
                         return $(this).text();
                     }).get();
 
@@ -667,11 +802,16 @@
 
                     let nonEditHeaders = [];
                     let editHeaders = [];
+
                     headerInfo.forEach((header, index) => {
                         if (!header.edit_value) {
                             nonEditHeaders.push({ header: header.header_name, cell: cells[index] });
                         } else {
-                            editHeaders.push({ header: header.header_name, cell: cells[index], format: header.format_value });
+                            editHeaders.push({
+                                header: header.header_name,
+                                cell: cells[index],
+                                format: header.format_value
+                            });
                         }
                     });
 
@@ -695,6 +835,7 @@
                                 </div>
                             `;
                         }
+
                         if (index < midpoint) {
                             colLeft1 += content;
                         } else {
@@ -713,15 +854,26 @@
                             <div class="mb-3 d-flex align-items-center w-100">
                                 <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
                                 <div class="position-relative w-100">
-                                    <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
-                                    ${item.format === 'time' ? `
-                                    <span class="time-clear-icon position-absolute${showClearIcon ? '' : ' d-none'}"
-                                          style="right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;">
-                                        <i class="fas fa-times-circle"></i>
-                                    </span>` : ''}
+                        `;
+
+                        if (item.format === 'option') {
+                            content += renderOptionField(item.header, item.cell, window.editOptions);
+                        } else {
+                            content += `
+                                <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                                ${item.format === 'time' ? `
+                                <span class="time-clear-icon position-absolute${showClearIcon ? '' : ' d-none'}"
+                                      style="right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;">
+                                    <i class="fas fa-times-circle"></i>
+                                </span>` : ''}
+                            `;
+                        }
+
+                        content += `
                                 </div>
                             </div>
                         `;
+
                         colRight += content;
                     });
 
@@ -755,43 +907,91 @@
                     });
                 });
 
-                function UpdateFormatData(Input) {
-                    const dataIndex = $('.show-data').attr('data-index');
-                    const fieldName = Input.attr('name');
-                    const fieldValue = Input.val();
 
-                    const postData = {
-                        key: dataIndex,
-                        field_name: fieldName,
-                        field_value: fieldValue,
-                        csrfmiddlewaretoken: getCookie('csrftoken')
-                    };
+                $(window).on('resize', function() {
+                    if ($.fn.DataTable.isDataTable("#inputData")) {
+                        $("#inputData").DataTable().columns.adjust();
+                    }
 
-                    $.ajax({
-                        url: "{% url 'update_format_data' %}",
-                        type: "POST",
-                        data: postData,
-                        error: function (error) {
-                            createToast('error', 'データ送信中にエラーが発生しました。');
-                        }
-                    });
-                }
-                $(document).ready(function() {
-                    $(document).on('input', '.time-picker', function() {
-                        const clearIcon = $(this).siblings('.time-clear-icon');
-                        if ($(this).val().trim() !== '') {
-                            clearIcon.removeClass('d-none');
-                        } else {
-                            clearIcon.addClass('d-none');
-                        }
-                    });
-                    $(document).on('click', '.time-clear-icon', function() {
-                        const input = $(this).siblings('.time-picker');
-                        input.val('');
-                        $(this).addClass('d-none');
+                    maxHeight = window.innerHeight * 0.8;
+                    const currentHeight = $('.dataTables_scrollBody').height();
+                    if (currentHeight > maxHeight) {
+                        $('.dataTables_scrollBody').height(maxHeight);
+                    }
 
-                        input.trigger('change');
-                    });
+                    adjustDataContainer();
+                });
+
+                $(document).on('input', '.time-picker', function() {
+                    const clearIcon = $(this).siblings('.time-clear-icon');
+                    if ($(this).val().trim() !== '') {
+                        clearIcon.removeClass('d-none');
+                    } else {
+                        clearIcon.addClass('d-none');
+                    }
+                });
+
+                $(document).on('click', '.time-clear-icon', function(e) {
+                    e.preventDefault();
+                    const input = $(this).siblings('.time-picker');
+                    input.val('');
+                    $(this).addClass('d-none');
+                    UpdateFormatData(input);
+
+                    const name = input.attr('name');
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    targetRow.find(`td.${name}`).text('');
+                });
+
+                $(document).on('change', '.edit-input-select', function() {
+                    UpdateFormatData($(this));
+
+                    const name = $(this).attr('name');
+                    const selectedText = $(this).val();
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    targetRow.find(`td.${name}`).text(selectedText);
+                });
+
+                $(document).on('blur change', '.edit-input', function() {
+                    if ($(this).hasClass('time-picker') && $(this).val().trim() !== '') {
+                        $(this).siblings('.time-clear-icon').removeClass('d-none');
+                    } else if ($(this).hasClass('time-picker')) {
+                        $(this).siblings('.time-clear-icon').addClass('d-none');
+                    }
+
+                    UpdateFormatData($(this));
+                });
+
+                $(document).on('change', 'input[type="radio"]', function() {
+                    const name = $(this).attr('name');
+                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+                    $(".date-picker").val(selectedDate);
+
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    targetRow.find('td.row-date').text(selectedDate);
+
+                    $(`input[name="${name}"]`).not(this).prop('checked', false);
+                    UpdateFormatData($(".date-picker"));
+                });
+
+                $(document).on('change', '.edit-input', function() {
+                    const newText = $(this).val();
+                    const name = $(this).attr('name');
+                    const formattedKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+
+                    targetRow.find(`td.${name}`).text(newText);
+                });
+
+                $(".btn-export").on('click', function() {
+                    if (this.id === 'system-csv') {
+                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
+                    } else {
+                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+                    }
                 });
 
                 $('<style>')
@@ -808,41 +1008,24 @@
                     .time-picker {
                         padding-right: 30px;
                     }
+                    .dataTables_scrollBody {
+                        transition: height 0.1s ease;
+                        border-bottom: 1px solid #e3e6f0;
+                    }
+                    .dataTables_scrollBody.resize-active {
+                        border-bottom: 2px solid #4e73df;
+                    }
+                    .table-resize-handle:hover {
+                        background-color: rgba(78, 115, 223, 0.3);
+                    }
+                    .active-row {
+                        background-color: #f8f9fa !important;
+                    }
                 `)
                 .appendTo('head');
 
-
-                $(document).on('blur change', '.edit-input', function () {
-                    UpdateFormatData($(this));
-                });
-
-                $(document).on('change', 'input[type="radio"]', function () {
-                    const name = $(this).attr('name');
-                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
-                    $(".date-picker").val(selectedDate);
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-                    targetRow.find('td.row-date').text(selectedDate);
-
-                    $(`input[name="${name}"]`).not(this).prop('checked', false);
-                    UpdateFormatData($(".date-picker"));
-                });
-
-                $(document).on('change', '.edit-input', function () {
-                    const newText = $(this).val();
-                    const name = $(this).attr('name');
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-
-                    targetRow.find(`td.${name}`).text(newText);
-                });
-
-                $(".btn-export").on('click', function () {
-                    if (this.attributes.id.value === 'system-csv') {
-                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
-                    } else {
-                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
-                    }
+                loadEditOptions().then(() => {
+                    loadProcessedFiles();
                 });
             });
 

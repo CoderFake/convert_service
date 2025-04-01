@@ -94,7 +94,7 @@ class DataItemType(models.Model):
         TIME = 'time', '時間'
         DATETIME = 'datetime', '日時'
         BOOLEAN = 'boolean', '真偽値'
-        PERIOD = 'period', '時間帯'
+        OPTION = 'option', '選択'
 
     id = models.AutoField(primary_key=True)
     data_item = models.ForeignKey('DataItem', on_delete=models.CASCADE, related_name='data_item_types')
