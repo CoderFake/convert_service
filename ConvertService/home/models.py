@@ -69,7 +69,8 @@ class DataConversionInfo(models.Model):
     data_convert_id = models.CharField(unique=True, max_length=50)
     data_convert_name = models.CharField(max_length=255)
     data_format_before = models.ForeignKey(DataFormat, related_name="before_conversion", on_delete=models.CASCADE)
-    data_format_after = models.ForeignKey(DataFormat, related_name="after_conversion", on_delete=models.CASCADE)
+    data_format_system_after = models.ForeignKey(DataFormat, related_name="after_system_conversion", on_delete=models.CASCADE, null=True, blank=True)
+    data_format_agency_after = models.ForeignKey(DataFormat, related_name="after_agency_conversion", on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -94,7 +95,7 @@ class DataItemType(models.Model):
         TIME = 'time', '時間'
         DATETIME = 'datetime', '日時'
         BOOLEAN = 'boolean', '真偽値'
-        PERIOD = 'period', '時間帯'
+        OPTION = 'option', '選択'
 
     id = models.AutoField(primary_key=True)
     data_item = models.ForeignKey('DataItem', on_delete=models.CASCADE, related_name='data_item_types')

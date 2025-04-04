@@ -90,7 +90,7 @@ INSERT INTO data_item_type (type_name, index_value, display, edit_value, format_
 ('output', 29, 1, 0, 'string', 54),
 ('format', 32, 1, 1, 'date', 55),
 ('format', 33, 1, 1, 'time', 56),
-('format', 34, 1, 1, 'string', 57),
+('format', 34, 1, 1, 'option', 57),
 ('output', 97, 1, 0, 'string', 57),
 ('output', 2, 1, 0, 'string', 58),
 ('output', 6, 1, 0, 'string', 59),

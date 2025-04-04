@@ -1,46 +1,26 @@
-
-/*!
-
-=========================================================
-* Argon Dashboard - v1.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/argon-dashboard
-* Copyright 2020 Creative Tim (https://www.creative-tim.com)
-* Licensed under MIT (https://github.com/creativetimofficial/argon-dashboard/blob/master/LICENSE.md)
-
-* Coded by www.creative-tim.com
-
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-*/
-
-
-
-//
-// Layout
-//
-
 'use strict';
+
+$(window).on('load resize', function() {
+    if ($(window).width() < 1200) {
+        $('body').removeClass('g-sidenav-pinned').addClass('g-sidenav-hidden');
+        $('.sidenav').addClass('d-none');
+    } else {
+        $('body').removeClass('g-sidenav-hidden').addClass('g-sidenav-pinned');
+        $('.sidenav').removeClass('d-none');
+    }
+});
 
 var Layout = (function() {
 
     function pinSidenav() {
-        $('.sidenav-toggler').addClass('active');
-        $('.sidenav-toggler').data('action', 'sidenav-unpin');
-        $('body').removeClass('g-sidenav-hidden').addClass('g-sidenav-show g-sidenav-pinned');
-        $('body').append('<div class="backdrop d-xl-none" data-action="sidenav-unpin" data-target='+$('#sidenav-main').data('target')+' />');
-
-        // Store the sidenav state in a cookie session
+		if($('.sidenav').hasClass('d-none'))
+			$('.sidenav').removeClass('d-none');
         Cookies.set('sidenav-state', 'pinned');
     }
 
     function unpinSidenav() {
-        $('.sidenav-toggler').removeClass('active');
-        $('.sidenav-toggler').data('action', 'sidenav-pin');
-        $('body').removeClass('g-sidenav-pinned').addClass('g-sidenav-hidden');
+		if(!$('.sidenav').hasClass('d-none'))
+			$('.sidenav').removeClass('d-none');
         $('body').find('.backdrop').remove();
 
         // Store the sidenav state in a cookie session

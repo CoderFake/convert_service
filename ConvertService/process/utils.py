@@ -260,7 +260,6 @@ class FileProcessor:
             file_extension = os.path.splitext(file_path)[1].lower()
             if file_extension == '.xls':
                 try:
-
                     import xlrd
                     workbook = xlrd.open_workbook(file_path)
                     sheet = workbook.sheet_by_index(0)
@@ -271,13 +270,16 @@ class FileProcessor:
                     data = []
                     for row_idx in range(1, sheet.nrows):
                         try:
+                            if all(sheet.cell_value(row_idx, col) == '' for col in range(sheet.ncols)):
+                                continue
+
                             row_data = {}
                             for header in headers:
                                 if header in header_indices:
                                     cell_value = sheet.cell_value(row_idx, header_indices[header])
                                     if sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_DATE:
-                                        cell_value = xlrd.xldate_as_datetime(cell_value, workbook.datemode).strftime(
-                                            "%Y-%m-%d")
+                                        datetime_obj = xlrd.xldate_as_datetime(cell_value, workbook.datemode)
+                                        cell_value = datetime_obj.strftime("%Y/%m/%d")
                                     row_data[header] = str(cell_value) if cell_value is not None else ""
                                 else:
                                     row_data[header] = ""
@@ -301,10 +303,17 @@ class FileProcessor:
                 data = []
                 for row in list(sheet.iter_rows())[1:]:  # Skip header row
                     try:
+                        if all(cell.value is None or str(cell.value).strip() == '' for cell in row):
+                            continue
+
                         row_data = {}
                         for header in headers:
                             if header in header_indices and header_indices[header] < len(row):
                                 cell_value = row[header_indices[header]].value
+
+                                if isinstance(cell_value, datetime.datetime) or isinstance(cell_value, datetime.date):
+                                    cell_value = cell_value.strftime("%Y/%m/%d")
+
                                 row_data[header] = str(cell_value) if cell_value is not None else ""
                             else:
                                 row_data[header] = ""
@@ -329,7 +338,6 @@ class FileProcessor:
                 try:
                     with open(file_path, 'r', encoding=encoding) as jsonfile:
                         json_data = json.load(jsonfile)
-                        # Map data to headers
                         if isinstance(json_data, list):
                             data = []
                             for item in json_data:
@@ -635,20 +643,22 @@ class DataFormatter:
             if not value:
                 return ""
 
-            # Convert Hiragana (or mixed Hiragana + Katakana) to Katakana
             value = jaconv.hira2kata(value)
 
             if kana_type == 'full_to_half':
-                return jaconv.z2h(value, kana=True)
+                result = jaconv.z2h(value, kana=True)
+                result = result.replace('\u3000', ' ')
+                return result
             elif kana_type == 'half_to_full':
-                return jaconv.h2z(value, kana=True)
+                result = jaconv.h2z(value, kana=True)
+                result = result.replace(' ', '\u3000')
+                return result
             else:
                 logger.warning(f"Unsupported kana type: {kana_type}")
                 return value
         except Exception as e:
             logger.error(f"Error in convert_kana: {e}")
             return ""
-
 
     @staticmethod
     def convert_postal_code(value):

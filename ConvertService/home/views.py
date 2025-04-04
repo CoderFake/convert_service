@@ -1,10 +1,12 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse
 from django.views import View
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from process.redis import redis_client
 import logging
 from process.views import process_and_display, save_format_field
+from configs.utils import get_edit_options
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +43,18 @@ class HomeView(View):
             context = {"tab": tab}
 
             if tab == "process-file":
-                pass
+                context["edit_options"] = get_edit_options()
 
             return render(request, 'web/home/index.html', context)
 
-        return render(request, 'web/accounts/login.html')
+        return redirect(reverse('login'))
+
+
+class GetEditOptionsView(LoginRequiredMixin, View):
+    def get(self, request):
+        try:
+            options = get_edit_options()
+            return JsonResponse({'status': 'success', 'options': options})
+        except Exception as e:
+            logger.error(f"Error fetching edit options: {e}")
+            return JsonResponse({'status': 'error', 'message': 'エラーが発生しました。'})
