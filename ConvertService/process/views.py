@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 class UploadFileView(LoginRequiredMixin, View):
     def post(self, request):
         file = request.FILES.get('file')
+
         if not file:
             return JsonResponse({'status': 'error', 'message': 'ファイルが提供されていません。'})
 
@@ -42,8 +43,13 @@ class UploadFileView(LoginRequiredMixin, View):
             for chunk in file.chunks():
                 destination.write(chunk)
 
+        client = redis_client.get_client()
+
+        if not client.keys(f'{request.session.session_key}-file:*'):
+            client.delete(f'{request.session.session_key}-file-format')
+
         user = Account.objects.get(pk=request.user.id)
-        allowed_formats = FileFormatFetcher.get_allowed_formats_for_tenant(user.tenant.id)
+        allowed_formats = FileFormatFetcher.get_allowed_formats_for_tenant(request.session.session_key, user.tenant.id)
 
         file_extension = os.path.splitext(file_name)[1].lower()
         content_type = file.content_type
@@ -53,7 +59,6 @@ class UploadFileView(LoginRequiredMixin, View):
 
         if file.size > 5 * 1024 * 1024:
             return JsonResponse({'status': 'error', 'message': f'ファイルサイズが制限を超えています: {file_name}。'})
-        client = redis_client.get_client()
         client.set(f'{request.session.session_key}-file:{file_name}', file_path)
 
         if not client.keys(f'{request.session.session_key}-file-format'):
@@ -78,6 +83,9 @@ class DeleteFileView(LoginRequiredMixin, View):
                 os.remove(file_path.decode('utf-8'))
                 client.delete(f'{request.session.session_key}-file:{file_name}')
                 return JsonResponse({'status': 'success', 'message': f'ファイルが削除されました: {file_name}。'})
+
+            if not client.keys(f'{request.session.session_key}-file:*') and client.keys(f'{request.session.session_key}-file-format'):
+                client.delete(f'{request.session.session_key}-file-format')
 
             return JsonResponse({'status': 'error', 'message': f'Redisにファイルが見つかりません: {file_name}。'})
         except Exception as e:
@@ -127,7 +135,13 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
                 False,
                 data_format_id=data_format_id
             )
-            rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
+
+            rules = RuleFetcher.get_rules(
+                user,
+                HeaderType.BEFORE.value,
+                HeaderType.FORMAT.value,
+                data_format_id=data_format_id
+            )
 
             process_and_format_file.run(
                 request.session.session_key,
@@ -187,6 +201,8 @@ class DownloadView(LoginRequiredMixin, View):
             data_format_id = get_data_format_id_from_redis(request)
 
             if download_type == DownloadType.SYSTEM.value:
+                sheet_name= DownloadType.SYSTEM.value
+
                 format_headers = HeaderFetcher.get_headers(
                     user,
                     HeaderType.FORMAT.value,
@@ -208,6 +224,8 @@ class DownloadView(LoginRequiredMixin, View):
                     data_format_id=data_format_id
                 )
             else:
+                sheet_name= DownloadType.AGENCY.value
+
                 format_headers = HeaderFetcher.get_headers(
                     user,
                     HeaderType.FORMAT.value,
@@ -241,7 +259,7 @@ class DownloadView(LoginRequiredMixin, View):
             output_file_format = FileFormatFetcher.get_output_file_format_id(user, download_type, data_format_id)
 
             if output_file_format == 'EXCEL':
-                file_key = generate_excel_task(f"{request.session.session_key}-output:*", output_headers)
+                file_key = generate_excel_task(f"{request.session.session_key}-output:*", output_headers, sheet_name)
                 if not file_key:
                     messages.error(request, '指定されたExcelファイルを生成できませんでした。')
                     return redirect('home')
@@ -526,16 +544,12 @@ class ProcessHeadersView(LoginRequiredMixin, View):
         return uploaded_files, None
 
     def auto_detect_file_format(self, file):
-        """
-        Tự động nhận diện định dạng file dựa trên content type và phần mở rộng
-        """
         if not file:
             return None
 
         content_type = file.content_type
         file_extension = os.path.splitext(file.name)[1].lower()
 
-        # Ánh xạ định dạng file
         format_mapping = {
             # CSV formats
             'text/csv': 'CSV_C_UTF-8',
@@ -565,19 +579,14 @@ class ProcessHeadersView(LoginRequiredMixin, View):
             '.xml': 'XML',
         }
 
-        # Thử xác định từ content type
         file_format = format_mapping.get(content_type)
 
-        # Nếu không nhận dạng được từ content type, thử từ phần mở rộng
         if not file_format:
             file_format = extension_mapping.get(file_extension)
 
-        # Nếu là CSV, kiểm tra xem là tab-delimited hay comma-delimited
         if file_format == 'CSV_C_UTF-8' and file_extension == '.csv':
-            # Đọc 1000 byte đầu tiên để kiểm tra
             file_sample = file.read(1000)
-            file.seek(0)  # Reset con trỏ file
-
+            file.seek(0)
             try:
                 sample_text = file_sample.decode('utf-8', errors='ignore')
                 if '\t' in sample_text and ',' not in sample_text:
