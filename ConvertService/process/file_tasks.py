@@ -227,7 +227,6 @@ def generate_zip_task(zip_key, headers, file_format_id):
 
 @shared_task
 def generate_csv_task(csv_key_pattern, headers, file_format_id):
-
     try:
         client = redis_client.get_client()
         keys = list(redis_client.scan_keys(csv_key_pattern))
@@ -244,12 +243,87 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         delimiter = format_details['delimiter']
         encoding = format_details['encoding']
 
+        incompatible_chars = {
+            # Circled numbers
+            '\u2460': '(1)',  # ① -> (1)
+            '\u2461': '(2)',  # ② -> (2)
+            '\u2462': '(3)',  # ③ -> (3)
+            '\u2463': '(4)',  # ④ -> (4)
+            '\u2464': '(5)',  # ⑤ -> (5)
+            '\u2465': '(6)',  # ⑥ -> (6)
+            '\u2466': '(7)',  # ⑦ -> (7)
+            '\u2467': '(8)',  # ⑧ -> (8)
+            '\u2468': '(9)',  # ⑨ -> (9)
+            '\u2469': '(10)',  # ⑩ -> (10)
+            '\u246A': '(11)',  # ⑪ -> (11)
+            '\u246B': '(12)',  # ⑫ -> (12)
+            '\u246C': '(13)',  # ⑬ -> (13)
+            '\u246D': '(14)',  # ⑭ -> (14)
+            '\u246E': '(15)',  # ⑮ -> (15)
+            '\u246F': '(16)',  # ⑯ -> (16)
+            '\u2470': '(17)',  # ⑰ -> (17)
+            '\u2471': '(18)',  # ⑱ -> (18)
+            '\u2472': '(19)',  # ⑲ -> (19)
+            '\u2473': '(20)',  # ⑳ -> (20)
+
+            # Music symbols
+            '\u266A': '*',  # ♪ -> *
+            '\u266B': '*',  # ♫ -> *
+
+            # Special symbols
+            '\u2605': '*',  # ★ -> *
+            '\u2606': '*',  # ☆ -> *
+            '\u2665': '<3',  # ♥ -> <3
+            '\u2660': '*',  # ♠ -> *
+            '\u2663': '*',  # ♣ -> *
+            '\u2666': '*',  # ♦ -> *
+
+            # Arrows
+            '\u2190': '<-',  # ← -> <-
+            '\u2191': '^',  # ↑ -> ^
+            '\u2192': '->',  # → -> ->
+            '\u2193': 'v',  # ↓ -> v
+            '\u2194': '<->',  # ↔ -> <->
+            '\u21D2': '=>',  # ⇒ -> =>
+            '\u21D4': '<=>',  # ⇔ -> <=>
+
+            # Bullets and marks
+            '\u2022': '*',  # • -> *
+            '\u2026': '...',  # … -> ...
+            '\u2018': "'",  # ' -> '
+            '\u2019': "'",  # ' -> '
+            '\u201C': '"',  # " -> "
+            '\u201D': '"',  # " -> "
+
+            # Math symbols
+            '\u00B1': '+/-',  # ± -> +/-
+            '\u00D7': 'x',  # × -> x
+            '\u00F7': '/',  # ÷ -> /
+            '\u221E': 'inf',  # ∞ -> inf
+            '\u2260': '!=',  # ≠ -> !=
+            '\u2264': '<=',  # ≤ -> <=
+            '\u2265': '>=',  # ≥ -> >=
+            '\u221A': 'sqrt',  # √ -> sqrt
+
+            # Currency
+            '\u20AC': 'EUR',  # € -> EUR
+            '\u00A3': 'GBP',  # £ -> GBP
+            '\u00A5': 'JPY',  # ¥ -> JPY
+        }
+
+        def replace_incompatible_chars(text):
+            if not isinstance(text, str):
+                return text
+
+            for char, replacement in incompatible_chars.items():
+                text = text.replace(char, replacement)
+            return text
+
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
         csv_writer.writerow(headers)
 
         buffer_lock = threading.Lock()
-
         max_workers = os.cpu_count() or 1
 
         def process_rows(key):
@@ -265,9 +339,10 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         def write_row(row):
             try:
                 if isinstance(row, dict):
-                    return list(row.values())
+                    values = list(row.values())
+                    return [replace_incompatible_chars(val) for val in values]
                 elif isinstance(row, list):
-                    return row
+                    return [replace_incompatible_chars(val) for val in row]
                 else:
                     logger.warning(f"Invalid row format: {row}")
                     return None
@@ -292,7 +367,7 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
                     logger.error(f"Error writing row to CSV: {e}")
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
-        client.set(csv_key_name, csv_buffer.getvalue().encode(encoding), ex=3600)
+        client.set(csv_key_name, csv_buffer.getvalue().encode(encoding, errors='ignore'), ex=3600)
         return csv_key_name
 
     except Exception as e:
@@ -301,7 +376,7 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
 
 
 @shared_task
-def generate_excel_task(excel_key_pattern, headers, file_format_id=None):
+def generate_excel_task(excel_key_pattern, headers, sheet_name):
     try:
         client = redis_client.get_client()
         keys = list(redis_client.scan_keys(excel_key_pattern))
@@ -317,11 +392,11 @@ def generate_excel_task(excel_key_pattern, headers, file_format_id=None):
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "Data"
+
+        ws.title = sheet_name
 
         ws.append(headers)
 
-        max_workers = os.cpu_count() or 1
         all_rows = []
 
         for key in keys:

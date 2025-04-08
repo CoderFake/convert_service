@@ -142,9 +142,14 @@ class FileFormatFetcher:
         return FileFormatFetcher.FORMAT_TO_DATA_FORMAT.get(file_format_id, 'DF_003')
 
     @staticmethod
-    def get_allowed_formats_for_tenant(tenant_id):
+    def get_allowed_formats_for_tenant(session_id, tenant_id):
         client = redis_client.get_client()
         cache_key = f'tenant:{tenant_id}:allowed_formats'
+
+        first_extension = client.get(f'{session_id}-file-format')
+        if first_extension:
+            first_extension = first_extension.decode('utf-8')
+            return [first_extension]
 
         cached_formats = client.get(cache_key)
         if cached_formats:
@@ -299,7 +304,7 @@ class RuleFetcher:
             tenant_id = user.tenant.id if user.tenant else 1
 
             data_convert = DataConversionInfo.objects.filter(
-                tenant_id=tenant_id
+                tenant_id=tenant_id, data_format_before__data_format_id=data_format_id
             ).first()
 
             if not data_convert:
@@ -311,16 +316,6 @@ class RuleFetcher:
                 'data_item_type_before__type_name': before_type,
                 'data_item_type_after__type_name': after_type
             }
-
-            if data_format_id:
-                try:
-                    data_format = DataFormat.objects.get(
-                        tenant_id=tenant_id,
-                        data_format_id=data_format_id
-                    )
-                    filter_params['data_item_type_before__data_item__data_format'] = data_format
-                except DataFormat.DoesNotExist:
-                    logger.warning(f"Data format {data_format_id} not found for tenant {tenant_id}, using default.")
 
             detailed_infos = DetailedInfo.objects.filter(**filter_params).select_related(
                 'data_item_type_before',
