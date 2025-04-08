@@ -193,7 +193,7 @@ class FileFormatFetcher:
         if not format_id:
             format_id = FileFormatFetcher.EXTENSION_MAP.get(file_extension.lower())
 
-        return format_id or 'CSV_C_UTF-8'
+        return format_id or 'CSV_C_SJIS'
 
     @staticmethod
     def get_file_format_id(user: Account, before=True, use_cache=True):
@@ -240,45 +240,43 @@ class FileFormatFetcher:
             return None
 
     @staticmethod
-    def get_output_file_format_id(user: Account, download_type=DownloadType.SYSTEM.value, use_cache=True):
+    def get_output_file_format_id(user: Account, download_type, data_format_id):
         try:
             tenant_id = user.tenant.id if user.tenant else 1
-            session_key = getattr(user, 'session', {}).get('session_key', '')
-
-            if session_key and use_cache:
-                client = redis_client.get_client()
-                cache_key = f'{session_key}-output-file-format-{download_type}'
-
-                cached_format = client.get(cache_key)
-                if cached_format:
-                    return cached_format.decode('utf-8')
-
-            data_format_column = 'data_format_system_after_id' if download_type == DownloadType.SYSTEM.value else 'data_format_agency_after_id'
-
-            data_format_id = DataConversionInfo.objects.filter(
-                tenant_id=tenant_id
-            ).values_list(data_format_column, flat=True).first()
 
             if not data_format_id:
                 raise ValueError(f"No output data_format found for {download_type} download type")
 
-            file_format = DataFormat.objects.filter(
-                id=data_format_id, tenant_id=tenant_id
-            ).values_list('file_format__file_format_id', flat=True).first()
+            data_format_obj = DataFormat.objects.filter(data_format_id=data_format_id).first()
+            if not data_format_obj:
+                raise ValueError(f"Data format with ID {data_format_id} not found")
 
-            if not file_format:
-                raise ValueError(f"No file format found for the specified output data_format")
+            conversion_info = DataConversionInfo.objects.filter(
+                data_format_before_id=data_format_obj.id,
+                tenant_id=tenant_id
+            ).first()
 
-            if session_key and use_cache:
-                client = redis_client.get_client()
-                cache_key = f'{session_key}-output-file-format-{download_type}'
-                client.set(cache_key, file_format, ex=FileFormatFetcher.CACHE_TIMEOUT)
+            if not conversion_info:
+                raise ValueError(f"No conversion info found for data format {data_format_id}")
 
-            return file_format
+            if download_type == DownloadType.SYSTEM.value:
+                data_format_after = conversion_info.data_format_system_after
+            else:
+                data_format_after = conversion_info.data_format_agency_after
+
+            if not data_format_after:
+                raise ValueError(f"No output data format found for {download_type}")
+
+            file_format_id = data_format_after.file_format.file_format_id
+
+            if not file_format_id:
+                raise ValueError(f"No file format found for the specified output data format")
+
+            return file_format_id
 
         except Exception as e:
             logger.error(f"Error fetching output file format ID: {e}")
-            return 'CSV_C_UTF-8'
+            return 'CSV_C_SJIS'
 
     @staticmethod
     def clear_format_cache():
