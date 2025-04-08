@@ -44,21 +44,6 @@ class HomeView(View):
                 context = {"tab": tab}
             elif tab == "process-file":
                 context = {"tab": tab}
-
-                client = redis_client.get_client()
-                file_keys = client.keys(f'{request.session.session_key}-file:*')
-
-                data_format_id = None
-                if file_keys:
-                    first_file_key = file_keys[0].decode('utf-8').split(':')[1]
-                    file_format_key = f'{request.session.session_key}-file-format:{first_file_key}'
-                    file_format = client.get(file_format_key)
-
-                    if file_format:
-                        file_format = file_format.decode('utf-8')
-                        data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
-
-                context["edit_options"] = get_edit_options(data_format_id)
             else:
                 context = {"tab": "upload-file"}
 
@@ -83,7 +68,7 @@ class GetEditOptionsView(LoginRequiredMixin, View):
                     file_format = file_format.decode('utf-8')
                     data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
 
-            options = get_edit_options(data_format_id)
+            options = get_edit_options()
             return JsonResponse({'status': 'success', 'options': options})
         except Exception as e:
             logger.error(f"Error fetching edit options: {e}")

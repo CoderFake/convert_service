@@ -56,8 +56,9 @@ class UploadFileView(LoginRequiredMixin, View):
         client = redis_client.get_client()
         client.set(f'{request.session.session_key}-file:{file_name}', file_path)
 
-        file_format = FileFormatFetcher.get_file_format_for_content_type(content_type, file_extension)
-        client.set(f'{request.session.session_key}-file-format:{file_name}', file_format, ex=3600)
+        if not client.keys(f'{request.session.session_key}-file-format'):
+            file_format = FileFormatFetcher.get_file_format_for_content_type(content_type, file_extension)
+            client.set(f'{request.session.session_key}-file-format', file_format, ex=3600)
 
         return JsonResponse({'status': 'success', 'message': f'ファイルがアップロードされました: {file_name}。'})
 
@@ -87,7 +88,14 @@ class ProcessFilesView(LoginRequiredMixin, View):
     def post(self, request):
         try:
             user = Account.objects.get(pk=request.user.id)
-            headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
+
+            headers = HeaderFetcher.get_headers(
+                user,
+                HeaderType.BEFORE.value,
+                DisplayType.ALL.value,
+                False,
+                get_data_format_id_from_redis(request)
+            )
             process_multiple_files_task.run(request.session.session_key, headers)
 
             return JsonResponse({
@@ -103,9 +111,22 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
     def post(self, request):
         try:
             user = Account.objects.get(pk=request.user.id)
-            before_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value,
-                                                       get_edit_header=True)
-            format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+            data_format_id = get_data_format_id_from_redis(request)
+            before_headers = HeaderFetcher.get_headers(
+                user,
+                HeaderType.BEFORE.value,
+                DisplayType.ALL.value,
+                True,
+                data_format_id=data_format_id
+            )
+
+            format_headers = HeaderFetcher.get_headers(
+                user,
+                HeaderType.FORMAT.value,
+                DisplayType.ALL.value,
+                False,
+                data_format_id=data_format_id
+            )
             rules = RuleFetcher.get_rules(user, HeaderType.BEFORE.value, HeaderType.FORMAT.value)
 
             process_and_format_file.run(
@@ -163,17 +184,7 @@ class DownloadView(LoginRequiredMixin, View):
             client = redis_client.get_client()
             user = Account.objects.get(pk=request.user.id)
 
-            file_keys = client.keys(f'{request.session.session_key}-file:*')
-            data_format_id = None
-
-            if file_keys:
-                first_file_key = file_keys[0].decode('utf-8').split(':')[1]
-                file_format_key = f'{request.session.session_key}-file-format:{first_file_key}'
-                file_format = client.get(file_format_key)
-
-                if file_format:
-                    file_format = file_format.decode('utf-8')
-                    data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
+            data_format_id = get_data_format_id_from_redis(request)
 
             if download_type == DownloadType.SYSTEM.value:
                 format_headers = HeaderFetcher.get_headers(
@@ -189,6 +200,7 @@ class DownloadView(LoginRequiredMixin, View):
                     DisplayType.ALL.value,
                     data_format_id=data_format_id
                 )
+
                 rules = RuleFetcher.get_rules(
                     user,
                     HeaderType.FORMAT.value,
@@ -226,7 +238,7 @@ class DownloadView(LoginRequiredMixin, View):
                 data_format_id=data_format_id
             )
 
-            output_file_format = FileFormatFetcher.get_output_file_format_id(user, download_type)
+            output_file_format = FileFormatFetcher.get_output_file_format_id(user, download_type, data_format_id)
 
             if output_file_format == 'EXCEL':
                 file_key = generate_excel_task(f"{request.session.session_key}-output:*", output_headers)
@@ -247,8 +259,7 @@ class DownloadView(LoginRequiredMixin, View):
                     'Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d_%H%M%S")}_{download_type}_output.xlsx"'
 
             else:
-                file_key = generate_csv_task(f"{request.session.session_key}-output:*", output_headers,
-                                             output_file_format)
+                file_key = generate_csv_task(f"{request.session.session_key}-output:*", output_headers, output_file_format)
                 if not file_key:
                     messages.error(request, '指定されたCSVファイルを生成できませんでした。')
                     return redirect('home')
@@ -293,24 +304,12 @@ class ProcessAndDisplayView:
             client = redis_client.get_client()
             user = Account.objects.get(pk=user_id)
 
-            file_keys = client.keys(f'{session_id}-file:*')
-
-            data_format_id = None
-            if file_keys:
-                first_file_key = file_keys[0].decode('utf-8').split(':')[1]
-                file_format_key = f'{session_id}-file-format:{first_file_key}'
-                file_format = client.get(file_format_key)
-
-                if file_format:
-                    file_format = file_format.decode('utf-8')
-                    data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
-
             show_formatted_header = HeaderFetcher.get_headers(
                 user,
                 HeaderType.FORMAT.value,
                 DisplayType.SHOW.value,
                 get_edit_header=True,
-                data_format_id=data_format_id
+                data_format_id=get_data_format_id_from_redis(request)
             )
 
             hidden_formatted_header = HeaderFetcher.get_headers(
@@ -318,13 +317,13 @@ class ProcessAndDisplayView:
                 HeaderType.FORMAT.value,
                 DisplayType.HIDDEN.value,
                 get_edit_header=True,
-                data_format_id=data_format_id
+                data_format_id=get_data_format_id_from_redis(request)
             )
 
             format_keys = client.keys(f"{session_id}-formatted:*")
 
             if not format_keys:
-                logger.warning("Không tìm thấy dữ liệu đã được xử lý.")
+                logger.warning("Can't not find processed data")
                 return JsonResponse({
                     'status': 'error',
                     'message': '処理されたファイルが見つかりません。'
@@ -390,23 +389,11 @@ class SaveFormatFieldView:
 
         user = Account.objects.get(pk=request.user.id)
 
-        file_keys = client.keys(f'{request.session.session_key}-file:*')
-
-        data_format_id = None
-        if file_keys:
-            first_file_key = file_keys[0].decode('utf-8').split(':')[1]
-            file_format_key = f'{request.session.session_key}-file-format:{first_file_key}'
-            file_format = client.get(file_format_key)
-
-            if file_format:
-                file_format = file_format.decode('utf-8')
-                data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
-
         header_names = HeaderFetcher.get_headers(
             user,
             HeaderType.FORMAT.value,
             DisplayType.ALL.value,
-            data_format_id=data_format_id
+            data_format_id=get_data_format_id_from_redis(request)
         )
 
         if field_name not in header_names:
@@ -599,6 +586,20 @@ class ProcessHeadersView(LoginRequiredMixin, View):
                 pass
 
         return file_format
+
+
+def get_data_format_id_from_redis(request):
+    data_format_id = None
+
+    client = redis_client.get_client()
+    file_format_key = f'{request.session.session_key}-file-format'
+    file_format = client.get(file_format_key)
+
+    if file_format:
+        file_format = file_format.decode('utf-8')
+        data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
+
+    return data_format_id
 
 
 def process_and_display(session_id, user_id, request=None):
