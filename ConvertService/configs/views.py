@@ -155,8 +155,8 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 filter_params = {
                     'tenant': tenant,
                     'data_convert': data_convert,
-                    'data_item_type_id_before': data_item_type_before,
-                    'data_item_type_id_after': data_item_type_after,
+                    'data_item_type_before': data_item_type_before,
+                    'data_item_type_after': data_item_type_after,
                 }
 
                 if data_format:
@@ -167,13 +167,13 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 if detail_info:
                     detail_info.convert_rule = rule
                     detail_info.save()
-                    messages.success(request, "Cập nhật rule thành công!")
+                    messages.success(request, "Update rule successfully!")
                 else:
                     create_params = {
                         'tenant': tenant,
                         'data_convert': data_convert,
-                        'data_item_type_id_before': data_item_type_before,
-                        'data_item_type_id_after': data_item_type_after,
+                        'data_item_type_before': data_item_type_before,
+                        'data_item_type_after': data_item_type_after,
                         'convert_rule': rule,
                     }
 
@@ -181,7 +181,7 @@ class RuleSettingsView(LoginRequiredMixin, View):
                         create_params['data_format'] = data_format
 
                     DetailedInfo.objects.create(**create_params)
-                    messages.success(request, "Thêm rule mới thành công!")
+                    messages.success(request, "Add rule successfully!")
 
                 if data_format:
                     return redirect(f'rule_settings?format_id={data_format.id}')

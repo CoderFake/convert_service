@@ -257,7 +257,6 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
                 data = client.get(key)
                 if data:
                     formatted_data = json.loads(data)
-                    client.delete(key)
                     return formatted_data
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
@@ -330,7 +329,6 @@ def generate_excel_task(excel_key_pattern, headers, file_format_id=None):
                 data = client.get(key)
                 if data:
                     formatted_data = json.loads(data)
-                    client.delete(key)
                     all_rows.extend(formatted_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")

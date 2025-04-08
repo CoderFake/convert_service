@@ -1,4 +1,5 @@
-INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert_id, tenant_id, data_item_type_after_id, data_item_type_before_id) VALUES (NOW(), NOW(), 1, 1, 1, 2, 1),
+INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert_id, tenant_id, data_item_type_after_id, data_item_type_before_id) VALUES
+(NOW(), NOW(), 1, 1, 1, 2, 1),
 (NOW(), NOW(), 1, 1, 1, 7, 6),
 (NOW(), NOW(), 1, 1, 1, 9, 8),
 (NOW(), NOW(), 1, 1, 1, 44, 43),
@@ -104,7 +105,7 @@ INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert
 (NOW(), NOW(), 1, 1, 1, 84, 207);
 
 
-INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert_id, tenant_id, data_item_type_id_after_id, data_item_type_id_before_id) VALUES
+INSERT INTO detailed_info (created_at, updated_at, convert_rule_id, data_convert_id, tenant_id, data_item_type_after_id, data_item_type_before_id) VALUES
 (NOW(), NOW(), 1, 2, 1, 208, 207),
 (NOW(), NOW(), 1, 2, 1, 213, 212),
 (NOW(), NOW(), 1, 2, 1, 215, 214),

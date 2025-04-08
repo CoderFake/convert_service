@@ -34,7 +34,7 @@ class ConvertDataValue(models.Model):
     tenant = models.ForeignKey("home.Tenant", on_delete=models.CASCADE, null=True, blank=True)
     data_value_before = models.CharField(max_length=255, null=True, blank=True)
     data_value_after = models.CharField(max_length=255, null=True, blank=True)
-    data_format = models.ForeignKey("DataFormat", on_delete=models.CASCADE, null=True, blank=True)
+    data_format = models.ForeignKey("home.DataFormat", on_delete=models.CASCADE, null=True, blank=True)
     convert_rule = models.ForeignKey(ConvertRule, on_delete=models.CASCADE, related_name='convert_data_values')
 
     class Meta:
