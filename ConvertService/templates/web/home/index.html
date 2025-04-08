@@ -446,7 +446,7 @@
 
                     optionsList.forEach(option => {
 
-                        const value = Array.isArray(option) ? option[0] : option.value;
+                        const value = Array.isArray(option) ? option[1] : option.value;
                         const label = Array.isArray(option) ? option[0] : option.label;
                         const selected = currentValue === value ? 'selected' : '';
                         selectHTML += `<option value="${value}" ${selected}>${label}</option>`;
