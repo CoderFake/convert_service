@@ -18,11 +18,32 @@ class RuleSettingsView(LoginRequiredMixin, View):
     def get(self, request):
         try:
             tenant = request.user.tenant
+            format_id = request.GET.get('format_id')
 
-            # Lấy các data item đầu vào
+            all_data_formats = DataFormat.objects.filter(tenant=tenant).select_related('file_format')
+
+            if not format_id or not all_data_formats.filter(id=format_id).exists():
+                if all_data_formats.exists():
+                    current_data_format = all_data_formats.first()
+                else:
+                    file_format = FileFormat.objects.filter(file_format_id='CSV_C_SJIS').first()
+                    if not file_format:
+                        file_format = FileFormat.objects.create(
+                            file_format_id='CSV_C_SJIS',
+                            file_format_name='CSVファイル（カンマ区切り）SJIS'
+                        )
+                    current_data_format = DataFormat.objects.create(
+                        tenant=tenant,
+                        data_format_id='DF_003',
+                        data_format_name='予約代行業者Bの予約データ',
+                        file_format=file_format
+                    )
+            else:
+                current_data_format = all_data_formats.get(id=format_id)
+
             data_inputs = DataItem.objects.filter(
                 tenant=tenant,
-                data_format__data_format_id="DF_003",
+                data_format=current_data_format,
                 data_item_types__type_name='input'
             ).select_related(
                 'data_format'
@@ -30,10 +51,9 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 'data_item_types'
             ).order_by('data_item_types__index_value')
 
-            # Lấy format/output data items
             data_formats = DataItem.objects.filter(
                 tenant=tenant,
-                data_format__data_format_id="DF_003",
+                data_format=current_data_format,
                 data_item_types__type_name='format'
             ).select_related(
                 'data_format'
@@ -41,20 +61,19 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 'data_item_types'
             ).order_by('data_item_types__index_value')
 
-            # Lấy tất cả convert rules
             rules = ConvertRule.objects.all().select_related('convert_rule_category')
 
-            # Lấy tất cả các rule đã tồn tại cho tenant này
             data_convert = DataConversionInfo.objects.filter(tenant=tenant).first()
             existing_rules = []
 
             if data_convert:
                 detailed_infos = DetailedInfo.objects.filter(
                     tenant=tenant,
-                    data_convert=data_convert
+                    data_convert=data_convert,
+                    data_item_type_before__data_item__data_format=current_data_format
                 ).select_related(
-                    'data_item_type_id_before__data_item',
-                    'data_item_type_id_after__data_item',
+                    'data_item_type_before__data_item',
+                    'data_item_type_after__data_item',
                     'convert_rule',
                     'convert_rule__convert_rule_category'
                 )
@@ -62,21 +81,20 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 for info in detailed_infos:
                     existing_rules.append({
                         'id': info.id,
-                        'input_item': info.data_item_type_id_before.data_item.data_item_name,
-                        'output_item': info.data_item_type_id_after.data_item.data_item_name,
+                        'input_item': info.data_item_type_before.data_item.data_item_name,
+                        'output_item': info.data_item_type_after.data_item.data_item_name,
                         'rule_name': info.convert_rule.convert_rule_name,
                         'rule_category': info.convert_rule.convert_rule_category.convert_rule_category_name,
                     })
 
-            # Lấy tất cả các giá trị dữ liệu cố định
             fixed_data_values = ConvertDataValue.objects.filter(
-                tenant=tenant
+                tenant=tenant,
+                data_format=current_data_format
             ).select_related('convert_rule')
 
-            # Lấy tất cả các header setting
             headers = DataItemType.objects.filter(
                 data_item__tenant=tenant,
-                data_item__data_format__data_format_id="DF_003"
+                data_item__data_format=current_data_format
             ).select_related('data_item')
 
             context = {
@@ -85,12 +103,15 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 'rules': rules,
                 'existing_rules': existing_rules,
                 'fixed_data_values': fixed_data_values,
-                'headers': headers
+                'headers': headers,
+                'all_data_formats': all_data_formats,
+                'current_data_format_id': current_data_format.id,
+                'current_data_format_name': current_data_format.data_format_name
             }
 
             return render(request, 'web/settings/rule_settings.html', context)
         except Exception as e:
-            messages.error(request, f"Đã xảy ra lỗi: {str(e)}")
+            messages.error(request, f"エラーが発生しました: {str(e)}")
             return redirect('home')
 
     def post(self, request):
@@ -100,8 +121,8 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 rule_id = request.POST.get("rule_name")
                 data_item_input_id = request.POST.get("data_item_input")
                 data_item_format_id = request.POST.get("data_item_format")
+                data_format_id = request.POST.get("data_format_id")
 
-                # Kiểm tra và lấy các đối tượng
                 rule = ConvertRule.objects.get(id=rule_id)
                 data_item_input = DataItem.objects.get(id=data_item_input_id, tenant=tenant)
                 data_item_format = DataItem.objects.get(id=data_item_format_id, tenant=tenant)
@@ -113,8 +134,6 @@ class RuleSettingsView(LoginRequiredMixin, View):
                 if not data_convert:
                     messages.error(request, "Không tìm thấy thông tin chuyển đổi dữ liệu.")
                     return redirect('rule_settings')
-
-                # Lấy data_item_type
                 data_item_type_before = DataItemType.objects.get(
                     data_item=data_item_input,
                     type_name='input'
@@ -125,33 +144,51 @@ class RuleSettingsView(LoginRequiredMixin, View):
                     type_name='format'
                 )
 
-                # Kiểm tra xem rule đã tồn tại chưa
-                detail_info = DetailedInfo.objects.filter(
-                    tenant=tenant,
-                    data_convert=data_convert,
-                    data_item_type_id_before=data_item_type_before,
-                    data_item_type_id_after=data_item_type_after,
-                ).first()
+                data_format = None
+                if data_format_id:
+                    try:
+                        data_format = DataFormat.objects.get(id=data_format_id, tenant=tenant)
+                    except DataFormat.DoesNotExist:
+                        messages.error(request, "Không tìm thấy data format.")
+                        return redirect('rule_settings')
+
+                filter_params = {
+                    'tenant': tenant,
+                    'data_convert': data_convert,
+                    'data_item_type_id_before': data_item_type_before,
+                    'data_item_type_id_after': data_item_type_after,
+                }
+
+                if data_format:
+                    filter_params['data_format'] = data_format
+
+                detail_info = DetailedInfo.objects.filter(**filter_params).first()
 
                 if detail_info:
                     detail_info.convert_rule = rule
                     detail_info.save()
                     messages.success(request, "Cập nhật rule thành công!")
                 else:
-                    # Tạo rule mới
-                    DetailedInfo.objects.create(
-                        tenant=tenant,
-                        data_convert=data_convert,
-                        data_item_type_id_before=data_item_type_before,
-                        data_item_type_id_after=data_item_type_after,
-                        convert_rule=rule,
-                    )
+                    create_params = {
+                        'tenant': tenant,
+                        'data_convert': data_convert,
+                        'data_item_type_id_before': data_item_type_before,
+                        'data_item_type_id_after': data_item_type_after,
+                        'convert_rule': rule,
+                    }
+
+                    if data_format:
+                        create_params['data_format'] = data_format
+
+                    DetailedInfo.objects.create(**create_params)
                     messages.success(request, "Thêm rule mới thành công!")
 
+                if data_format:
+                    return redirect(f'rule_settings?format_id={data_format.id}')
                 return redirect('rule_settings')
 
         except Exception as e:
-            messages.error(request, f"Đã xảy ra lỗi: {str(e)}")
+            messages.error(request, f"エラーが発生しました: {str(e)}")
             return redirect('rule_settings')
 
 
@@ -161,41 +198,59 @@ class AddFixedDataView(LoginRequiredMixin, View):
             rule_id = request.POST.get('rule')
             before_value = request.POST.get('before')
             after_value = request.POST.get('after')
+            data_format_id = request.POST.get('data_format_id')
 
             if not rule_id or not before_value or not after_value:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Thiếu thông tin cần thiết'
+                    'message': 'データが不足しています'
                 })
 
-            # Lấy ConvertRule
             convert_rule = ConvertRule.objects.filter(convert_rule_id=rule_id).first()
             if not convert_rule:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Không tìm thấy rule'
+                    'message': 'ルールが見つかりません'
                 })
 
-            # Kiểm tra xem đã tồn tại chưa
-            existing = ConvertDataValue.objects.filter(
-                tenant=request.user.tenant,
-                convert_rule=convert_rule,
-                data_value_before=before_value
-            ).first()
+            data_format = None
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(id=data_format_id, tenant=request.user.tenant)
+                except DataFormat.DoesNotExist:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'データフォーマットが見つかりません'
+                    })
+
+            filter_params = {
+                'tenant': request.user.tenant,
+                'convert_rule': convert_rule,
+                'data_value_before': before_value
+            }
+
+            if data_format:
+                filter_params['data_format'] = data_format
+
+            existing = ConvertDataValue.objects.filter(**filter_params).first()
 
             if existing:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Giá trị này đã tồn tại'
+                    'message': 'この値は既に存在します'
                 })
 
-            # Thêm mới
-            fixed_data = ConvertDataValue.objects.create(
-                tenant=request.user.tenant,
-                convert_rule=convert_rule,
-                data_value_before=before_value,
-                data_value_after=after_value
-            )
+            create_params = {
+                'tenant': request.user.tenant,
+                'convert_rule': convert_rule,
+                'data_value_before': before_value,
+                'data_value_after': after_value
+            }
+
+            if data_format:
+                create_params['data_format'] = data_format
+
+            fixed_data = ConvertDataValue.objects.create(**create_params)
 
             return JsonResponse({
                 'status': 'success',
@@ -206,7 +261,7 @@ class AddFixedDataView(LoginRequiredMixin, View):
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'Đã xảy ra lỗi: {str(e)}'
+                'message': f'エラーが発生しました: {str(e)}'
             })
 
 
@@ -214,36 +269,45 @@ class DeleteFixedDataView(LoginRequiredMixin, View):
     def post(self, request):
         try:
             fixed_data_id = request.POST.get('id')
+            data_format_id = request.POST.get('data_format_id')
 
             if not fixed_data_id:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'ID không hợp lệ'
+                    'message': 'IDが無効です'
                 })
 
-            # Tìm và xóa
-            fixed_data = ConvertDataValue.objects.filter(
-                id=fixed_data_id,
-                tenant=request.user.tenant
-            ).first()
+            filter_params = {
+                'id': fixed_data_id,
+                'tenant': request.user.tenant
+            }
+
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(id=data_format_id)
+                    filter_params['data_format'] = data_format
+                except DataFormat.DoesNotExist:
+                    pass
+
+            fixed_data = ConvertDataValue.objects.filter(**filter_params).first()
 
             if not fixed_data:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Không tìm thấy dữ liệu cần xóa'
+                    'message': '削除するデータが見つかりません'
                 })
 
             fixed_data.delete()
 
             return JsonResponse({
                 'status': 'success',
-                'message': 'Xóa thành công'
+                'message': '削除に成功しました'
             })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'Đã xảy ra lỗi: {str(e)}'
+                'message': f'エラーが発生しました: {str(e)}'
             })
 
 
@@ -251,36 +315,45 @@ class DeleteRuleView(LoginRequiredMixin, View):
     def post(self, request):
         try:
             rule_id = request.POST.get('rule_id')
+            data_format_id = request.POST.get('data_format_id')
 
             if not rule_id:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'ID không hợp lệ'
+                    'message': 'IDが無効です'
                 })
 
-            # Tìm và xóa
-            detailed_info = DetailedInfo.objects.filter(
-                id=rule_id,
-                tenant=request.user.tenant
-            ).first()
+            filter_params = {
+                'id': rule_id,
+                'tenant': request.user.tenant
+            }
+
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(id=data_format_id)
+                    filter_params['data_format'] = data_format
+                except DataFormat.DoesNotExist:
+                    pass
+
+            detailed_info = DetailedInfo.objects.filter(**filter_params).first()
 
             if not detailed_info:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Không tìm thấy rule cần xóa'
+                    'message': '削除するルールが見つかりません'
                 })
 
             detailed_info.delete()
 
             return JsonResponse({
                 'status': 'success',
-                'message': 'Xóa rule thành công'
+                'message': 'ルールの削除に成功しました'
             })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'Đã xảy ra lỗi: {str(e)}'
+                'message': f'エラーが発生しました: {str(e)}'
             })
 
 
@@ -373,8 +446,25 @@ class SaveHeaderSettingsView(LoginRequiredMixin, View):
         try:
             with transaction.atomic():
                 data = request.POST
+                data_format_id = data.get('data_format_id')
 
-                # Xử lý các cài đặt header
+                data_format = None
+                if data_format_id:
+                    try:
+                        data_format = DataFormat.objects.get(id=data_format_id, tenant=request.user.tenant)
+                    except DataFormat.DoesNotExist:
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': 'データフォーマットが見つかりません'
+                        })
+
+                filter_params = {
+                    'data_item__tenant': request.user.tenant
+                }
+
+                if data_format:
+                    filter_params['data_item__data_format'] = data_format
+
                 for key, value in data.items():
                     if key.startswith('display_') or key.startswith('edit_') or key.startswith(
                             'format_') or key.startswith('index_'):
@@ -382,10 +472,9 @@ class SaveHeaderSettingsView(LoginRequiredMixin, View):
                         prefix = parts[0]
                         header_id = parts[1]
 
-                        # Lấy header item
                         header = DataItemType.objects.filter(
                             id=header_id,
-                            data_item__tenant=request.user.tenant
+                            **filter_params
                         ).first()
 
                         if header:
@@ -403,11 +492,11 @@ class SaveHeaderSettingsView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': 'Cài đặt header đã được lưu'
+                    'message': 'ヘッダー設定が保存されました'
                 })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'Đã xảy ra lỗi: {str(e)}'
+                'message': f'エラーが発生しました: {str(e)}'
             })

@@ -20,7 +20,7 @@ from .file_tasks import (
     process_and_format_file,
     process_multiple_files_task,
     generate_zip_task,
-    generate_csv_task
+    generate_csv_task, generate_excel_task
 )
 from .utils import ProcessHeader, DisplayData
 from .redis import redis_client
@@ -161,20 +161,60 @@ class DownloadView(LoginRequiredMixin, View):
 
         try:
             client = redis_client.get_client()
-
             user = Account.objects.get(pk=request.user.id)
-            if download_type == DownloadType.SYSTEM.value:
-                format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.SHOW.value,
-                                                           get_edit_header=True)
-                output_headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.ALL.value)
-                rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.AFTER.value)
-            else:
-                format_headers = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value,
-                                                           get_edit_header=True)
-                output_headers = HeaderFetcher.get_headers(user, HeaderType.BEFORE.value, DisplayType.ALL.value)
-                rules = RuleFetcher.get_rules(user, HeaderType.FORMAT.value, HeaderType.BEFORE.value)
 
-            file_format = FileFormatFetcher.get_file_format_id(user, before=False)
+            file_keys = client.keys(f'{request.session.session_key}-file:*')
+            data_format_id = None
+
+            if file_keys:
+                first_file_key = file_keys[0].decode('utf-8').split(':')[1]
+                file_format_key = f'{request.session.session_key}-file-format:{first_file_key}'
+                file_format = client.get(file_format_key)
+
+                if file_format:
+                    file_format = file_format.decode('utf-8')
+                    data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
+
+            if download_type == DownloadType.SYSTEM.value:
+                format_headers = HeaderFetcher.get_headers(
+                    user,
+                    HeaderType.FORMAT.value,
+                    DisplayType.SHOW.value,
+                    get_edit_header=True,
+                    data_format_id=data_format_id
+                )
+                output_headers = HeaderFetcher.get_headers(
+                    user,
+                    HeaderType.AFTER.value,
+                    DisplayType.ALL.value,
+                    data_format_id=data_format_id
+                )
+                rules = RuleFetcher.get_rules(
+                    user,
+                    HeaderType.FORMAT.value,
+                    HeaderType.AFTER.value,
+                    data_format_id=data_format_id
+                )
+            else:
+                format_headers = HeaderFetcher.get_headers(
+                    user,
+                    HeaderType.FORMAT.value,
+                    DisplayType.ALL.value,
+                    get_edit_header=True,
+                    data_format_id=data_format_id
+                )
+                output_headers = HeaderFetcher.get_headers(
+                    user,
+                    HeaderType.BEFORE.value,
+                    DisplayType.ALL.value,
+                    data_format_id=data_format_id
+                )
+                rules = RuleFetcher.get_rules(
+                    user,
+                    HeaderType.FORMAT.value,
+                    HeaderType.BEFORE.value,
+                    data_format_id=data_format_id
+                )
 
             process_and_format_file.run(
                 request.session.session_key,
@@ -182,25 +222,51 @@ class DownloadView(LoginRequiredMixin, View):
                 format_headers,
                 output_headers,
                 user.tenant.id,
-                type_keys="formatted:*"
+                type_keys="formatted:*",
+                data_format_id=data_format_id
             )
 
-            csv_key = generate_csv_task(f"{request.session.session_key}-output:*", output_headers, file_format)
+            output_file_format = FileFormatFetcher.get_output_file_format_id(user, download_type)
 
-            if not csv_key:
-                return redirect('home')
+            if output_file_format == 'EXCEL':
+                file_key = generate_excel_task(f"{request.session.session_key}-output:*", output_headers)
+                if not file_key:
+                    messages.error(request, '指定されたExcelファイルを生成できませんでした。')
+                    return redirect('home')
 
-            csv_data = client.get(csv_key)
-            if not csv_data:
-                messages.error(request, '指定されたCSVファイルが見つかりません。')
-                return redirect('home')
+                excel_data = client.get(file_key)
+                if not excel_data:
+                    messages.error(request, '指定されたExcelファイルが見つかりません。')
+                    return redirect('home')
 
-            response = HttpResponse(csv_data, content_type='text/csv')
-            response['Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d_%H%M%S")}_{download_type}_output.csv"'
+                response = HttpResponse(
+                    excel_data,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                response[
+                    'Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d_%H%M%S")}_{download_type}_output.xlsx"'
+
+            else:
+                file_key = generate_csv_task(f"{request.session.session_key}-output:*", output_headers,
+                                             output_file_format)
+                if not file_key:
+                    messages.error(request, '指定されたCSVファイルを生成できませんでした。')
+                    return redirect('home')
+
+                csv_data = client.get(file_key)
+                if not csv_data:
+                    messages.error(request, '指定されたCSVファイルが見つかりません。')
+                    return redirect('home')
+
+                response = HttpResponse(csv_data, content_type='text/csv')
+                response[
+                    'Content-Disposition'] = f'attachment; filename="{timezone.now().strftime("%Y%m%d_%H%M%S")}_{download_type}_output.csv"'
 
             return response
+
         except Exception as e:
-            logger.error(f"Error downloading CSV file: {e}")
+            logger.error(f"Error downloading file: {e}")
+            messages.error(request, f'ファイルのダウンロード中にエラーが発生しました: {str(e)}')
             return redirect('home')
 
 
@@ -225,21 +291,34 @@ class ProcessAndDisplayView:
             page_size = max(10, min(100, page_size))
 
             client = redis_client.get_client()
-
             user = Account.objects.get(pk=user_id)
+
+            file_keys = client.keys(f'{session_id}-file:*')
+
+            data_format_id = None
+            if file_keys:
+                first_file_key = file_keys[0].decode('utf-8').split(':')[1]
+                file_format_key = f'{session_id}-file-format:{first_file_key}'
+                file_format = client.get(file_format_key)
+
+                if file_format:
+                    file_format = file_format.decode('utf-8')
+                    data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
 
             show_formatted_header = HeaderFetcher.get_headers(
                 user,
                 HeaderType.FORMAT.value,
                 DisplayType.SHOW.value,
-                get_edit_header=True
+                get_edit_header=True,
+                data_format_id=data_format_id
             )
 
             hidden_formatted_header = HeaderFetcher.get_headers(
                 user,
                 HeaderType.FORMAT.value,
                 DisplayType.HIDDEN.value,
-                get_edit_header=True
+                get_edit_header=True,
+                data_format_id=data_format_id
             )
 
             format_keys = client.keys(f"{session_id}-formatted:*")
@@ -310,7 +389,25 @@ class SaveFormatFieldView:
                 {'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
 
         user = Account.objects.get(pk=request.user.id)
-        header_names = HeaderFetcher.get_headers(user, HeaderType.FORMAT.value, DisplayType.ALL.value)
+
+        file_keys = client.keys(f'{request.session.session_key}-file:*')
+
+        data_format_id = None
+        if file_keys:
+            first_file_key = file_keys[0].decode('utf-8').split(':')[1]
+            file_format_key = f'{request.session.session_key}-file-format:{first_file_key}'
+            file_format = client.get(file_format_key)
+
+            if file_format:
+                file_format = file_format.decode('utf-8')
+                data_format_id = FileFormatFetcher.get_data_format_id_for_file_format(file_format)
+
+        header_names = HeaderFetcher.get_headers(
+            user,
+            HeaderType.FORMAT.value,
+            DisplayType.ALL.value,
+            data_format_id=data_format_id
+        )
 
         if field_name not in header_names:
             return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
@@ -340,7 +437,25 @@ class ProcessHeadersView(LoginRequiredMixin, View):
 
         for idx, (file, file_type) in enumerate(uploaded_files):
             try:
+                file_extension = os.path.splitext(file.name)[1].lower() if hasattr(file, 'name') else ''
+                content_type = file.content_type if hasattr(file, 'content_type') else ''
+
+                if not file_type:
+                    if file_extension in ['.csv', '.tsv', '.txt']:
+                        if '\t' in file.read().decode('utf-8', errors='ignore')[:1000]:
+                            file_type = 'CSV_T_UTF-8'
+                        else:
+                            file_type = 'CSV_C_UTF-8'
+                        file.seek(0)
+                    elif file_extension in ['.xlsx', '.xls']:
+                        file_type = 'EXCEL'
+                    elif file_extension == '.json':
+                        file_type = 'JSON'
+                    elif file_extension == '.xml':
+                        file_type = 'XML'
+
                 headers = ProcessHeader.get_header(file, file_type)
+
                 if headers:
                     for i, header in enumerate(headers):
                         if header not in structured_data:
@@ -350,7 +465,7 @@ class ProcessHeadersView(LoginRequiredMixin, View):
                                 "output": None
                             }
 
-                        data_type = "string"
+                        data_type = self.determine_data_type(header, file_type)
                         display = 0 if idx == 0 else 1
 
                         if idx == 0:
@@ -380,6 +495,22 @@ class ProcessHeadersView(LoginRequiredMixin, View):
             "structured_data": structured_data
         })
 
+    def determine_data_type(self, header, file_type):
+        data_type = "string"
+
+        header_lower = header.lower()
+
+        if any(date_term in header_lower for date_term in ['date', 'ngày', '日付', '日', '年月日']):
+            data_type = "date"
+
+        elif any(time_term in header_lower for time_term in ['time', 'giờ', '時間', '時', '分']):
+            data_type = "time"
+
+        elif any(num_term in header_lower for num_term in ['id', 'number', 'amount', 'price', 'cost', 'count']):
+            data_type = "number"
+
+        return data_type
+
     def get_uploaded_files(self, request):
         input_file = request.FILES.get('input-file')
         format_file = request.FILES.get('format-file')
@@ -393,13 +524,81 @@ class ProcessHeadersView(LoginRequiredMixin, View):
         output_type = request.POST.get('output-type', '').strip()
 
         if not input_type or not format_type or not output_type:
-            return None, 'すべてのファイル形式 (input-type, format-type, output-type) を選択してください。'
+            input_type = self.auto_detect_file_format(input_file)
+            format_type = self.auto_detect_file_format(format_file)
+            output_type = self.auto_detect_file_format(output_file)
+
+            if not all([input_type, format_type, output_type]):
+                return None, 'すべてのファイル形式 (input-type, format-type, output-type) を選択してください。'
+
         uploaded_files = []
 
         for file, file_type in [(input_file, input_type), (format_file, format_type), (output_file, output_type)]:
             uploaded_files.append((file, file_type))
 
         return uploaded_files, None
+
+    def auto_detect_file_format(self, file):
+        """
+        Tự động nhận diện định dạng file dựa trên content type và phần mở rộng
+        """
+        if not file:
+            return None
+
+        content_type = file.content_type
+        file_extension = os.path.splitext(file.name)[1].lower()
+
+        # Ánh xạ định dạng file
+        format_mapping = {
+            # CSV formats
+            'text/csv': 'CSV_C_UTF-8',
+            'application/csv': 'CSV_C_UTF-8',
+            'text/plain': 'CSV_C_UTF-8',
+
+            # Excel formats
+            'application/vnd.ms-excel': 'EXCEL',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'EXCEL',
+            'application/excel': 'EXCEL',
+
+            # JSON format
+            'application/json': 'JSON',
+            'text/json': 'JSON',
+
+            # XML format
+            'application/xml': 'XML',
+            'text/xml': 'XML',
+        }
+
+        extension_mapping = {
+            '.csv': 'CSV_C_UTF-8',
+            '.tsv': 'CSV_T_UTF-8',
+            '.xlsx': 'EXCEL',
+            '.xls': 'EXCEL',
+            '.json': 'JSON',
+            '.xml': 'XML',
+        }
+
+        # Thử xác định từ content type
+        file_format = format_mapping.get(content_type)
+
+        # Nếu không nhận dạng được từ content type, thử từ phần mở rộng
+        if not file_format:
+            file_format = extension_mapping.get(file_extension)
+
+        # Nếu là CSV, kiểm tra xem là tab-delimited hay comma-delimited
+        if file_format == 'CSV_C_UTF-8' and file_extension == '.csv':
+            # Đọc 1000 byte đầu tiên để kiểm tra
+            file_sample = file.read(1000)
+            file.seek(0)  # Reset con trỏ file
+
+            try:
+                sample_text = file_sample.decode('utf-8', errors='ignore')
+                if '\t' in sample_text and ',' not in sample_text:
+                    file_format = 'CSV_T_UTF-8'
+            except:
+                pass
+
+        return file_format
 
 
 def process_and_display(session_id, user_id, request=None):

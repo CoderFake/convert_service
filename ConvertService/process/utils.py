@@ -439,7 +439,7 @@ class DataFormatter:
         return rule_id in DataFormatter.RuleFixedMapping.get_values()
 
     @staticmethod
-    def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
+    def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id, data_format_id=None):
         try:
             mapped_row = [""] * len(after_headers)
 
@@ -484,7 +484,7 @@ class DataFormatter:
                         before_value = mapped_row[idx_after]
                         if DataFormatter.is_fixed_rule(rule_id):
                             mapped_row[idx_after] = DataFormatter.convert_fixed_value(
-                                before_value, rule_id, tenant_id
+                                before_value, rule_id, tenant_id, data_format_id
                             )
                         else:
                             mapped_row[idx_after] = DataFormatter.apply_rule(
@@ -501,16 +501,15 @@ class DataFormatter:
             return [""] * len(after_headers)
 
     @staticmethod
-    def convert_fixed_value(value, rule_id, tenant_id):
+    def convert_fixed_value(value, rule_id, tenant_id, data_format_id=None):
         try:
-            after_value = FixedValueFetcher.get_value_mapping(tenant_id, rule_id, value)
+            after_value = FixedValueFetcher.get_value_mapping(tenant_id, rule_id, value, data_format_id)
 
             return after_value if after_value else value
 
         except Exception as e:
             logger.error(f"Error in convert_fixed_value for rule {rule_id}, tenant {tenant_id}: {value} -> {e}")
             return value
-
 
     @staticmethod
     def convert_date(value, target_format='%Y/%m/%d'):

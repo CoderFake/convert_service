@@ -79,7 +79,8 @@ def process_and_format_file(
     before_headers,
     after_headers,
     tenant_id,
-    type_keys="processed:*"
+    type_keys="processed:*",
+    data_format_id=None
 ):
     try:
         logger.info("Task 'process_and_format_file' started.")
@@ -115,7 +116,8 @@ def process_and_format_file(
                                 rules,
                                 before_headers,
                                 after_headers,
-                                tenant_id
+                                tenant_id,
+                                data_format_id
                             )
                             formatted_data.append(formatted_row)
                     else:
@@ -126,7 +128,8 @@ def process_and_format_file(
                                 rules,
                                 before_headers,
                                 after_headers,
-                                tenant_id
+                                tenant_id,
+                                data_format_id
                             )
                             formatted_data.append(formatted_row)
 
@@ -295,4 +298,73 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
 
     except Exception as e:
         logger.error(f"Critical error generating CSV file: {e}")
+        return None
+
+
+@shared_task
+def generate_excel_task(excel_key_pattern, headers, file_format_id=None):
+    try:
+        client = redis_client.get_client()
+        keys = list(redis_client.scan_keys(excel_key_pattern))
+
+        if not keys:
+            logger.warning("No formatted data found for Excel generation.")
+            return None
+
+        import pandas as pd
+        import io
+        from openpyxl import Workbook
+        from openpyxl.utils.dataframe import dataframe_to_rows
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+
+        ws.append(headers)
+
+        max_workers = os.cpu_count() or 1
+        all_rows = []
+
+        for key in keys:
+            try:
+                data = client.get(key)
+                if data:
+                    formatted_data = json.loads(data)
+                    client.delete(key)
+                    all_rows.extend(formatted_data)
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
+
+        for row in all_rows:
+            if isinstance(row, dict):
+                ws.append(list(row.values()))
+            elif isinstance(row, list):
+                ws.append(row)
+            else:
+                logger.warning(f"Invalid row format: {row}")
+
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column_letter].width = min(adjusted_width, 50)
+
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        excel_key_name = f"excel:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
+        client.set(excel_key_name, excel_buffer.getvalue(), ex=3600)
+
+        logger.info(f"Excel file created successfully with key {excel_key_name}")
+        return excel_key_name
+
+    except Exception as e:
+        logger.error(f"Error generating Excel file: {e}")
         return None

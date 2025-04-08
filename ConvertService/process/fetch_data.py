@@ -2,7 +2,7 @@ import csv
 from functools import lru_cache
 import json
 from accounts.models import Account
-from .data_type import HeaderType, DisplayType
+from .data_type import HeaderType, DisplayType, DownloadType
 from configs.models import ConvertDataValue
 from home.models import DataConversionInfo, DataFormat, DetailedInfo, DataItemType, FileFormat
 from .redis import redis_client
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 class HeaderFetcher:
     @staticmethod
-    def get_headers(user: Account, type_name: str, display: any, get_edit_header=False):
+    def get_headers(user: Account, type_name: str, display: any, get_edit_header=False, data_format_id=None):
         """
-        Fetch headers based on type_name and display flag.
+        Fetch headers based on type_name, display flag and optionally data_format_id.
         """
 
         if type_name not in [HeaderType.BEFORE.value, HeaderType.FORMAT.value, HeaderType.AFTER.value]:
@@ -28,34 +28,29 @@ class HeaderFetcher:
 
         try:
             tenant_id = user.tenant.id if user.tenant else 1
-            if display is None:
-                data_item_types = DataItemType.objects.filter(
-                    data_item__tenant_id=tenant_id,
-                    type_name=type_name
-                ).select_related('data_item')
-            else:
-                data_item_types = DataItemType.objects.filter(
-                    data_item__tenant_id=tenant_id,
-                    type_name=type_name,
-                    display=display
-                ).select_related('data_item')
 
-            data_items = [
-                {
-                    'header_name': item.data_item.data_item_name,
-                    'index_value': item.index_value,
-                    'edit_value': item.edit_value,
-                    'format_value': item.format_value
-                }
-                for item in data_item_types
-            ]
+            data_format = None
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(
+                        tenant_id=tenant_id,
+                        data_format_id=data_format_id
+                    )
+                except DataFormat.DoesNotExist:
+                    logger.warning(f"Data format {data_format_id} not found for tenant {tenant_id}, using default.")
 
-            sorted_headers = sorted(
-                data_items,
-                key=lambda x: (x['index_value'] is None, x['index_value'])
-            )
+            query_filter = {
+                'data_item__tenant_id': tenant_id,
+                'type_name': type_name,
+            }
 
-            headers = [item['header_name'] for item in sorted_headers]
+            if display is not None:
+                query_filter['display'] = display
+
+            if data_format:
+                query_filter['data_item__data_format'] = data_format
+
+            data_item_types = DataItemType.objects.filter(**query_filter).select_related('data_item')
 
             if get_edit_header:
                 headers = [
@@ -66,14 +61,31 @@ class HeaderFetcher:
                         'index_value': item.index_value
                     } for item in data_item_types
                 ]
+
                 sorted_headers = sorted(
                     headers,
                     key=lambda x: (x['index_value'] is None, x['index_value'])
                 )
 
                 return sorted_headers
+            else:
+                data_items = [
+                    {
+                        'header_name': item.data_item.data_item_name,
+                        'index_value': item.index_value,
+                        'edit_value': item.edit_value,
+                        'format_value': item.format_value
+                    }
+                    for item in data_item_types
+                ]
 
-            return headers
+                sorted_headers = sorted(
+                    data_items,
+                    key=lambda x: (x['index_value'] is None, x['index_value'])
+                )
+
+                headers = [item['header_name'] for item in sorted_headers]
+                return headers
 
         except Exception as e:
             logger.error(f"Error fetching headers: {e}")
@@ -81,9 +93,7 @@ class HeaderFetcher:
 
 
 class FileFormatFetcher:
-
     CONTENT_TYPE_MAP = {
-
         'text/csv': 'CSV_C_UTF-8',
         'application/csv': 'CSV_C_UTF-8',
         'text/plain': 'CSV_C_UTF-8',
@@ -116,6 +126,20 @@ class FileFormatFetcher:
     }
 
     CACHE_TIMEOUT = 3600
+
+    FORMAT_TO_DATA_FORMAT = {
+        'CSV_C_SJIS': 'DF_003',
+        'CSV_C_UTF-8': 'DF_003',
+        'CSV_T_SJIS': 'DF_003',
+        'CSV_T_UTF-8': 'DF_003',
+        'XML': 'DF_002',
+        'JSON': 'DF_002',
+        'EXCEL': 'DF_004',
+    }
+
+    @staticmethod
+    def get_data_format_id_for_file_format(file_format_id):
+        return FileFormatFetcher.FORMAT_TO_DATA_FORMAT.get(file_format_id, 'DF_003')
 
     @staticmethod
     def get_allowed_formats_for_tenant(tenant_id):
@@ -165,7 +189,6 @@ class FileFormatFetcher:
 
     @staticmethod
     def get_file_format_for_content_type(content_type, file_extension):
-
         format_id = FileFormatFetcher.CONTENT_TYPE_MAP.get(content_type)
         if not format_id:
             format_id = FileFormatFetcher.EXTENSION_MAP.get(file_extension.lower())
@@ -217,6 +240,47 @@ class FileFormatFetcher:
             return None
 
     @staticmethod
+    def get_output_file_format_id(user: Account, download_type=DownloadType.SYSTEM.value, use_cache=True):
+        try:
+            tenant_id = user.tenant.id if user.tenant else 1
+            session_key = getattr(user, 'session', {}).get('session_key', '')
+
+            if session_key and use_cache:
+                client = redis_client.get_client()
+                cache_key = f'{session_key}-output-file-format-{download_type}'
+
+                cached_format = client.get(cache_key)
+                if cached_format:
+                    return cached_format.decode('utf-8')
+
+            data_format_column = 'data_format_system_after_id' if download_type == DownloadType.SYSTEM.value else 'data_format_agency_after_id'
+
+            data_format_id = DataConversionInfo.objects.filter(
+                tenant_id=tenant_id
+            ).values_list(data_format_column, flat=True).first()
+
+            if not data_format_id:
+                raise ValueError(f"No output data_format found for {download_type} download type")
+
+            file_format = DataFormat.objects.filter(
+                id=data_format_id, tenant_id=tenant_id
+            ).values_list('file_format__file_format_id', flat=True).first()
+
+            if not file_format:
+                raise ValueError(f"No file format found for the specified output data_format")
+
+            if session_key and use_cache:
+                client = redis_client.get_client()
+                cache_key = f'{session_key}-output-file-format-{download_type}'
+                client.set(cache_key, file_format, ex=FileFormatFetcher.CACHE_TIMEOUT)
+
+            return file_format
+
+        except Exception as e:
+            logger.error(f"Error fetching output file format ID: {e}")
+            return 'CSV_C_UTF-8'
+
+    @staticmethod
     def clear_format_cache():
         """
         Clear all file format cache entries
@@ -232,7 +296,7 @@ class FileFormatFetcher:
 
 class RuleFetcher:
     @staticmethod
-    def get_rules(user: Account, before_type: str, after_type: str):
+    def get_rules(user: Account, before_type: str, after_type: str, data_format_id=None):
         try:
             tenant_id = user.tenant.id if user.tenant else 1
 
@@ -243,22 +307,34 @@ class RuleFetcher:
             if not data_convert:
                 raise ValueError("No data conversion found for this tenant.")
 
-            detailed_infos = DetailedInfo.objects.filter(
-                tenant_id=tenant_id,
-                data_convert=data_convert,
-                data_item_type_id_before__type_name=before_type,
-                data_item_type_id_after__type_name=after_type
-            ).select_related(
-                'data_item_type_id_before',
-                'data_item_type_id_after',
+            filter_params = {
+                'tenant_id': tenant_id,
+                'data_convert': data_convert,
+                'data_item_type_before__type_name': before_type,
+                'data_item_type_after__type_name': after_type
+            }
+
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(
+                        tenant_id=tenant_id,
+                        data_format_id=data_format_id
+                    )
+                    filter_params['data_item_type_before__data_item__data_format'] = data_format
+                except DataFormat.DoesNotExist:
+                    logger.warning(f"Data format {data_format_id} not found for tenant {tenant_id}, using default.")
+
+            detailed_infos = DetailedInfo.objects.filter(**filter_params).select_related(
+                'data_item_type_before',
+                'data_item_type_after',
                 'convert_rule'
             )
 
             results = [
                 {
                     'convert_rule_id': detail.convert_rule.convert_rule_id,
-                    'index_before': detail.data_item_type_id_before.index_value,
-                    'index_after': detail.data_item_type_id_after.index_value
+                    'index_before': detail.data_item_type_before.index_value,
+                    'index_after': detail.data_item_type_after.index_value
                 }
                 for detail in detailed_infos
             ]
@@ -306,12 +382,24 @@ class RuleFixedID:
 class FixedValueFetcher:
     @staticmethod
     @lru_cache(maxsize=128)
-    def _get_mapping_for_rule(tenant_id, rule_fixed_id):
+    def _get_mapping_for_rule(tenant_id, rule_fixed_id, data_format_id=None):
         try:
-            fixed_values = ConvertDataValue.objects.filter(
-                tenant_id=tenant_id,
-                convert_rule__convert_rule_id=rule_fixed_id
-            ).values_list("data_value_before", "data_value_after")
+            query_filter = {
+                'tenant_id': tenant_id,
+                'convert_rule__convert_rule_id': rule_fixed_id
+            }
+
+            if data_format_id:
+                try:
+                    data_format = DataFormat.objects.get(
+                        tenant_id=tenant_id,
+                        data_format_id=data_format_id
+                    )
+                    query_filter['data_format'] = data_format
+                except DataFormat.DoesNotExist:
+                    logger.warning(f"Data format {data_format_id} not found for tenant {tenant_id}, using default.")
+
+            fixed_values = ConvertDataValue.objects.filter(**query_filter).values_list("data_value_before", "data_value_after")
 
             return {f"{before}": after for before, after in fixed_values}
 
@@ -320,8 +408,9 @@ class FixedValueFetcher:
             return {}
 
     @classmethod
-    def get_value_mapping(cls, tenant_id, rule_fixed_id, before_value=None):
-        mapping = cls._get_mapping_for_rule(tenant_id, rule_fixed_id)
+    def get_value_mapping(cls, tenant_id, rule_fixed_id, before_value=None, data_format_id=None):
+
+        mapping = cls._get_mapping_for_rule(tenant_id, rule_fixed_id, data_format_id)
 
         if before_value is not None:
             return mapping.get(f"{before_value}", '')
