@@ -1,6 +1,7 @@
 import datetime
 import os
 import re
+import unicodedata
 import csv
 import json
 import fitz
@@ -119,15 +120,15 @@ class DisplayData:
                 if header.get('index_value', False)
             ]
 
-            result = []
-
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-
-            processed_rows = 0
+            all_rows_with_global_index = []
             total_rows = 0
+            current_global_index = 0
 
-            for key in keys:
+            # Sort keys to process files in order
+            sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+                                 if k.decode('utf-8').split(':')[1].isdigit() else 0)
+
+            for key in sorted_keys:
                 try:
                     raw_data = redis_client.get(key)
                     if not raw_data:
@@ -137,45 +138,31 @@ class DisplayData:
                     data_rows_count = len(data)
                     total_rows += data_rows_count
 
-                    if processed_rows + data_rows_count <= start_idx:
-                        processed_rows += data_rows_count
-                        continue
-
-                    local_start = max(0, start_idx - processed_rows)
-                    local_end = min(data_rows_count, end_idx - processed_rows)
-
-                    current_page_data = data[local_start:local_end]
-
-                    filtered_rows = []
-                    for row in current_page_data:
+                    for i, row in enumerate(data):
                         if isinstance(row, list):
-                            row_index = getattr(row, 'row_index', None)
-                            
                             new_row = list(row)
+                            # Remove hidden columns
                             for idx in sorted(visible_indices, reverse=True):
                                 if idx < len(new_row):
                                     new_row.pop(idx)
-
-                            if row_index is not None:
-                                new_row.row_index = row_index
-                                
-                            filtered_rows.append(new_row)
-
-                    if filtered_rows:
-                        result.append({
-                            "data": filtered_rows,
-                            "key": key.decode('utf-8')
-                        })
-
-                    processed_rows += data_rows_count
-                    if processed_rows >= end_idx:
-                        break
+                            # Store the row data along with its global index (starting from 0)
+                            all_rows_with_global_index.append({
+                                "global_index": current_global_index,
+                                "data": new_row,
+                                "original_key": key.decode('utf-8') # Keep original key if needed
+                            })
+                        current_global_index += 1
 
                 except Exception as e:
-                    logger.error(f"Reading Rdis key failed {key}: {e}")
+                    logger.error(f"Reading Redis key failed {key}: {e}")
                     continue
 
-            return result, total_rows
+            # Paginate the flattened list
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_rows = all_rows_with_global_index[start_idx:end_idx]
+
+            return paginated_rows, total_rows
 
         except Exception as e:
             logger.error(f"Failed to get pagination: {e}")
@@ -297,6 +284,8 @@ class FileProcessor:
                                     if sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_DATE:
                                         datetime_obj = xlrd.xldate_as_datetime(cell_value, workbook.datemode)
                                         cell_value = datetime_obj.strftime("%Y/%m/%d")
+                                    elif sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_NUMBER:
+                                        cell_value = CharacterNormalizer.format_numeric_value(cell_value)
                                     row_data[header] = str(cell_value) if cell_value is not None else ""
                                 else:
                                     row_data[header] = ""
@@ -318,7 +307,7 @@ class FileProcessor:
                 header_indices = {header: idx for idx, header in enumerate(header_row) if header in headers}
 
                 data = []
-                for row in list(sheet.iter_rows())[1:]:  # Skip header row
+                for row in list(sheet.iter_rows())[1:]:
                     try:
                         if all(cell.value is None or str(cell.value).strip() == '' for cell in row):
                             continue
@@ -330,6 +319,8 @@ class FileProcessor:
 
                                 if isinstance(cell_value, datetime.datetime) or isinstance(cell_value, datetime.date):
                                     cell_value = cell_value.strftime("%Y/%m/%d")
+                                elif isinstance(cell_value, (int, float)):
+                                    cell_value = CharacterNormalizer.format_numeric_value(cell_value)
 
                                 row_data[header] = str(cell_value) if cell_value is not None else ""
                             else:
@@ -459,8 +450,7 @@ class DataFormatter:
     def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id, data_format_id=None):
         try:
             mapped_row = [""] * len(after_headers)
-            
-            # Preserve row_index if it exists in the input row
+
             row_index = None
             if isinstance(row, dict) and 'row_index' in row:
                 row_index = row['row_index']
@@ -516,9 +506,6 @@ class DataFormatter:
 
                 except Exception as e:
                     logger.error(f"Error applying rule: {e}")
-
-            if row_index is not None:
-                mapped_row.row_index = row_index
                 
             return mapped_row
 
@@ -993,3 +980,155 @@ class ProcessHeader:
         except Exception as e:
             logger.error(f"Error in get_header: {e}")
             return []
+
+
+class CharacterNormalizer:
+    """
+    A utility class for normalizing text to ensure compatibility with various file formats.
+    """
+
+    COMMON_REPLACEMENTS = {
+        # Circled numbers
+        '\u2460': '(1)',  # ① -> (1)
+        '\u2461': '(2)',  # ② -> (2)
+        '\u2462': '(3)',  # ③ -> (3)
+        '\u2463': '(4)',  # ④ -> (4)
+        '\u2464': '(5)',  # ⑤ -> (5)
+        '\u2465': '(6)',  # ⑥ -> (6)
+        '\u2466': '(7)',  # ⑦ -> (7)
+        '\u2467': '(8)',  # ⑧ -> (8)
+        '\u2468': '(9)',  # ⑨ -> (9)
+        '\u2469': '(10)',  # ⑩ -> (10)
+        '\u246A': '(11)',  # ⑪ -> (11)
+        '\u246B': '(12)',  # ⑫ -> (12)
+        '\u246C': '(13)',  # ⑬ -> (13)
+        '\u246D': '(14)',  # ⑭ -> (14)
+        '\u246E': '(15)',  # ⑮ -> (15)
+        '\u246F': '(16)',  # ⑯ -> (16)
+        '\u2470': '(17)',  # ⑰ -> (17)
+        '\u2471': '(18)',  # ⑱ -> (18)
+        '\u2472': '(19)',  # ⑲ -> (19)
+        '\u2473': '(20)',  # ⑳ -> (20)
+
+        # Music symbols
+        '\u266A': '*',  # ♪ -> *
+        '\u266B': '*',  # ♫ -> *
+
+        # Special symbols
+        '\u2605': '*',  # ★ -> *
+        '\u2606': '*',  # ☆ -> *
+        '\u2665': '<3',  # ♥ -> <3
+        '\u2660': '*',  # ♠ -> *
+        '\u2663': '*',  # ♣ -> *
+        '\u2666': '*',  # ♦ -> *
+
+        # Arrows
+        '\u2190': '<-',  # ← -> <-
+        '\u2191': '^',  # ↑ -> ^
+        '\u2192': '->',  # → -> ->
+        '\u2193': 'v',  # ↓ -> v
+        '\u2194': '<->',  # ↔ -> <->
+        '\u21D2': '=>',  # ⇒ -> =>
+        '\u21D4': '<=>',  # ⇔ -> <=>
+
+        # Bullets and marks
+        '\u2022': '*',  # • -> *
+        '\u2026': '...',  # … -> ...
+        '\u2018': "'",  # ' -> '
+        '\u2019': "'",  # ' -> '
+        '\u201C': '"',  # " -> "
+        '\u201D': '"',  # " -> "
+
+        # Math symbols
+        '\u00B1': '+/-',  # ± -> +/-
+        '\u00D7': 'x',  # × -> x
+        '\u00F7': '/',  # ÷ -> /
+        '\u221E': 'inf',  # ∞ -> inf
+        '\u2260': '!=',  # ≠ -> !=
+        '\u2264': '<=',  # ≤ -> <=
+        '\u2265': '>=',  # ≥ -> >=
+        '\u221A': 'sqrt',  # √ -> sqrt
+
+        # Currency
+        '\u20AC': 'EUR',  # € -> EUR
+        '\u00A3': 'GBP',  # £ -> GBP
+        '\u00A5': 'JPY',  # ¥ -> JPY
+    }
+
+    @classmethod
+    def normalize_text(cls, text):
+        """
+        Normalize text by replacing problematic characters with safe alternatives.
+        If a character cannot be converted, it will be preserved as is.
+
+        Args:
+            text: The text to normalize
+
+        Returns:
+            Normalized text
+        """
+        if not isinstance(text, str):
+            return text
+
+        try:
+            for char, replacement in cls.COMMON_REPLACEMENTS.items():
+                text = text.replace(char, replacement)
+
+            normalized = unicodedata.normalize('NFKD', text)
+
+            result = ''
+            for char in normalized:
+                if ord(char) < 128:
+                    result += char
+                else:
+                    result += char
+
+            return result
+        except Exception as e:
+            logger.warning(f"Character normalization error: {e}. Keeping original text.")
+            return text
+
+    @classmethod
+    def format_numeric_value(cls, value):
+        """
+        Format numeric values consistently for export.
+
+        Args:
+            value: The value to format
+
+        Returns:
+            Formatted value
+        """
+        if not isinstance(value, str):
+            return value
+
+        try:
+            if re.match(r'^-?\d+(\.\d+)?$', value):
+
+                if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
+                    return int(value)
+                return float(value)
+            return value
+        except Exception as e:
+            logger.warning(f"Numeric formatting error: {e}. Keeping original value.")
+            return value
+
+    @classmethod
+    def safe_normalize(cls, value):
+        """
+        Safely normalize any value type for export.
+
+        Args:
+            value: Any value that needs to be normalized
+
+        Returns:
+            Normalized value
+        """
+        try:
+            if isinstance(value, str):
+                normalized = cls.normalize_text(value)
+                return cls.format_numeric_value(normalized)
+            return value
+        except Exception as e:
+            logger.warning(f"Safe normalization error: {e}. Keeping original value.")
+            return value

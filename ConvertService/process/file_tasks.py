@@ -10,6 +10,7 @@ from .utils import (
     DataFormatter,
     FileProcessor,
     FileFormatMapper,
+    CharacterNormalizer,  
 )
 from .redis import redis_client
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -74,13 +75,13 @@ def process_multiple_files_task(session_id, headers):
 
 @shared_task
 def process_and_format_file(
-    session_id,
-    rules,
-    before_headers,
-    after_headers,
-    tenant_id,
-    type_keys="processed:*",
-    data_format_id=None
+        session_id,
+        rules,
+        before_headers,
+        after_headers,
+        tenant_id,
+        type_keys="processed:*",
+        data_format_id=None
 ):
     try:
         logger.info("Task 'process_and_format_file' started.")
@@ -92,18 +93,13 @@ def process_and_format_file(
             return "処理するデータが見つかりません。"
 
         logger.info(f"Found {len(keys)} keys for processing.")
-        max_workers = os.cpu_count() or 1
-        logger.info(f"Using {max_workers} workers for processing.")
-
-        batch_size = 500
         type_key = "output" if type_keys == "formatted:*" else "formatted"
-        
-        # Sort keys to maintain original file order
-        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
-        
-        # Process files sequentially to maintain continuous row indexing
+
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
+
         row_index_counter = 0
-        
+
         for key in sorted_keys:
             try:
                 raw_data = client.get(key)
@@ -118,7 +114,7 @@ def process_and_format_file(
                     for idx, row in enumerate(data_dict):
                         if isinstance(row, dict):
                             row['row_index'] = row_index_counter + idx
-                        
+
                         formatted_row = DataFormatter.format_data_with_rules(
                             row,
                             rules,
@@ -127,15 +123,16 @@ def process_and_format_file(
                             tenant_id,
                             data_format_id
                         )
-                        
+
                         if isinstance(formatted_row, list) and len(formatted_row) > 0:
                             formatted_data.append(formatted_row)
+
                 else:
                     formatted_data = []
                     for idx, (row_key, row) in enumerate(data_dict.items()):
                         if isinstance(row, dict):
                             row['row_index'] = row_index_counter + idx
-                            
+
                         formatted_row = DataFormatter.format_data_with_rules(
                             row,
                             rules,
@@ -150,7 +147,7 @@ def process_and_format_file(
                 client.set(formatted_key, json.dumps(formatted_data), ex=3600)
 
                 row_index_counter += len(formatted_data)
-                
+
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
 
@@ -222,6 +219,17 @@ def generate_zip_task(zip_key, headers, file_format_id):
 
 @shared_task
 def generate_csv_task(csv_key_pattern, headers, file_format_id):
+    """
+    Generate a CSV file from formatted data stored in Redis.
+
+    Args:
+        csv_key_pattern: Redis key pattern to find formatted data
+        headers: List of column headers
+        file_format_id: ID of the file format (encoding, delimiter)
+
+    Returns:
+        Redis key where the generated CSV is stored, or None on failure
+    """
     try:
         client = redis_client.get_client()
         keys = list(redis_client.scan_keys(csv_key_pattern))
@@ -238,133 +246,41 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         delimiter = format_details['delimiter']
         encoding = format_details['encoding']
 
-        incompatible_chars = {
-            # Circled numbers
-            '\u2460': '(1)',  # ① -> (1)
-            '\u2461': '(2)',  # ② -> (2)
-            '\u2462': '(3)',  # ③ -> (3)
-            '\u2463': '(4)',  # ④ -> (4)
-            '\u2464': '(5)',  # ⑤ -> (5)
-            '\u2465': '(6)',  # ⑥ -> (6)
-            '\u2466': '(7)',  # ⑦ -> (7)
-            '\u2467': '(8)',  # ⑧ -> (8)
-            '\u2468': '(9)',  # ⑨ -> (9)
-            '\u2469': '(10)',  # ⑩ -> (10)
-            '\u246A': '(11)',  # ⑪ -> (11)
-            '\u246B': '(12)',  # ⑫ -> (12)
-            '\u246C': '(13)',  # ⑬ -> (13)
-            '\u246D': '(14)',  # ⑭ -> (14)
-            '\u246E': '(15)',  # ⑮ -> (15)
-            '\u246F': '(16)',  # ⑯ -> (16)
-            '\u2470': '(17)',  # ⑰ -> (17)
-            '\u2471': '(18)',  # ⑱ -> (18)
-            '\u2472': '(19)',  # ⑲ -> (19)
-            '\u2473': '(20)',  # ⑳ -> (20)
-
-            # Music symbols
-            '\u266A': '*',  # ♪ -> *
-            '\u266B': '*',  # ♫ -> *
-
-            # Special symbols
-            '\u2605': '*',  # ★ -> *
-            '\u2606': '*',  # ☆ -> *
-            '\u2665': '<3',  # ♥ -> <3
-            '\u2660': '*',  # ♠ -> *
-            '\u2663': '*',  # ♣ -> *
-            '\u2666': '*',  # ♦ -> *
-
-            # Arrows
-            '\u2190': '<-',  # ← -> <-
-            '\u2191': '^',  # ↑ -> ^
-            '\u2192': '->',  # → -> ->
-            '\u2193': 'v',  # ↓ -> v
-            '\u2194': '<->',  # ↔ -> <->
-            '\u21D2': '=>',  # ⇒ -> =>
-            '\u21D4': '<=>',  # ⇔ -> <=>
-
-            # Bullets and marks
-            '\u2022': '*',  # • -> *
-            '\u2026': '...',  # … -> ...
-            '\u2018': "'",  # ' -> '
-            '\u2019': "'",  # ' -> '
-            '\u201C': '"',  # " -> "
-            '\u201D': '"',  # " -> "
-
-            # Math symbols
-            '\u00B1': '+/-',  # ± -> +/-
-            '\u00D7': 'x',  # × -> x
-            '\u00F7': '/',  # ÷ -> /
-            '\u221E': 'inf',  # ∞ -> inf
-            '\u2260': '!=',  # ≠ -> !=
-            '\u2264': '<=',  # ≤ -> <=
-            '\u2265': '>=',  # ≥ -> >=
-            '\u221A': 'sqrt',  # √ -> sqrt
-
-            # Currency
-            '\u20AC': 'EUR',  # € -> EUR
-            '\u00A3': 'GBP',  # £ -> GBP
-            '\u00A5': 'JPY',  # ¥ -> JPY
-        }
-
-        def replace_incompatible_chars(text):
-            if not isinstance(text, str):
-                return text
-
-            for char, replacement in incompatible_chars.items():
-                text = text.replace(char, replacement)
-            return text
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
 
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
         csv_writer.writerow(headers)
 
-        buffer_lock = threading.Lock()
-        max_workers = os.cpu_count() or 1
-
-        def process_rows(key):
+        all_rows = []
+        for key in sorted_keys:
             try:
                 data = client.get(key)
                 if data:
                     formatted_data = json.loads(data)
-                    return formatted_data
+                    all_rows.extend(formatted_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
-                return []
+                continue
 
-        def write_row(row):
+        for row in all_rows:
             try:
                 if isinstance(row, dict):
-                    values = list(row.values())
-                    return [replace_incompatible_chars(val) for val in values]
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row.values()]
+                    csv_writer.writerow(values)
                 elif isinstance(row, list):
-                    return [replace_incompatible_chars(val) for val in row]
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row]
+                    csv_writer.writerow(values)
                 else:
-                    logger.warning(f"Invalid row format: {row}")
-                    return None
+                    logger.warning(f"Invalid row format: {type(row)}. Skipping.")
             except Exception as e:
-                logger.error(f"Error preparing row for CSV: {e}")
-                return None
-
-        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
-        
-        all_rows = []
-        for key in sorted_keys:
-            all_rows.extend(process_rows(key))
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_row = {executor.submit(write_row, row): row for row in all_rows}
-
-            for future in as_completed(future_to_row):
-                try:
-                    processed_row = future.result()
-                    if processed_row is not None:
-                        with buffer_lock:
-                            csv_writer.writerow(processed_row)
-                except Exception as e:
-                    logger.error(f"Error writing row to CSV: {e}")
+                logger.error(f"Error writing row to CSV: {e}")
+                continue
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         client.set(csv_key_name, csv_buffer.getvalue().encode(encoding, errors='ignore'), ex=3600)
+        logger.info(f"CSV file created successfully with key {csv_key_name}")
         return csv_key_name
 
     except Exception as e:
@@ -374,6 +290,17 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
 
 @shared_task
 def generate_excel_task(excel_key_pattern, headers, sheet_name):
+    """
+    Generate an Excel file from formatted data stored in Redis.
+
+    Args:
+        excel_key_pattern: Redis key pattern to find formatted data
+        headers: List of column headers
+        sheet_name: Name for the Excel sheet
+
+    Returns:
+        Redis key where the generated Excel file is stored, or None on failure
+    """
     try:
         client = redis_client.get_client()
         keys = list(redis_client.scan_keys(excel_key_pattern))
@@ -389,15 +316,14 @@ def generate_excel_task(excel_key_pattern, headers, sheet_name):
 
         wb = Workbook()
         ws = wb.active
-
         ws.title = sheet_name
 
         ws.append(headers)
 
-        all_rows = []
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
 
-        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
-        
+        all_rows = []
         for key in sorted_keys:
             try:
                 data = client.get(key)
@@ -406,22 +332,29 @@ def generate_excel_task(excel_key_pattern, headers, sheet_name):
                     all_rows.extend(formatted_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
+                continue
 
         for row in all_rows:
-            if isinstance(row, dict):
-                ws.append(list(row.values()))
-            elif isinstance(row, list):
-                ws.append(row)
-            else:
-                logger.warning(f"Invalid row format: {row}")
+            try:
+                if isinstance(row, dict):
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row.values()]
+                    ws.append(values)
+                elif isinstance(row, list):
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row]
+                    ws.append(values)
+                else:
+                    logger.warning(f"Invalid row format: {type(row)}. Skipping.")
+            except Exception as e:
+                logger.error(f"Error adding row to Excel: {e}")
+                continue
 
         for column in ws.columns:
             max_length = 0
             column_letter = column[0].column_letter
             for cell in column:
                 try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(cell.value)
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
                 except:
                     pass
             adjusted_width = (max_length + 2)

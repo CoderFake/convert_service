@@ -347,7 +347,7 @@ class ProcessAndDisplayView:
                     'message': '処理されたファイルが見つかりません。'
                 }, status=404)
 
-            processed_data, total_rows = DisplayData.get_paginated_data(
+            paginated_rows, total_rows = DisplayData.get_paginated_data(
                 client,
                 format_keys,
                 hidden_formatted_header,
@@ -360,7 +360,7 @@ class ProcessAndDisplayView:
             return JsonResponse({
                 'status': "success",
                 'headers': show_formatted_header,
-                'data': processed_data,
+                'data': paginated_rows,
                 'pagination': {
                     'page': page,
                     'page_size': page_size,
@@ -390,9 +390,16 @@ class SaveFormatFieldView:
             return JsonResponse({'status': 'error', 'message': 'キーまたはフィールド名が提供されていません。'})
 
         try:
-            input_key = key.split(' ')[0]
-            index = int(key.split(' ')[1])
-        except Exception as e:
+            parts = key.split(' ')
+            if len(parts) != 2:
+                return JsonResponse({'status': 'error', 'message': 'キー形式が無効です。'})
+
+            input_key = parts[0]
+            index = int(parts[1])
+
+            if index < 0:
+                return JsonResponse({'status': 'error', 'message': 'インデックスが無効です。'})
+        except ValueError:
             return JsonResponse({'status': 'error', 'message': 'キーの解析中にエラーが発生しました。'})
 
         raw_format_data = client.get(input_key)
@@ -401,35 +408,38 @@ class SaveFormatFieldView:
 
         try:
             format_data = json.loads(raw_format_data.decode('utf-8'))
-        except Exception as e:
-            return JsonResponse(
-                {'status': 'error', 'message': f'フォーマットデータの読み取り中にエラーが発生しました: {e}'})
 
-        user = Account.objects.get(pk=request.user.id)
+            if not isinstance(format_data, list) or index >= len(format_data):
+                return JsonResponse({'status': 'error', 'message': 'データインデックスが範囲外です。'})
 
-        header_names = HeaderFetcher.get_headers(
-            user,
-            HeaderType.FORMAT.value,
-            DisplayType.ALL.value,
-            data_format_id=get_data_format_id_from_redis(request)
-        )
+            user = Account.objects.get(pk=request.user.id)
 
-        if field_name not in header_names:
-            return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
+            header_names = HeaderFetcher.get_headers(
+                user,
+                HeaderType.FORMAT.value,
+                DisplayType.ALL.value,
+                data_format_id=get_data_format_id_from_redis(request)
+            )
 
-        header_index = header_names.index(field_name)
+            if field_name not in header_names:
+                return JsonResponse({'status': 'error', 'message': '指定されたフィールドが存在しません。'})
 
-        if len(format_data[index]) > header_index:
-            format_data[index][header_index] = field_value
-        else:
-            return JsonResponse({'status': 'error', 'message': 'データの更新中にエラーが発生しました。'})
-        try:
+            header_index = header_names.index(field_name)
+
+            if len(format_data[index]) > header_index:
+                format_data[index][header_index] = field_value
+            else:
+                return JsonResponse({'status': 'error', 'message': 'データの更新中にエラーが発生しました。'})
+
             client.set(input_key, json.dumps(format_data))
+
+            return JsonResponse({'status': 'success', 'message': 'データが正常に更新されました。'})
+
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'JSONデータの解析中にエラーが発生しました。'})
         except Exception as e:
             return JsonResponse(
                 {'status': 'error', 'message': f'フォーマットデータの更新中にエラーが発生しました: {e}'})
-
-        return JsonResponse({'status': 'success', 'message': 'データが正常に更新されました。'})
 
 
 class ProcessHeadersView(LoginRequiredMixin, View):
