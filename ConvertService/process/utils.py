@@ -33,7 +33,13 @@ class DisplayData:
                     logger.warning(f"Skipping row due to mismatched length: {row}")
                     continue
                 try:
+                    row_index = getattr(row, 'row_index', None)
+                    
                     filtered_row = [row[i] if i < len(row) else "" for i in visible_indices]
+
+                    if row_index is not None:
+                        filtered_row.row_index = row_index
+                        
                     filtered_data.append(filtered_row)
                 except IndexError as e:
                     logger.error(f"Error accessing row: {row}, error: {e}")
@@ -65,11 +71,16 @@ class DisplayData:
                             futures = []
 
                             def remove_columns(row):
+                                row_index = getattr(row, 'row_index', None)
+                                
                                 indices_to_remove = sorted(visible_indices, reverse=True)
                                 new_row = list(row)
                                 for idx in indices_to_remove:
                                     if idx < len(new_row):
                                         new_row.pop(idx)
+                                if row_index is not None:
+                                    new_row.row_index = row_index
+                                    
                                 return new_row
 
                             for row in data:
@@ -138,10 +149,16 @@ class DisplayData:
                     filtered_rows = []
                     for row in current_page_data:
                         if isinstance(row, list):
+                            row_index = getattr(row, 'row_index', None)
+                            
                             new_row = list(row)
                             for idx in sorted(visible_indices, reverse=True):
                                 if idx < len(new_row):
                                     new_row.pop(idx)
+
+                            if row_index is not None:
+                                new_row.row_index = row_index
+                                
                             filtered_rows.append(new_row)
 
                     if filtered_rows:
@@ -442,6 +459,11 @@ class DataFormatter:
     def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id, data_format_id=None):
         try:
             mapped_row = [""] * len(after_headers)
+            
+            # Preserve row_index if it exists in the input row
+            row_index = None
+            if isinstance(row, dict) and 'row_index' in row:
+                row_index = row['row_index']
 
             if isinstance(row, dict):
                 index_to_header = {h['index_value']: h['header_name'] for h in before_headers}
@@ -494,6 +516,10 @@ class DataFormatter:
 
                 except Exception as e:
                     logger.error(f"Error applying rule: {e}")
+
+            if row_index is not None:
+                mapped_row.row_index = row_index
+                
             return mapped_row
 
         except Exception as e:
