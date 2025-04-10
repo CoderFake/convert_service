@@ -97,57 +97,62 @@ def process_and_format_file(
 
         batch_size = 500
         type_key = "output" if type_keys == "formatted:*" else "formatted"
+        
+        # Sort keys to maintain original file order
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
+        
+        # Process files sequentially to maintain continuous row indexing
+        row_index_counter = 0
+        
+        for key in sorted_keys:
+            try:
+                raw_data = client.get(key)
+                if not raw_data:
+                    logger.warning(f"No valid data found for key {key}. Skipping...")
+                    continue
 
-        def process_batch(batch_keys):
-            for key in batch_keys:
-                try:
-                    raw_data = client.get(key)
-                    if not raw_data:
-                        logger.warning(f"No valid data found for key {key}. Skipping...")
-                        continue
+                data_dict = json.loads(raw_data.decode('utf-8'))
 
-                    data_dict = json.loads(raw_data.decode('utf-8'))
-
-                    if isinstance(data_dict, list):
-                        formatted_data = []
-                        for idx, row in enumerate(data_dict):
-                            formatted_row = DataFormatter.format_data_with_rules(
-                                row,
-                                rules,
-                                before_headers,
-                                after_headers,
-                                tenant_id,
-                                data_format_id
-                            )
+                if isinstance(data_dict, list):
+                    formatted_data = []
+                    for idx, row in enumerate(data_dict):
+                        if isinstance(row, dict):
+                            row['row_index'] = row_index_counter + idx
+                        
+                        formatted_row = DataFormatter.format_data_with_rules(
+                            row,
+                            rules,
+                            before_headers,
+                            after_headers,
+                            tenant_id,
+                            data_format_id
+                        )
+                        
+                        if isinstance(formatted_row, list) and len(formatted_row) > 0:
                             formatted_data.append(formatted_row)
-                    else:
-                        formatted_data = []
-                        for row_key, row in data_dict.items():
-                            formatted_row = DataFormatter.format_data_with_rules(
-                                row,
-                                rules,
-                                before_headers,
-                                after_headers,
-                                tenant_id,
-                                data_format_id
-                            )
-                            formatted_data.append(formatted_row)
+                else:
+                    formatted_data = []
+                    for idx, (row_key, row) in enumerate(data_dict.items()):
+                        if isinstance(row, dict):
+                            row['row_index'] = row_index_counter + idx
+                            
+                        formatted_row = DataFormatter.format_data_with_rules(
+                            row,
+                            rules,
+                            before_headers,
+                            after_headers,
+                            tenant_id,
+                            data_format_id
+                        )
+                        formatted_data.append(formatted_row)
 
-                    formatted_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
-                    client.set(formatted_key, json.dumps(formatted_data), ex=3600)
+                formatted_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
+                client.set(formatted_key, json.dumps(formatted_data), ex=3600)
 
-                except Exception as e:
-                    logger.error(f"Error processing key {key}: {e}")
-
-        batches = [keys[i:i + batch_size] for i in range(0, len(keys), batch_size)]
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_batch, batch): batch for batch in batches}
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.error(f"Error in batch processing: {e}")
+                row_index_counter += len(formatted_data)
+                
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
 
         logger.info("All keys processed successfully.")
         return "データは正常に処理され、保存されました。"
@@ -177,44 +182,34 @@ def generate_zip_task(zip_key, headers, file_format_id):
         delimiter = format_details['delimiter']
         encoding = format_details['encoding']
 
-        def process_key(key):
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
+        all_data = []
+        for key in sorted_keys:
             try:
                 data = client.get(key)
-                if not data:
-                    return None, None
-
-                formatted_data = json.loads(data)
-                csv_buffer = io.StringIO()
-                csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
-
-                csv_writer.writerow(headers)
-
-                if isinstance(formatted_data, list):
-                    for row in formatted_data:
-                        if isinstance(row, dict):
-                            csv_writer.writerow(row.values())
-                        elif isinstance(row, list):
-                            csv_writer.writerow(row)
-                        else:
-                            logger.warning(f"Invalid row format: {row}")
-
+                if data:
+                    formatted_data = json.loads(data)
+                    all_data.extend(formatted_data)
                 client.delete(key)
-
-                file_name = f"{timezone.now().strftime('%Y%m%d')}_output.csv"
-                return file_name, csv_buffer.getvalue().encode(encoding)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
-                return None, None
+
+        csv_buffer = io.StringIO()
+        csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
+        csv_writer.writerow(headers)
+
+        for row in all_data:
+            if isinstance(row, dict):
+                csv_writer.writerow(row.values())
+            elif isinstance(row, list):
+                csv_writer.writerow(row)
+            else:
+                logger.warning(f"Invalid row format: {row}")
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(process_key, key): key for key in keys}
-
-                for future in as_completed(futures):
-                    file_name, csv_content = future.result()
-                    if file_name and csv_content:
-                        zip_file.writestr(file_name, csv_content)
-                        logger.info(f"Added file {file_name} to ZIP.")
+            file_name = f"{timezone.now().strftime('%Y%m%d')}_output.csv"
+            zip_file.writestr(file_name, csv_buffer.getvalue().encode(encoding))
+            logger.info(f"Added file {file_name} to ZIP.")
 
         zip_key_name = f"zip:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         client.set(zip_key_name, zip_buffer.getvalue(), ex=3600)
@@ -350,8 +345,10 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
                 logger.error(f"Error preparing row for CSV: {e}")
                 return None
 
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
+        
         all_rows = []
-        for key in keys:
+        for key in sorted_keys:
             all_rows.extend(process_rows(key))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -399,7 +396,9 @@ def generate_excel_task(excel_key_pattern, headers, sheet_name):
 
         all_rows = []
 
-        for key in keys:
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
+        
+        for key in sorted_keys:
             try:
                 data = client.get(key)
                 if data:
