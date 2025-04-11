@@ -451,10 +451,6 @@ class DataFormatter:
         try:
             mapped_row = [""] * len(after_headers)
 
-            row_index = None
-            if isinstance(row, dict) and 'row_index' in row:
-                row_index = row['row_index']
-
             if isinstance(row, dict):
                 index_to_header = {h['index_value']: h['header_name'] for h in before_headers}
 
@@ -502,7 +498,6 @@ class DataFormatter:
                             mapped_row[idx_after] = DataFormatter.apply_rule(
                                 before_value, rule_id
                             )
-                        after_value = mapped_row[idx_after]
 
                 except Exception as e:
                     logger.error(f"Error applying rule: {e}")
@@ -1070,20 +1065,15 @@ class CharacterNormalizer:
         if not isinstance(text, str):
             return text
 
+        if not isinstance(text, str):
+            return text
+
         try:
+            replaced_text = text
             for char, replacement in cls.COMMON_REPLACEMENTS.items():
-                text = text.replace(char, replacement)
+                replaced_text = replaced_text.replace(char, replacement)
 
-            normalized = unicodedata.normalize('NFKD', text)
-
-            result = ''
-            for char in normalized:
-                if ord(char) < 128:
-                    result += char
-                else:
-                    result += char
-
-            return result
+            return replaced_text
         except Exception as e:
             logger.warning(f"Character normalization error: {e}. Keeping original text.")
             return text
