@@ -400,6 +400,7 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
+
             $(document).ready(function () {
 
                 let headerInfo = [];
@@ -408,6 +409,8 @@
                 let hasMoreData = true;
                 let endMessageAdded = false;
                 const PAGE_SIZE = 20;
+                let formattedCounters = {};
+                let lastSeenFormatted = {};
 
                 window.editOptions = window.editOptions || [];
 
@@ -464,10 +467,27 @@
                     loading = true;
 
                     if (!append) {
+                        formattedCounters = {};
+                        lastSeenFormatted = null;
                         $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
                     } else {
                         $("#loadingRow").remove();
                         $("#inputData tbody").append('<tr id="loadingRow"><td colspan="100%" class="text-center"><div class="loading-spinner"></div> 追加データを読み込み中...</td></tr>');
+
+                        $("#inputData tbody tr").each(function() {
+                            const dataIndex = $(this).attr("data-index");
+                            if (dataIndex) {
+                                const matches = dataIndex.match(/formatted:(\d+)\s+(\d+)/);
+                                if (matches && matches.length >= 3) {
+                                    const formattedNum = matches[1];
+                                    const counterVal = parseInt(matches[2], 10) + 1;
+
+                                    if (!formattedCounters[formattedNum] || formattedCounters[formattedNum] < counterVal) {
+                                        formattedCounters[formattedNum] = counterVal;
+                                    }
+                                }
+                            }
+                        });
                     }
 
                     $.ajax({
@@ -521,23 +541,44 @@
                                 }
 
                                 let rowsAdded = 0;
-                                processedData.forEach(dataSet => {
-                                    if (dataSet.data && Array.isArray(dataSet.data)) {
-                                        dataSet.data.forEach((row, index) => {
-                                            const rowKey = `${dataSet.key} ${index}`;
-                                            const rowHTML = row.map((cell, cellIndex) => {
-                                                const header = headerInfo[cellIndex];
-                                                const cellClass = header?.edit_value
-                                                    ? header.format_value === 'date' ? 'row-date'
-                                                    : header.format_value === 'time' ? 'row-time'
-                                                    : header.format_value === 'option' ? 'row-option'
-                                                    : ''
-                                                    : '';
-                                                return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
-                                            }).join('');
-                                            tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
-                                            rowsAdded++;
-                                        });
+                                processedData.forEach((item, loopIndex) => {
+                                    const globalIndex = item.global_index;
+                                    const rowData = item.data;
+                                    const originalKey = item.original_key;
+
+                                    const formattedMatch = originalKey.match(/formatted:(\d+)/);
+                                    let dataIndexValue = globalIndex;
+
+                                    if (formattedMatch && formattedMatch.length >= 2) {
+                                        const formattedNum = formattedMatch[1];
+
+                                        if (typeof formattedCounters[formattedNum] === 'undefined') {
+                                            formattedCounters[formattedNum] = 0;
+                                        }
+
+                                        dataIndexValue = formattedCounters[formattedNum];
+                                        formattedCounters[formattedNum]++;
+                                        lastSeenFormatted = formattedNum;
+                                    }
+
+                                    const rowClass = loopIndex % 2 === 0 ? 'even' : 'odd';
+
+                                    if (rowData && Array.isArray(rowData)) {
+                                        const rowHTML = rowData.map((cell, cellIndex) => {
+                                            const header = headerInfo[cellIndex];
+
+                                            const cellClass = header?.edit_value
+                                                ? header.format_value === 'date' ? 'row-date'
+                                                : header.format_value === 'time' ? 'row-time'
+                                                : header.format_value === 'option' ? 'row-option'
+                                                : ''
+                                                : '';
+                                            const headerNameClass = header?.header_name;
+                                            return `<td class="${cellClass} ${headerNameClass}">${cell || ''}</td>`;
+                                        }).join('');
+
+                                        tbody.append(`<tr data-index="${originalKey} ${dataIndexValue}" class="${rowClass}" role="row">${rowHTML}</tr>`);
+                                        rowsAdded++;
                                     }
                                 });
 
@@ -549,7 +590,7 @@
                                     }
                                 } else if (append && rowsAdded > 0) {
                                     const newRows = table.find('tbody tr').slice(-rowsAdded);
-                                    newRows.find('td').addClass('dt-center');
+                                    newRows.find('td').addClass('dt-start');
 
                                     newRows.find('td').each(function() {
                                         const $cell = $(this);
@@ -608,7 +649,7 @@
                         columnDefs: [
                             {
                                 targets: '_all',
-                                className: 'dt-center',
+                                className: 'dt-start',
                                 render: function(data, type, row) {
                                     const displayData = data || '';
                                     return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
