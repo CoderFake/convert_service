@@ -1,12 +1,27 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} Quản lý trường dữ liệu {% endblock title %}
+{% block title %} Data Item Management {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
     <style>
+        .filter-row {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .filter-row label {
+            margin-bottom: 0;
+            margin-right: 0.5rem;
+            font-weight: 500;
+        }
+        .filter-row .form-select {
+            min-width: 150px;
+            height: 40px;
+        }
         .card {
             margin-bottom: 20px;
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
@@ -61,6 +76,18 @@
             border-radius: 0.375rem !important;
             border: 1px solid #e9ecef !important;
         }
+        /* Ensure table actions column has enough width */
+        #dataItemTable th:last-child,
+        #dataItemTable td:last-child {
+            width: 100px;
+            text-align: center;
+        }
+        #dataItemTable td:last-child .btn {
+            margin-right: 5px;
+        }
+        #dataItemTable td:last-child .btn:last-child {
+            margin-right: 0;
+        }
 
     </style>
 {% endblock stylesheets %}
@@ -71,152 +98,53 @@
         <div class="col-12">
             <div class="card shadow mt-6">
                 <div class="card-body pt-3">
-                    {% include "web/settings/includes/tab.html" %}
-                    <ul class="nav nav-tabs" id="myTab" role="tablist">
-                        <li class="nav-item">
-                            <a class="nav-link active" id="excel-tab" data-toggle="tab" href="#excel" role="tab"
-                               aria-controls="excel" aria-selected="true">Excel</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="csv-tab" data-toggle="tab" href="#csv" role="tab"
-                               aria-controls="csv" aria-selected="false">CSV</a>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="myTabContent">
-                        <!-- Excel Tab -->
-                        <div class="tab-pane fade show active" id="excel" role="tabpanel" aria-labelledby="excel-tab">
-                            <div class="table-responsive mt-3">
-                                <table class="table table-bordered" id="excelTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tên trường</th>
-                                            <th>Định dạng dữ liệu</th>
-                                            <th>Hiển thị</th>
-                                            <th>Chỉnh sửa</th>
-                                            <th>Chỉ số</th>
-                                            <th>Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in excel_items %}
-                                        <tr>
-                                            <td>{{ item.data_item_id }}</td>
-                                            <td>{{ item.data_item_name }}</td>
-                                            <td>
-                                                <span class="badge format-badge badge-excel">EXCEL</span>
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {% if type.display %}
-                                                            <i class="fas fa-check text-success"></i>
-                                                        {% else %}
-                                                            <i class="fas fa-times text-danger"></i>
-                                                        {% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {% if type.edit_value %}
-                                                            <i class="fas fa-check text-success"></i>
-                                                        {% else %}
-                                                            <i class="fas fa-times text-danger"></i>
-                                                        {% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {{ type.index_value }}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                <a href="{% url 'edit_data_item' item.id %}" class="btn btn-info btn-sm">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <button class="btn btn-danger btn-sm delete-item" data-id="{{ item.id }}" data-name="{{ item.data_item_name }}">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                    <div class="container-fluid mb-3" style="padding: 0 !important;">
+                        <div class="row">
+                            {% include "web/settings/includes/tab.html" %}
+                            <div class="col-3">
+                                <div class="d-flex justify-content-end">
+                                    <a href="{% url 'create_data_item' %}" class="nav-link add-btn px-5 border-0 rounded rounded-3 bg-primary"><span class="nav-link-text">追加</span></a>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- CSV Tab -->
-                        <div class="tab-pane fade" id="csv" role="tabpanel" aria-labelledby="csv-tab">
-                            <div class="table-responsive mt-3">
-                                <table class="table table-bordered" id="csvTable" width="100%" cellspacing="0">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tên trường</th>
-                                            <th>Định dạng dữ liệu</th>
-                                            <th>Hiển thị</th>
-                                            <th>Chỉnh sửa</th>
-                                            <th>Chỉ số</th>
-                                            <th>Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in csv_items %}
-                                        <tr>
-                                            <td>{{ item.data_item_id }}</td>
-                                            <td>{{ item.data_item_name }}</td>
-                                            <td>
-                                                <span class="badge format-badge badge-csv">CSV</span>
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {% if type.display %}
-                                                            <i class="fas fa-check text-success"></i>
-                                                        {% else %}
-                                                            <i class="fas fa-times text-danger"></i>
-                                                        {% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {% if type.edit_value %}
-                                                            <i class="fas fa-check text-success"></i>
-                                                        {% else %}
-                                                            <i class="fas fa-times text-danger"></i>
-                                                        {% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                {% for type in item.data_item_types.all %}
-                                                    {% if type.type_name == 'format' %}
-                                                        {{ type.index_value }}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                <a href="{% url 'edit_data_item' item.id %}" class="btn btn-info btn-sm">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <button class="btn btn-danger btn-sm delete-item" data-id="{{ item.id }}" data-name="{{ item.data_item_name }}">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
+                    <!-- Filter Row -->
+                    <div class="filter-row">
+                        <div>
+                            <select id="fileFormatSelect" class="form-select form-select-sm">
+                                {% for format in file_formats %}
+                                    <option value="{{ format.id }}">{{ format.file_format_name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
+                        <div>
+                            <select id="dataTypeSelect" class="form-select form-select-sm">
+                                {% for value, name in data_item_type_format_choices %}
+                                    <option value="{{ value }}" {% if value == 'format' %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Single DataTable -->
+                    <div class="table-responsive mt-3">
+                        <table class="table table-bordered" id="dataItemTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Field Name</th>
+                                    <th>File Format</th>
+                                    <th>Display</th>
+                                    <th>Editable</th>
+                                    <th>Index</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded via AJAX -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -245,37 +173,307 @@
         </div>
     </div>
 </div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="dataItemModal" tabindex="-1" role="dialog" aria-labelledby="dataItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form id="dataItemForm">
+                {% csrf_token %}
+                <input type="hidden" id="editItemId" name="item_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dataItemModalLabel">Data Item</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                     <div class="form-group row">
+                        <label for="data_item_id" class="col-sm-3 col-form-label">Data Item ID</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="data_item_id" name="data_item_id" required>
+                        </div>
+                    </div>
+                    <div class="form-group row mt-3">
+                        <label for="data_item_name" class="col-sm-3 col-form-label">Data Item Name</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="data_item_name" name="data_item_name" required>
+                        </div>
+                    </div>
+                    <div class="form-group row mt-3">
+                        <label for="data_format_id" class="col-sm-3 col-form-label">Data Format</label>
+                        <div class="col-sm-9">
+                             <select class="form-control" id="data_format_id" name="data_format_id" required>
+                                 <option value="">---------</option>
+                                 {# Options will be populated dynamically if needed, or use existing list #}
+                                 {% for format in data_formats %}
+                                     <option value="{{ format.id }}">{{ format.data_format_name }} ({{ format.file_format.file_format_name }})</option>
+                                 {% endfor %}
+                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder for Edit-specific fields (DataItemType details) -->
+                    <div id="editSpecificFields" class="mt-4" style="display: none;">
+                        <h6>Type Specific Settings</h6>
+                        <hr>
+                        {% for type_val, type_name in data_type_choices %}
+                        <div class="type-settings-group mb-3 p-3 border rounded">
+                             <h7><strong>{{ type_name }}</strong></h7>
+                             <div class="form-group row mt-2">
+                                 <label class="col-sm-3 col-form-label">Display</label>
+                                 <div class="col-sm-9">
+                                     <input type="checkbox" class="form-check-input" id="display_{{ type_val }}" name="display_{{ type_val }}">
+                                 </div>
+                             </div>
+                             <div class="form-group row mt-2">
+                                 <label class="col-sm-3 col-form-label">Editable</label>
+                                 <div class="col-sm-9">
+                                     <input type="checkbox" class="form-check-input" id="edit_{{ type_val }}" name="edit_{{ type_val }}">
+                                 </div>
+                             </div>
+                             <div class="form-group row mt-2">
+                                 <label for="format_{{ type_val }}" class="col-sm-3 col-form-label">Format Value</label>
+                                 <div class="col-sm-9">
+                                     <select class="form-control" id="format_{{ type_val }}" name="format_{{ type_val }}">
+                                         {% for f_val, f_name in data_item_type_format_choices %}
+                                             <option value="{{ f_val }}">{{ f_name }}</option>
+                                         {% endfor %}
+                                     </select>
+                                 </div>
+                             </div>
+                             <div class="form-group row mt-2">
+                                 <label for="index_{{ type_val }}" class="col-sm-3 col-form-label">Index</label>
+                                 <div class="col-sm-9">
+                                     <input type="number" class="form-control" id="index_{{ type_val }}" name="index_{{ type_val }}" value="0" required>
+                                 </div>
+                             </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                     <div id="formErrors" class="text-danger mt-2"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary" id="saveDataItem">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- Delete Confirmation Modal (existing) -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
+                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block javascripts %}
+<script src="{% static 'web/vendor/jquery/dist/jquery.min.js' %}"></script> {# Ensure jQuery is loaded first #}
+<script src="{% static 'web/vendor/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script> {# Ensure Bootstrap JS is loaded for modals #}
 <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'web/vendor/datatables.net/js/dataTables.bootstrap5.js' %}"></script>
+<script src="{% static 'web/js/toast.js' %}"></script> {# Assuming toast.js is available for notifications #}
+
 <script>
     $(document).ready(function() {
-        $('#excelTable').DataTable({
-        language: {
-            url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
-        },
-        dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
-    });
-
-
-        $('#csvTable').DataTable({
-            "language": {
+        const dataItemTable = $('#dataItemTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{% url 'data_items' %}",
+                type: "GET",
+                data: function (d) {
+                    d.file_format_id = $('#fileFormatSelect').val();
+                    d.data_type_name = $('#dataTypeSelect').val();
+                }
+            },
+            columns: [
+                { data: "data_item_id", name: "data_item_id" },
+                { data: "data_item_name", name: "data_item_name" },
+                { data: "file_format_name", name: "file_format_name", orderable: false },
+                {
+                    data: "display",
+                    name: "target_type_display",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                {
+                    data: "edit_value",
+                    name: "target_type_edit_value",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                { data: "index_value", name: "target_type_index_value" },
+                {
+                    data: "id",
+                    orderable: false,
+                    searchable: false,
+                    render: function (data, type, row) {
+                        return `
+                            <button class="btn btn-info btn-sm edit-item" data-id="${data}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm delete-item" data-id="${data}" data-name="${row.data_item_name}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
+                    }
+                }
+            ],
+            language: {
                 url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
-            }
+            },
+            dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50]]
         });
 
-        $('.delete-item').on('click', function() {
+        $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+            dataItemTable.ajax.reload();
+        });
+
+        // --- Modal Handling ---
+
+        const dataItemModal = $('#dataItemModal');
+        const dataItemForm = $('#dataItemForm');
+        const formErrors = $('#formErrors');
+        const editSpecificFields = $('#editSpecificFields');
+
+        function resetForm() {
+            dataItemForm[0].reset();
+            $('#editItemId').val('');
+            formErrors.text('');
+            editSpecificFields.hide();
+            $('#data_item_id').prop('readonly', false);
+            dataItemModal.find('.modal-title').text('Add New Data Item');
+        }
+
+        $('.add-btn').on('click', function(e) {
+            e.preventDefault();
+            resetForm();
+            dataItemModal.modal('show');
+        });
+
+        $('#dataItemTable tbody').on('click', '.edit-item', function() {
+            const itemId = $(this).data('id');
+            resetForm();
+            dataItemModal.find('.modal-title').text('Edit Data Item');
+            $('#editItemId').val(itemId);
+            $('#data_item_id').prop('readonly', true);
+            editSpecificFields.show();
+
+            $.ajax({
+                url: `/settings/data-item-detail/${itemId}/`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const item = response.data_item;
+                        const types = response.item_types;
+
+                        $('#data_item_id').val(item.data_item_id);
+                        $('#data_item_name').val(item.data_item_name);
+                        $('#data_format_id').val(item.data_format_id);
+
+                        for (const type_val in types) {
+                            const typeData = types[type_val];
+                            $(`#display_${type_val}`).prop('checked', typeData.display);
+                            $(`#edit_${type_val}`).prop('checked', typeData.edit_value);
+                            $(`#format_${type_val}`).val(typeData.format_value);
+                            $(`#index_${type_val}`).val(typeData.index_value);
+                        }
+                        dataItemModal.modal('show');
+                    } else {
+                        createToast('error', response.message || 'Failed to load item details.');
+                    }
+                },
+                error: function() {
+                    createToast('error', 'Error fetching item details.');
+                }
+            });
+        });
+
+        dataItemForm.on('submit', function(e) {
+            e.preventDefault();
+            formErrors.text('');
+            const itemId = $('#editItemId').val();
+            const url = itemId ? `/settings/data-item-edit/${itemId}/` : "{% url 'create_data_item' %}";
+            const formData = $(this).serialize();
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        dataItemModal.modal('hide');
+                        createToast('success', response.message || 'Operation successful!');
+                        dataItemTable.ajax.reload();
+                    } else {
+                        if (response.errors) {
+                            let errorHtml = '<ul>';
+                            for (const field in response.errors) {
+                                errorHtml += `<li>${field}: ${response.errors[field].join(', ')}</li>`;
+                            }
+                            errorHtml += '</ul>';
+                            formErrors.html(errorHtml);
+                        } else {
+                            formErrors.text(response.message || 'An error occurred.');
+                        }
+                    }
+                },
+                error: function(xhr) {
+                     let errorMsg = 'An error occurred during submission.';
+                     if (xhr.responseJSON && xhr.responseJSON.message) {
+                         errorMsg = xhr.responseJSON.message;
+                     } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                         let errorHtml = '<ul>';
+                         for (const field in xhr.responseJSON.errors) {
+                             errorHtml += `<li>${field}: ${xhr.responseJSON.errors[field].join(', ')}</li>`;
+                         }
+                         errorHtml += '</ul>';
+                         formErrors.html(errorHtml);
+                         return;
+                     }
+                     formErrors.text(errorMsg);
+                }
+            });
+        });
+
+
+        // --- Delete Handling (adapted for modal confirmation) ---
+        $('#dataItemTable tbody').on('click', '.delete-item', function() {
             const itemId = $(this).data('id');
             const itemName = $(this).data('name');
 
             $('#itemName').text(itemName);
             $('#deleteModal').modal('show');
 
-            $('#confirmDelete').off('click').on('click', function() {
+            $('#confirmDelete').one('click', function() {
                 $.ajax({
-                    url: `/settings/delete/${itemId}/`,
+                    url: `/settings/data-item-delete/${itemId}/`,
                     type: 'POST',
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken')
