@@ -1,0 +1,30 @@
+{% load static %}
+
+<div class="container-fluid mb-3" style="padding: 0 !important;">
+    <div class="row">
+         <div class="col-9">
+             <div class="tab-pane d-flex flex-row justify-content-start gap-2">
+                 <div class="nav-item pr-2">
+                     <a class="nav-link rounded rounded-3{% if request.path == "/settings/data-items/" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'data_items' %}">
+                         <span class="nav-link-text">データ項目設定</span>
+                     </a>
+                 </div>
+                 <div class="nav-item pr-2">
+                     <a class="nav-link rounded rounded-3{% if request.path == "/settings/rule-settings/" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'home' %}">
+                         <span class="nav-link-text">変換ルール設定</span>
+                     </a>
+                 </div>
+                 <div class="nav-item pr-2">
+                     <a class="nav-link rounded rounded-3{% if request.path == "/settings/fixed-data" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'home' %}">
+                         <span class="nav-link-text">固定データ設定</span>
+                     </a>
+                 </div>
+             </div>
+         </div>
+        <div class="col-3">
+            <div class="d-flex justify-content-end">
+                <button class="nav-link px-5 border-0 rounded rounded-3 bg-primary"><span class="nav-link-text">追加</span></button>
+            </div>
+        </div>
+    </div>
+</div>

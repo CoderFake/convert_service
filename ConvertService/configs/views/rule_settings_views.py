@@ -4,9 +4,11 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.views import View
+
 from configs.models import ConvertRule, ConvertDataValue
-from home.models import FileFormat, DataItemType, DataItem, DetailedInfo, DataConversionInfo, DataFormat
 from configs.utils import remove_bom
+from home.models import FileFormat, DataFormat, DataItem, DataConversionInfo, DetailedInfo, DataItemType
+
 
 class ConfigsView(LoginRequiredMixin, View):
     def get(self, request):
