@@ -1,0 +1,314 @@
+{% extends 'web/layouts/base.html' %}
+{% load static %}
+{% load i18n %}
+{% block title %} Quản lý trường dữ liệu {% endblock title %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" type="text/css"
+          href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+    <style>
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            color: #5e72e4;
+        }
+        .format-badge {
+            font-size: 85%;
+            font-weight: normal;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+        .badge-excel {
+            background-color: #1D6F42;
+            color: white;
+        }
+        .badge-csv {
+            background-color: #4F81BD;
+            color: white;
+        }
+        .dataTables_filter, .dataTables_length{
+            width: 100% !important;
+            display: flex;
+            justify-content: start;
+            align-content: center;
+        }
+
+        .dataTables_length{
+            justify-content: end;
+        }
+
+        .dataTables_length select{
+            height: 40px;
+            width: 60px !important;
+            background: none;
+            border-radius: 0.375rem !important;
+            border: 1px solid #e9ecef !important;
+        }
+
+        .dataTables_wrapper .row label{
+            margin-bottom: 0;
+        }
+        .dataTables_filter input{
+            width: 390px !important;
+            height: 40px;
+            border-radius: 0.375rem !important;
+            border: 1px solid #e9ecef !important;
+        }
+
+    </style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mt-6">
+                <div class="card-body pt-3">
+                    {% include "web/settings/includes/tab.html" %}
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="excel-tab" data-toggle="tab" href="#excel" role="tab"
+                               aria-controls="excel" aria-selected="true">Excel</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="csv-tab" data-toggle="tab" href="#csv" role="tab"
+                               aria-controls="csv" aria-selected="false">CSV</a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="myTabContent">
+                        <!-- Excel Tab -->
+                        <div class="tab-pane fade show active" id="excel" role="tabpanel" aria-labelledby="excel-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-bordered" id="excelTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tên trường</th>
+                                            <th>Định dạng dữ liệu</th>
+                                            <th>Hiển thị</th>
+                                            <th>Chỉnh sửa</th>
+                                            <th>Chỉ số</th>
+                                            <th>Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in excel_items %}
+                                        <tr>
+                                            <td>{{ item.data_item_id }}</td>
+                                            <td>{{ item.data_item_name }}</td>
+                                            <td>
+                                                <span class="badge format-badge badge-excel">EXCEL</span>
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {% if type.display %}
+                                                            <i class="fas fa-check text-success"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times text-danger"></i>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {% if type.edit_value %}
+                                                            <i class="fas fa-check text-success"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times text-danger"></i>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {{ type.index_value }}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'edit_data_item' item.id %}" class="btn btn-info btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-danger btn-sm delete-item" data-id="{{ item.id }}" data-name="{{ item.data_item_name }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- CSV Tab -->
+                        <div class="tab-pane fade" id="csv" role="tabpanel" aria-labelledby="csv-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-bordered" id="csvTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tên trường</th>
+                                            <th>Định dạng dữ liệu</th>
+                                            <th>Hiển thị</th>
+                                            <th>Chỉnh sửa</th>
+                                            <th>Chỉ số</th>
+                                            <th>Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in csv_items %}
+                                        <tr>
+                                            <td>{{ item.data_item_id }}</td>
+                                            <td>{{ item.data_item_name }}</td>
+                                            <td>
+                                                <span class="badge format-badge badge-csv">CSV</span>
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {% if type.display %}
+                                                            <i class="fas fa-check text-success"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times text-danger"></i>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {% if type.edit_value %}
+                                                            <i class="fas fa-check text-success"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-times text-danger"></i>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% for type in item.data_item_types.all %}
+                                                    {% if type.type_name == 'format' %}
+                                                        {{ type.index_value }}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'edit_data_item' item.id %}" class="btn btn-info btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-danger btn-sm delete-item" data-id="{{ item.id }}" data-name="{{ item.data_item_name }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
+                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'web/vendor/datatables.net/js/dataTables.bootstrap5.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        $('#excelTable').DataTable({
+        language: {
+            url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+        },
+        dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+
+
+        $('#csvTable').DataTable({
+            "language": {
+                url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+            }
+        });
+
+        $('.delete-item').on('click', function() {
+            const itemId = $(this).data('id');
+            const itemName = $(this).data('name');
+
+            $('#itemName').text(itemName);
+            $('#deleteModal').modal('show');
+
+            $('#confirmDelete').off('click').on('click', function() {
+                $.ajax({
+                    url: `/settings/delete/${itemId}/`,
+                    type: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            $('#deleteModal').modal('hide');
+                            location.reload();
+                        } else {
+                            createToast('error', response.message || 'Đã xảy ra lỗi khi xóa');
+                        }
+                    },
+                    error: function() {
+                        createToast('error', 'Đã xảy ra lỗi kết nối');
+                    }
+                });
+            });
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    });
+</script>
+{% endblock javascripts %}
