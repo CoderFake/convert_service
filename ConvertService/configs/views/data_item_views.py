@@ -1,11 +1,10 @@
 import json
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Subquery, IntegerField, OuterRef
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views import View
-from django.core.paginator import Paginator
 
 from home.models import DataItem, FileFormat, DataFormat, DataItemType
 
@@ -23,103 +22,124 @@ class DataItemListView(LoginRequiredMixin, View):
 
     def render_page(self, request):
         tenant = request.user.tenant
-        file_formats = FileFormat.objects.all()
+
+        file_formats = FileFormat.objects.filter(
+            dataformat__tenant=tenant
+        ).distinct()
+
         data_type_choices = DataItemType.TypeName.choices
         data_formats_list = DataFormat.objects.filter(tenant=tenant).select_related('file_format')
-        data_item_type_format_choices = [
+        data_item_type_choices = [
             ('input', '変換前のデータ'),
             ('format', '画面のデータ'),
             ('output', '健診システム取り込みデータ'),
             ('input', '予約代行業者取り込みデータ'),
         ]
 
-
         context = {
             'file_formats': file_formats,
             'data_type_choices': data_type_choices,
-            'data_type_choices_json': json.dumps(dict(data_type_choices)),
             'data_formats': data_formats_list,
-            'data_item_type_format_choices': data_item_type_format_choices
+            'data_item_type_choices': data_item_type_choices
         }
         return render(request, 'web/settings/data-item.html', context)
 
     def get_datatable_data(self, request):
-        tenant = request.user.tenant
-        draw = int(request.GET.get('draw', 1))
-        start = int(request.GET.get('start', 0))
-        length = int(request.GET.get('length', 10))
-        search_value = request.GET.get('search[value]', '')
-        file_format_id = request.GET.get('file_format_id', '')
-        data_type_name = request.GET.get('data_type_name', DataItemType.TypeName.BEFORE)
+        try:
+            tenant = request.user.tenant
+            draw = int(request.GET.get('draw', 1))
+            start = int(request.GET.get('start', 0))
+            length = int(request.GET.get('length', 10))
+            search_value = request.GET.get('search[value]', '')
+            file_format_id = request.GET.get('file_format_id', '')
+            data_type_name = request.GET.get('data_type_name', DataItemType.TypeName.FORMAT)
 
-        queryset = DataItem.objects.filter(tenant=tenant).select_related(
-            'data_format', 'data_format__file_format'
-        ).prefetch_related('data_item_types')
+            base_queryset = DataItem.objects.filter(tenant=tenant)
 
-        if file_format_id:
-            queryset = queryset.filter(data_format__file_format__id=file_format_id)
+            if file_format_id:
+                base_queryset = base_queryset.filter(data_format__file_format__id=file_format_id)
 
-        queryset = queryset.annotate(
-            target_type_display=F(f'data_item_types__display'),
-            target_type_edit_value=F(f'data_item_types__edit_value'),
-            target_type_index_value=F(f'data_item_types__index_value'),
-            target_type_format_value=F(f'data_item_types__format_value')
-        ).filter(data_item_types__type_name=data_type_name).distinct()
-
-        if search_value:
-            queryset = queryset.filter(
-                Q(data_item_id__icontains=search_value) |
-                Q(data_item_name__icontains=search_value)
+            base_queryset = base_queryset.filter(
+                data_item_types__type_name=data_type_name
+            ).select_related(
+                'data_format__file_format'
+            ).prefetch_related(
+                'data_item_types'
             )
 
-        total_records = DataItem.objects.filter(tenant=tenant).count()
-        records_filtered = queryset.count()
+            if search_value:
+                base_queryset = base_queryset.filter(
+                    Q(data_item_id__icontains=search_value) |
+                    Q(data_item_name__icontains=search_value)
+                )
 
-        order_column_index = int(request.GET.get('order[0][column]', 0))
-        order_dir = request.GET.get('order[0][dir]', 'asc')
-        order_columns = ['data_item_id', 'data_item_name', None, 'target_type_display', 'target_type_edit_value', 'target_type_index_value'] # Map index to field name
+            total_records = DataItem.objects.filter(tenant=tenant).count()
+            records_filtered = base_queryset.count()
 
-        if order_column_index < len(order_columns) and order_columns[order_column_index]:
-            order_field = order_columns[order_column_index]
-            if order_dir == 'desc':
-                order_field = f'-{order_field}'
-            queryset = queryset.order_by(order_field)
-        else:
-             queryset = queryset.order_by('data_item_id')
+            subquery = DataItem.objects.filter(
+                tenant=tenant,
+                data_item_name=OuterRef('data_item_name'),
+                data_item_types__type_name=data_type_name
+            ).annotate(
+                idx=F('data_item_types__index_value')
+            ).order_by('idx').values('id')[:1]
 
-        paginator = Paginator(queryset, length)
-        page_number = (start // length) + 1
-        page_obj = paginator.get_page(page_number)
+            unique_ids = base_queryset.values('data_item_name').annotate(
+                selected_id=Subquery(subquery, output_field=IntegerField())
+            ).values_list('selected_id', flat=True)
 
-        data = []
-        for item in page_obj:
-            try:
-                item_type = item.data_item_types.get(type_name=data_type_name)
-                display = item_type.display
-                edit_value = item_type.edit_value
-                index_value = item_type.index_value
-            except DataItemType.DoesNotExist:
-                display = False
-                edit_value = False
-                index_value = 0
+            paginated_ids = list(unique_ids)[start:start + length]
+            paginated_items = DataItem.objects.filter(id__in=paginated_ids).select_related('data_format__file_format')
 
-            data.append({
-                'id': item.id,
-                'data_item_id': item.data_item_id,
-                'data_item_name': item.data_item_name,
-                'file_format_name': item.data_format.file_format.file_format_name if item.data_format and item.data_format.file_format else 'N/A',
-                'display': display,
-                'edit_value': edit_value,
-                'index_value': index_value,
+            item_types = {
+                (item.data_item_id): item_type
+                for item_type in DataItemType.objects.filter(
+                    data_item__in=paginated_items,
+                    type_name=data_type_name
+                ).select_related('data_item')
+                for item in [item_type.data_item]
+            }
+
+            data = []
+            for index, item in enumerate(paginated_items, start=start + 1):
+                item_type = item_types.get(item.data_item_id)
+                display = item_type.display if item_type else False
+                edit_value = item_type.edit_value if item_type else False
+                index_value = item_type.index_value if item_type else 0
+                format_value = item_type.format_value if item_type else 'string'
+
+                file_format_name = item.data_format.file_format.file_format_name if item.data_format and item.data_format.file_format else 'N/A'
+
+                data.append({
+                    'DT_RowId': f'row_{item.id}',
+                    'no': index,
+                    'id': item.id,
+                    'data_item_id': item.data_item_id,
+                    'data_item_name': item.data_item_name,
+                    'file_format_name': file_format_name,
+                    'display': display,
+                    'edit_value': edit_value,
+                    'index_value': index_value,
+                    'format_value': format_value
+                })
+
+            response = {
+                'draw': draw,
+                'recordsTotal': total_records,
+                'recordsFiltered': records_filtered,
+                'data': data,
+            }
+            return JsonResponse(response)
+
+        except Exception as e:
+            logger.error(f"Error in get_datatable_data: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'draw': int(request.GET.get('draw', 1)),
+                'recordsTotal': 0,
+                'recordsFiltered': 0,
+                'data': [],
+                'error': str(e)
             })
-
-        response = {
-            'draw': draw,
-            'recordsTotal': total_records,
-            'recordsFiltered': records_filtered,
-            'data': data,
-        }
-        return JsonResponse(response)
 
 
 class DataItemCreateView(LoginRequiredMixin, View):

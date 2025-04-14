@@ -76,7 +76,7 @@
             border-radius: 0.375rem !important;
             border: 1px solid #e9ecef !important;
         }
-        /* Ensure table actions column has enough width */
+
         #dataItemTable th:last-child,
         #dataItemTable td:last-child {
             width: 100px;
@@ -89,6 +89,73 @@
             margin-right: 0;
         }
 
+        .custom-switch {
+            padding-left: 2.25rem;
+        }
+        .custom-control-input {
+            position: absolute;
+            left: 0;
+            z-index: -1;
+            width: 1rem;
+            height: 1.25rem;
+            opacity: 0;
+        }
+        .custom-control-label {
+            position: relative;
+            margin-bottom: 0;
+            vertical-align: top;
+        }
+        .custom-control-label::before {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1.75rem;
+            height: 1rem;
+            content: "";
+            background-color: #e9ecef;
+            border-radius: 0.5rem;
+        }
+        .custom-control-label::after {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1rem;
+            height: 1rem;
+            content: "";
+            background-color: #fff;
+            border-radius: 0.5rem;
+            transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            transform: translateX(0);
+        }
+        .custom-control-input:checked ~ .custom-control-label::before {
+            background-color: #5e72e4;
+        }
+        .custom-control-input:checked ~ .custom-control-label::after {
+            transform: translateX(0.75rem);
+        }
+
+        .hide-column {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
     </style>
 {% endblock stylesheets %}
 
@@ -103,7 +170,7 @@
                             {% include "web/settings/includes/tab.html" %}
                             <div class="col-3">
                                 <div class="d-flex justify-content-end">
-                                    <a href="{% url 'create_data_item' %}" class="nav-link add-btn px-5 border-0 rounded rounded-3 bg-primary"><span class="nav-link-text">追加</span></a>
+                                    <button id="addDataItemBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
                                 </div>
                             </div>
                         </div>
@@ -112,31 +179,39 @@
                     <!-- Filter Row -->
                     <div class="filter-row">
                         <div>
+                            <label for="fileFormatSelect">ファイル形式:</label>
                             <select id="fileFormatSelect" class="form-select form-select-sm">
+                                <option value="">全て</option>
                                 {% for format in file_formats %}
                                     <option value="{{ format.id }}">{{ format.file_format_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div>
+                            <label for="dataTypeSelect">データタイプ:</label>
                             <select id="dataTypeSelect" class="form-select form-select-sm">
-                                {% for value, name in data_item_type_format_choices %}
-                                    <option value="{{ value }}" {% if value == 'format' %}selected{% endif %}>{{ name }}</option>
+                                {% for value, name in data_item_type_choices %}
+                                    <option value="{{ value }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                     </div>
 
-                    <!-- Single DataTable -->
-                    <div class="table-responsive mt-3">
+                    <!-- DataTable with loading overlay -->
+                    <div class="table-responsive mt-3 position-relative">
+                        <div id="tableLoadingOverlay" class="loading-overlay">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                        </div>
                         <table class="table table-bordered" id="dataItemTable" width="100%" cellspacing="0">
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Field Name</th>
                                     <th>File Format</th>
-                                    <th>Display</th>
-                                    <th>Editable</th>
+                                    <th class="display-column">Display</th>
+                                    <th class="edit-column">Editable</th>
                                     <th>Index</th>
                                     <th>Actions</th>
                                 </tr>
@@ -157,24 +232,23 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <h5 class="modal-title" id="deleteModalLabel">削除確認</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
-                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
+                <p>データ項目 "<span id="itemName"></span>" を削除してもよろしいですか?</p>
+                <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add/Edit Modal -->
 <div class="modal fade" id="dataItemModal" tabindex="-1" role="dialog" aria-labelledby="dataItemModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -182,30 +256,29 @@
                 {% csrf_token %}
                 <input type="hidden" id="editItemId" name="item_id">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="dataItemModalLabel">Data Item</h5>
+                    <h5 class="modal-title" id="dataItemModalLabel">データ項目</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                     <div class="form-group row">
-                        <label for="data_item_id" class="col-sm-3 col-form-label">Data Item ID</label>
+                    <div class="form-group row">
+                        <label for="data_item_id" class="col-sm-3 col-form-label">データ項目ID</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="data_item_id" name="data_item_id" required>
                         </div>
                     </div>
                     <div class="form-group row mt-3">
-                        <label for="data_item_name" class="col-sm-3 col-form-label">Data Item Name</label>
+                        <label for="data_item_name" class="col-sm-3 col-form-label">データ項目名</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="data_item_name" name="data_item_name" required>
                         </div>
                     </div>
                     <div class="form-group row mt-3">
-                        <label for="data_format_id" class="col-sm-3 col-form-label">Data Format</label>
+                        <label for="data_format_id" class="col-sm-3 col-form-label">データフォーマット</label>
                         <div class="col-sm-9">
                              <select class="form-control" id="data_format_id" name="data_format_id" required>
-                                 <option value="">---------</option>
-                                 {# Options will be populated dynamically if needed, or use existing list #}
+                                 <option value="">選択してください</option>
                                  {% for format in data_formats %}
                                      <option value="{{ format.id }}">{{ format.data_format_name }} ({{ format.file_format.file_format_name }})</option>
                                  {% endfor %}
@@ -213,27 +286,33 @@
                         </div>
                     </div>
 
-                    <!-- Placeholder for Edit-specific fields (DataItemType details) -->
-                    <div id="editSpecificFields" class="mt-4" style="display: none;">
-                        <h6>Type Specific Settings</h6>
+                    <!-- Type-specific settings - Only show for current type -->
+                    <div id="editSpecificFields" class="mt-4">
+                        <h6>タイプ別設定</h6>
                         <hr>
                         {% for type_val, type_name in data_type_choices %}
-                        <div class="type-settings-group mb-3 p-3 border rounded">
-                             <h7><strong>{{ type_name }}</strong></h7>
-                             <div class="form-group row mt-2">
-                                 <label class="col-sm-3 col-form-label">Display</label>
+                        <div class="type-settings-group mb-3 p-3 border rounded" data-type="{{ type_val }}" style="display:none;">
+                             <h6><strong>{{ type_name }}</strong></h6>
+                             <div class="form-group row mt-2 display-setting" {% if type_val == 'input' or type_val == 'output' or type_val == 'agency' %}style="display:none;"{% endif %}>
+                                 <label class="col-sm-3 col-form-label">表示</label>
                                  <div class="col-sm-9">
-                                     <input type="checkbox" class="form-check-input" id="display_{{ type_val }}" name="display_{{ type_val }}">
+                                     <div class="custom-control custom-switch">
+                                         <input type="checkbox" class="custom-control-input" id="display_{{ type_val }}" name="display_{{ type_val }}">
+                                         <label class="custom-control-label" for="display_{{ type_val }}"></label>
+                                     </div>
                                  </div>
                              </div>
-                             <div class="form-group row mt-2">
-                                 <label class="col-sm-3 col-form-label">Editable</label>
+                             <div class="form-group row mt-2 edit-setting" {% if type_val == 'input' or type_val == 'output' or type_val == 'agency' %}style="display:none;"{% endif %}>
+                                 <label class="col-sm-3 col-form-label">編集可能</label>
                                  <div class="col-sm-9">
-                                     <input type="checkbox" class="form-check-input" id="edit_{{ type_val }}" name="edit_{{ type_val }}">
+                                     <div class="custom-control custom-switch">
+                                         <input type="checkbox" class="custom-control-input" id="edit_{{ type_val }}" name="edit_{{ type_val }}">
+                                         <label class="custom-control-label" for="edit_{{ type_val }}"></label>
+                                     </div>
                                  </div>
                              </div>
-                             <div class="form-group row mt-2">
-                                 <label for="format_{{ type_val }}" class="col-sm-3 col-form-label">Format Value</label>
+                             <div class="form-group row mt-2 format-setting" {% if type_val == 'input' or type_val == 'output' or type_val == 'agency' %}style="display:none;"{% endif %}>
+                                 <label for="format_{{ type_val }}" class="col-sm-3 col-form-label">フォーマット値</label>
                                  <div class="col-sm-9">
                                      <select class="form-control" id="format_{{ type_val }}" name="format_{{ type_val }}">
                                          {% for f_val, f_name in data_item_type_format_choices %}
@@ -242,60 +321,79 @@
                                      </select>
                                  </div>
                              </div>
-                             <div class="form-group row mt-2">
-                                 <label for="index_{{ type_val }}" class="col-sm-3 col-form-label">Index</label>
+                             <div class="form-group row mt-2 index-setting">
+                                 <label for="index_{{ type_val }}" class="col-sm-3 col-form-label">インデックス</label>
                                  <div class="col-sm-9">
-                                     <input type="number" class="form-control" id="index_{{ type_val }}" name="index_{{ type_val }}" value="0" required>
+                                     <input type="number" class="form-control" id="index_{{ type_val }}" name="index_{{ type_val }}" value="0" min="0" required>
                                  </div>
                              </div>
                         </div>
                         {% endfor %}
                     </div>
-                     <div id="formErrors" class="text-danger mt-2"></div>
+                    <div id="formErrors" class="text-danger mt-2"></div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary" id="saveDataItem">Save</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">閉じる</button>
+                    <button type="submit" class="btn btn-primary" id="saveDataItem">保存</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-
-<!-- Delete Confirmation Modal (existing) -->
-<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
-                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock content %}
 
 {% block javascripts %}
-<script src="{% static 'web/vendor/jquery/dist/jquery.min.js' %}"></script> {# Ensure jQuery is loaded first #}
-<script src="{% static 'web/vendor/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script> {# Ensure Bootstrap JS is loaded for modals #}
+<script src="{% static 'web/vendor/jquery/dist/jquery.min.js' %}"></script>
+<script src="{% static 'web/vendor/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'web/vendor/datatables.net/js/dataTables.bootstrap5.js' %}"></script>
-<script src="{% static 'web/js/toast.js' %}"></script> {# Assuming toast.js is available for notifications #}
+<script src="{% static 'web/js/toast.js' %}"></script>
 
 <script>
-    $(document).ready(function() {
-        const dataItemTable = $('#dataItemTable').DataTable({
+$(document).ready(function() {
+    // Fix scrollbar error by checking if the scrollbar function exists
+    if (typeof $.fn.scrollbar === 'function') {
+        $('.scrollbar-inner').scrollbar();
+    }
+
+    // Group CSV formats for display simplicity
+    function groupCsvFormats() {
+        let seenCSV = false;
+        $('#fileFormatSelect option').each(function() {
+            const text = $(this).text();
+            if (text.includes('CSV')) {
+                if (!seenCSV) {
+                    $(this).text('CSV');
+                    seenCSV = true;
+                } else {
+                    $(this).remove();
+                }
+            }
+        });
+    }
+
+    // Show/hide columns based on data type
+    function updateColumnVisibility() {
+        const dataType = $('#dataTypeSelect').val();
+
+        if (dataType === 'input' || dataType === 'output' || dataType === 'agency') {
+            $('.display-column, .edit-column').addClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').hide();
+        } else {
+            $('.display-column, .edit-column').removeClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').show();
+        }
+
+        if (dataItemTable) {
+            dataItemTable.columns.adjust();
+        }
+    }
+
+    // Initialize DataTable with server-side processing
+    let dataItemTable;
+    try {
+        dataItemTable = $('#dataItemTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: {
@@ -304,27 +402,44 @@
                 data: function (d) {
                     d.file_format_id = $('#fileFormatSelect').val();
                     d.data_type_name = $('#dataTypeSelect').val();
+                },
+                beforeSend: function() {
+                    $('#tableLoadingOverlay').show();
+                },
+                complete: function() {
+                    $('#tableLoadingOverlay').hide();
+                },
+                error: function(xhr, error, thrown) {
+                    $('#tableLoadingOverlay').hide();
+                    console.error("DataTable AJAX error:", error, thrown);
+                    createToast('error', 'データの読み込み中にエラーが発生しました。');
                 }
             },
             columns: [
-                { data: "data_item_id", name: "data_item_id" },
+                {
+                    data: "no",
+                    name: "no",
+                    searchable: false
+                },
                 { data: "data_item_name", name: "data_item_name" },
                 { data: "file_format_name", name: "file_format_name", orderable: false },
                 {
                     data: "display",
-                    name: "target_type_display",
+                    name: "display",
+                    className: "display-column",
                     render: function (data, type, row) {
                         return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
                     }
                 },
                 {
                     data: "edit_value",
-                    name: "target_type_edit_value",
+                    name: "edit_value",
+                    className: "edit-column",
                     render: function (data, type, row) {
                         return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
                     }
                 },
-                { data: "index_value", name: "target_type_index_value" },
+                { data: "index_value", name: "index_value" },
                 {
                     data: "id",
                     orderable: false,
@@ -342,171 +457,286 @@
                 }
             ],
             language: {
-                url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+                processing: "処理中...",
+                search: "検索:",
+                lengthMenu: "_MENU_ 件表示",
+                info: " _TOTAL_ 件中 _START_ から _END_ まで表示",
+                infoEmpty: "0 件中 0 から 0 まで表示",
+                infoFiltered: "（全 _MAX_ 件より抽出）",
+                infoPostFix: "",
+                loadingRecords: "読み込み中...",
+                zeroRecords: "表示するデータがありません。",
+                emptyTable: "データがありません。",
+                paginate: {
+                    first: "先頭",
+                    previous: "前",
+                    next: "次",
+                    last: "最終"
+                },
+                aria: {
+                    sortAscending: ": 列を昇順に並べ替えるにはアクティブにする",
+                    sortDescending: ": 列を降順に並べ替えるにはアクティブにする"
+                }
             },
             dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
-            lengthMenu: [[10, 25, 50, -1], [10, 25, 50]]
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "全て"]],
+            drawCallback: function() {
+                // Fix the first column header after draw
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                updateColumnVisibility();
+            },
+            initComplete: function() {
+                // Fix the first column header on initialization
+                $('#dataItemTable thead tr').find('th').first().text('No');
+            }
         });
+    } catch (e) {
+        console.error("Error initializing DataTable:", e);
+        createToast('error', 'テーブルの初期化中にエラーが発生しました。');
+    }
 
-        $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+    // Handle filter changes
+    $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+        if (dataItemTable) {
             dataItemTable.ajax.reload();
-        });
-
-        // --- Modal Handling ---
-
-        const dataItemModal = $('#dataItemModal');
-        const dataItemForm = $('#dataItemForm');
-        const formErrors = $('#formErrors');
-        const editSpecificFields = $('#editSpecificFields');
-
-        function resetForm() {
-            dataItemForm[0].reset();
-            $('#editItemId').val('');
-            formErrors.text('');
-            editSpecificFields.hide();
-            $('#data_item_id').prop('readonly', false);
-            dataItemModal.find('.modal-title').text('Add New Data Item');
         }
+        updateColumnVisibility();
+    });
 
-        $('.add-btn').on('click', function(e) {
-            e.preventDefault();
-            resetForm();
-            dataItemModal.modal('show');
+    // Group CSV formats on initial load
+    groupCsvFormats();
+
+    // Set initial column visibility
+    updateColumnVisibility();
+
+    // ===== Modal Handling =====
+    const dataItemModal = $('#dataItemModal');
+    const dataItemForm = $('#dataItemForm');
+    const formErrors = $('#formErrors');
+    const editSpecificFields = $('#editSpecificFields');
+
+    // Reset form to initial state
+    function resetForm() {
+        dataItemForm[0].reset();
+        $('#editItemId').val('');
+        formErrors.empty();
+        $('#data_item_id').prop('readonly', false);
+        dataItemModal.find('.modal-title').text('データ項目追加');
+
+        // Reset all type settings based on the currently selected data type
+        updateTypeSettingsVisibility();
+    }
+
+    // Show/hide type settings based on type
+    function updateTypeSettingsVisibility() {
+        const dataType = $('#dataTypeSelect').val();
+
+        $('.type-settings-group').each(function() {
+            const groupType = $(this).data('type');
+
+            if (groupType === 'input' || groupType === 'output' || groupType === 'agency') {
+                $(this).find('.display-setting, .edit-setting, .format-setting').hide();
+                $(this).find('.index-setting').show();
+            } else {
+                $(this).find('.display-setting, .edit-setting, .format-setting, .index-setting').show();
+            }
         });
+    }
 
-        $('#dataItemTable tbody').on('click', '.edit-item', function() {
-            const itemId = $(this).data('id');
-            resetForm();
-            dataItemModal.find('.modal-title').text('Edit Data Item');
-            $('#editItemId').val(itemId);
-            $('#data_item_id').prop('readonly', true);
-            editSpecificFields.show();
+    // Open add modal
+    $('#addDataItemBtn').on('click', function() {
+        resetForm();
+        dataItemModal.modal('show');
+    });
 
-            $.ajax({
-                url: `/settings/data-item-detail/${itemId}/`,
-                type: 'GET',
-                success: function(response) {
-                    if (response.status === 'success') {
-                        const item = response.data_item;
-                        const types = response.item_types;
+    // Open edit modal
+    $('#dataItemTable tbody').on('click', '.edit-item', function() {
+        const itemId = $(this).data('id');
+        resetForm();
+        dataItemModal.find('.modal-title').text('データ項目編集');
+        $('#editItemId').val(itemId);
+        $('#data_item_id').prop('readonly', true);
 
-                        $('#data_item_id').val(item.data_item_id);
-                        $('#data_item_name').val(item.data_item_name);
-                        $('#data_format_id').val(item.data_format_id);
+        // Show loading in modal
+        formErrors.html('<div class="text-info">データを読み込み中...</div>');
 
-                        for (const type_val in types) {
-                            const typeData = types[type_val];
-                            $(`#display_${type_val}`).prop('checked', typeData.display);
-                            $(`#edit_${type_val}`).prop('checked', typeData.edit_value);
-                            $(`#format_${type_val}`).val(typeData.format_value);
-                            $(`#index_${type_val}`).val(typeData.index_value);
-                        }
-                        dataItemModal.modal('show');
-                    } else {
-                        createToast('error', response.message || 'Failed to load item details.');
+        $.ajax({
+            url: `/settings/data-item-detail/${itemId}/`,
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                formErrors.empty();
+
+                if (response.status === 'success') {
+                    const item = response.data_item;
+                    const types = response.item_types;
+
+                    $('#data_item_id').val(item.data_item_id || '');
+                    $('#data_item_name').val(item.data_item_name || '');
+                    $('#data_format_id').val(item.data_format_id || '');
+
+                    // Apply type settings
+                    for (const type_val in types) {
+                        const typeData = types[type_val] || {};
+
+                        // Set values with fallbacks
+                        $(`#display_${type_val}`).prop('checked', !!typeData.display);
+                        $(`#edit_${type_val}`).prop('checked', !!typeData.edit_value);
+                        $(`#format_${type_val}`).val(typeData.format_value || 'string');
+                        $(`#index_${type_val}`).val(typeData.index_value || 0);
                     }
-                },
-                error: function() {
-                    createToast('error', 'Error fetching item details.');
+
+                    // Update visibility of type settings
+                    updateTypeSettingsVisibility();
+                } else {
+                    formErrors.html(`<div class="alert alert-danger">${response.message || '詳細を読み込めませんでした。'}</div>`);
                 }
-            });
+            },
+            error: function(xhr) {
+                let errorMsg = 'データ読み込み中にエラーが発生しました。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                formErrors.html(`<div class="alert alert-danger">${errorMsg}</div>`);
+            }
         });
 
-        dataItemForm.on('submit', function(e) {
-            e.preventDefault();
-            formErrors.text('');
-            const itemId = $('#editItemId').val();
-            const url = itemId ? `/settings/data-item-edit/${itemId}/` : "{% url 'create_data_item' %}";
-            const formData = $(this).serialize();
+        dataItemModal.modal('show');
+    });
+
+    // Submit form
+    dataItemForm.on('submit', function(e) {
+        e.preventDefault();
+        formErrors.empty();
+
+        const itemId = $('#editItemId').val();
+        const url = itemId ? `/settings/data-item-edit/${itemId}/` : "{% url 'create_data_item' %}";
+
+        // Show loading
+        const saveBtn = $('#saveDataItem');
+        const saveBtnText = saveBtn.html();
+        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...');
+        saveBtn.prop('disabled', true);
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    dataItemModal.modal('hide');
+                    createToast('success', response.message || '操作が成功しました!');
+                    if (dataItemTable) {
+                        dataItemTable.ajax.reload();
+                    }
+                } else {
+                    if (response.errors) {
+                        let errorHtml = '<div class="alert alert-danger"><ul>';
+                        for (const field in response.errors) {
+                            errorHtml += `<li>${field}: ${response.errors[field].join(', ')}</li>`;
+                        }
+                        errorHtml += '</ul></div>';
+                        formErrors.html(errorHtml);
+                    } else {
+                        formErrors.html(`<div class="alert alert-danger">${response.message || 'エラーが発生しました。'}</div>`);
+                    }
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'リクエスト中にエラーが発生しました。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    let errorHtml = '<div class="alert alert-danger"><ul>';
+                    for (const field in xhr.responseJSON.errors) {
+                        errorHtml += `<li>${field}: ${xhr.responseJSON.errors[field].join(', ')}</li>`;
+                    }
+                    errorHtml += '</ul></div>';
+                    formErrors.html(errorHtml);
+                    saveBtn.html(saveBtnText);
+                    saveBtn.prop('disabled', false);
+                    return;
+                }
+                formErrors.html(`<div class="alert alert-danger">${errorMsg}</div>`);
+            },
+            complete: function() {
+                saveBtn.html(saveBtnText);
+                saveBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    // Handle delete confirmation
+    $('#dataItemTable tbody').on('click', '.delete-item', function() {
+        const itemId = $(this).data('id');
+        const itemName = $(this).data('name') || '選択した項目';
+
+        $('#itemName').text(itemName);
+        $('#deleteModal').modal('show');
+
+        $('#confirmDelete').off('click').on('click', function() {
+            // Show loading
+            const deleteBtn = $(this);
+            const deleteBtnText = deleteBtn.html();
+            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 削除中...');
+            deleteBtn.prop('disabled', true);
 
             $.ajax({
-                url: url,
+                url: `/settings/data-item-delete/${itemId}/`,
                 type: 'POST',
-                data: formData,
                 headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 success: function(response) {
+                    $('#deleteModal').modal('hide');
+
                     if (response.status === 'success') {
-                        dataItemModal.modal('hide');
-                        createToast('success', response.message || 'Operation successful!');
-                        dataItemTable.ajax.reload();
-                    } else {
-                        if (response.errors) {
-                            let errorHtml = '<ul>';
-                            for (const field in response.errors) {
-                                errorHtml += `<li>${field}: ${response.errors[field].join(', ')}</li>`;
-                            }
-                            errorHtml += '</ul>';
-                            formErrors.html(errorHtml);
-                        } else {
-                            formErrors.text(response.message || 'An error occurred.');
+                        createToast('success', '項目が削除されました');
+                        if (dataItemTable) {
+                            dataItemTable.ajax.reload();
                         }
+                    } else {
+                        createToast('error', response.message || '削除中にエラーが発生しました');
                     }
                 },
                 error: function(xhr) {
-                     let errorMsg = 'An error occurred during submission.';
-                     if (xhr.responseJSON && xhr.responseJSON.message) {
-                         errorMsg = xhr.responseJSON.message;
-                     } else if (xhr.responseJSON && xhr.responseJSON.errors) {
-                         let errorHtml = '<ul>';
-                         for (const field in xhr.responseJSON.errors) {
-                             errorHtml += `<li>${field}: ${xhr.responseJSON.errors[field].join(', ')}</li>`;
-                         }
-                         errorHtml += '</ul>';
-                         formErrors.html(errorHtml);
-                         return;
-                     }
-                     formErrors.text(errorMsg);
+                    $('#deleteModal').modal('hide');
+                    let errorMsg = 'エラーが発生しました。';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    createToast('error', errorMsg);
+                },
+                complete: function() {
+                    deleteBtn.html(deleteBtnText);
+                    deleteBtn.prop('disabled', false);
                 }
             });
         });
+    });
 
-
-        // --- Delete Handling (adapted for modal confirmation) ---
-        $('#dataItemTable tbody').on('click', '.delete-item', function() {
-            const itemId = $(this).data('id');
-            const itemName = $(this).data('name');
-
-            $('#itemName').text(itemName);
-            $('#deleteModal').modal('show');
-
-            $('#confirmDelete').one('click', function() {
-                $.ajax({
-                    url: `/settings/data-item-delete/${itemId}/`,
-                    type: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            $('#deleteModal').modal('hide');
-                            location.reload();
-                        } else {
-                            createToast('error', response.message || 'Đã xảy ra lỗi khi xóa');
-                        }
-                    },
-                    error: function() {
-                        createToast('error', 'Đã xảy ra lỗi kết nối');
-                    }
-                });
-            });
-        });
-
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
             }
-            return cookieValue;
         }
-    });
+        return cookieValue;
+    }
+});
 </script>
 {% endblock javascripts %}
