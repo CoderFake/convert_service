@@ -21,25 +21,22 @@ class DataItemListView(LoginRequiredMixin, View):
             return self.render_page(request)
 
     def render_page(self, request):
-        tenant = request.user.tenant
+        file_formats = [
+            ('CSV', 'CSV'),
+            ('EXCEL', 'EXCEL')
+        ]
 
-        file_formats = FileFormat.objects.filter(
-            dataformat__tenant=tenant
-        ).distinct()
-
-        data_type_choices = DataItemType.TypeName.choices
-        data_formats_list = DataFormat.objects.filter(tenant=tenant).select_related('file_format')
         data_item_type_choices = [
             ('input', '変換前のデータ'),
             ('format', '画面のデータ'),
             ('output', '健診システム取り込みデータ'),
             ('input', '予約代行業者取り込みデータ'),
         ]
+        data_type_choices = DataItemType.FormatValue.choices
 
         context = {
             'file_formats': file_formats,
-            'data_type_choices': data_type_choices,
-            'data_formats': data_formats_list,
+            "data_type_choices": data_type_choices,
             'data_item_type_choices': data_item_type_choices
         }
         return render(request, 'web/settings/data-item.html', context)
@@ -54,10 +51,11 @@ class DataItemListView(LoginRequiredMixin, View):
             file_format_id = request.GET.get('file_format_id', '')
             data_type_name = request.GET.get('data_type_name', DataItemType.TypeName.FORMAT)
 
+
             base_queryset = DataItem.objects.filter(tenant=tenant)
 
             if file_format_id:
-                base_queryset = base_queryset.filter(data_format__file_format__id=file_format_id)
+                base_queryset = base_queryset.filter(data_format__file_format__file_format_id__contains=file_format_id)
 
             base_queryset = base_queryset.filter(
                 data_item_types__type_name=data_type_name
@@ -74,41 +72,56 @@ class DataItemListView(LoginRequiredMixin, View):
                 )
 
             total_records = DataItem.objects.filter(tenant=tenant).count()
-            records_filtered = base_queryset.count()
+            records_filtered = base_queryset.distinct().count()
 
-            subquery = DataItem.objects.filter(
-                tenant=tenant,
-                data_item_name=OuterRef('data_item_name'),
-                data_item_types__type_name=data_type_name
-            ).annotate(
-                idx=F('data_item_types__index_value')
-            ).order_by('idx').values('id')[:1]
+            item_types_dict = {
+                item_type.data_item_id: item_type
+                for item_type in DataItemType.objects.filter(
+                    data_item__in=base_queryset,
+                    type_name=data_type_name
+                ).select_related('data_item')
+            }
 
-            unique_ids = base_queryset.values('data_item_name').annotate(
-                selected_id=Subquery(subquery, output_field=IntegerField())
-            ).values_list('selected_id', flat=True)
+            unique_ids = list(base_queryset.values(
+                'id',
+                'data_item_id',
+                'data_format__file_format__file_format_id'
+            ).distinct())
 
-            paginated_ids = list(unique_ids)[start:start + length]
+            sorted_ids = sorted(
+                unique_ids,
+                key=lambda x: item_types_dict.get(x['data_item_id'], DataItemType()).index_value or 0
+            )
+
+            paginated_data = sorted_ids[start:start + length]
+            paginated_ids = [item['id'] for item in paginated_data]
+
             paginated_items = DataItem.objects.filter(id__in=paginated_ids).select_related('data_format__file_format')
 
             item_types = {
-                (item.data_item_id): item_type
+                item_type.data_item.id: item_type
                 for item_type in DataItemType.objects.filter(
                     data_item__in=paginated_items,
                     type_name=data_type_name
                 ).select_related('data_item')
-                for item in [item_type.data_item]
             }
 
+            id_dict = {item.id: item for item in paginated_items}
+            ordered_items = [id_dict[id] for id in paginated_ids if id in id_dict]
+            format_value_dict = dict(DataItemType.FormatValue.choices)
+
             data = []
-            for index, item in enumerate(paginated_items, start=start + 1):
-                item_type = item_types.get(item.data_item_id)
+            for index, item in enumerate(ordered_items, start=start + 1):
+                item_type = item_types.get(item.id)
                 display = item_type.display if item_type else False
                 edit_value = item_type.edit_value if item_type else False
                 index_value = item_type.index_value if item_type else 0
                 format_value = item_type.format_value if item_type else 'string'
 
-                file_format_name = item.data_format.file_format.file_format_name if item.data_format and item.data_format.file_format else 'N/A'
+                format_value_code = item_type.format_value if item_type else 'string'
+                format_value_label = format_value_dict.get(format_value_code, '文字列')
+
+                file_format_name = item.data_format.file_format.file_format_name
 
                 data.append({
                     'DT_RowId': f'row_{item.id}',
@@ -120,7 +133,8 @@ class DataItemListView(LoginRequiredMixin, View):
                     'display': display,
                     'edit_value': edit_value,
                     'index_value': index_value,
-                    'format_value': format_value
+                    'format_value': format_value_code,
+                    'format_value_label': format_value_label
                 })
 
             response = {
