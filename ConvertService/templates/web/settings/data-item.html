@@ -6,6 +6,7 @@
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/toggle.css' %}"/>
     <style>
         .filter-row {
             margin-bottom: 1.5rem;
@@ -21,7 +22,9 @@
         .filter-row .form-select {
             min-width: 150px;
             height: 40px;
+            color: #525f7f;
         }
+
         .card {
             margin-bottom: 20px;
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
@@ -34,12 +37,32 @@
             font-weight: bold;
             color: #5e72e4;
         }
+
+        .filter-row .form-select, .dataTables_filter input{
+            height: 40px;
+            border-radius: 0.375rem !important;
+            border: 1px solid #efefef !important;
+        }
+
+        .filter-row #fileFormatSelect{
+            min-width: 160px;
+        }
+
+        .filter-row #dataTypeSelect{
+            min-width: 248px;
+        }
+
         .format-badge {
             font-size: 85%;
             font-weight: normal;
             padding: 3px 6px;
             border-radius: 3px;
         }
+
+        .bg-light{
+            background: #efefef !important;
+        }
+
         .badge-excel {
             background-color: #1D6F42;
             color: white;
@@ -70,13 +93,22 @@
         .dataTables_wrapper .row label{
             margin-bottom: 0;
         }
-        .dataTables_filter input{
-            width: 390px !important;
-            height: 40px;
-            border-radius: 0.375rem !important;
-            border: 1px solid #e9ecef !important;
+
+        .dataTables_filter label {
+            width: 100%;
+            margin-bottom: 0;
         }
-        /* Ensure table actions column has enough width */
+
+        .dataTables_filter input{
+            margin: 0 !important;
+            padding: 5px;
+            width: 422px !important;
+        }
+
+        .dataTables_filter label:before {
+            content: '' !important;
+        }
+
         #dataItemTable th:last-child,
         #dataItemTable td:last-child {
             width: 100px;
@@ -88,7 +120,81 @@
         #dataItemTable td:last-child .btn:last-child {
             margin-right: 0;
         }
+        .dataTables_info{
+            display: none;
+        }
 
+        .setting-form select, .setting-form input{
+            min-width: 150px !important;
+        }
+
+        .custom-switch {
+            padding-left: 2.25rem;
+        }
+        .custom-control-input {
+            position: absolute;
+            left: 0;
+            z-index: -1;
+            width: 1rem;
+            height: 1.25rem;
+            opacity: 0;
+        }
+        .custom-control-label {
+            position: relative;
+            margin-bottom: 0;
+            vertical-align: top;
+        }
+        .custom-control-label::before {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1.75rem;
+            height: 1rem;
+            content: "";
+            background-color: #e9ecef;
+            border-radius: 0.5rem;
+        }
+        .custom-control-label::after {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1rem;
+            height: 1rem;
+            content: "";
+            background-color: #fff;
+            border-radius: 0.5rem;
+            transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            transform: translateX(0);
+        }
+        .custom-control-input:checked ~ .custom-control-label::before {
+            background-color: #5e72e4;
+        }
+        .custom-control-input:checked ~ .custom-control-label::after {
+            transform: translateX(0.75rem);
+        }
+
+        .hide-column {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
     </style>
 {% endblock stylesheets %}
 
@@ -103,7 +209,7 @@
                             {% include "web/settings/includes/tab.html" %}
                             <div class="col-3">
                                 <div class="d-flex justify-content-end">
-                                    <a href="{% url 'create_data_item' %}" class="nav-link add-btn px-5 border-0 rounded rounded-3 bg-primary"><span class="nav-link-text">追加</span></a>
+                                    <button id="addDataItemBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
                                 </div>
                             </div>
                         </div>
@@ -113,32 +219,37 @@
                     <div class="filter-row">
                         <div>
                             <select id="fileFormatSelect" class="form-select form-select-sm">
-                                {% for format in file_formats %}
-                                    <option value="{{ format.id }}">{{ format.file_format_name }}</option>
+                                {% for format_id, format_name in file_formats %}
+                                    <option value="{{ format_id }}">{{format_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div>
                             <select id="dataTypeSelect" class="form-select form-select-sm">
-                                {% for value, name in data_item_type_format_choices %}
-                                    <option value="{{ value }}" {% if value == 'format' %}selected{% endif %}>{{ name }}</option>
+                                {% for value, name in data_item_type_choices %}
+                                    <option value="{{ value }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                     </div>
 
-                    <!-- Single DataTable -->
-                    <div class="table-responsive mt-3">
+                    <!-- DataTable with loading overlay -->
+                    <div class="table-responsive mt-3 position-relative">
+                        <div id="tableLoadingOverlay" class="loading-overlay">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                        </div>
                         <table class="table table-bordered" id="dataItemTable" width="100%" cellspacing="0">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Field Name</th>
-                                    <th>File Format</th>
-                                    <th>Display</th>
-                                    <th>Editable</th>
-                                    <th>Index</th>
-                                    <th>Actions</th>
+                                    <th>項目名</th>
+                                    <th>インデックス値</th>
+                                    <th class="display-column">表示可能</th>
+                                    <th class="edit-column">手入力可能</th>
+                                    <th class="format-column">データ型</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -157,24 +268,23 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <h5 class="modal-title" id="deleteModalLabel">削除確認</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
-                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
+                <p>このアイテムを削除しますが、よろしいでしょうか？</p>
+                <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add/Edit Modal -->
 <div class="modal fade" id="dataItemModal" tabindex="-1" role="dialog" aria-labelledby="dataItemModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -182,120 +292,101 @@
                 {% csrf_token %}
                 <input type="hidden" id="editItemId" name="item_id">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="dataItemModalLabel">Data Item</h5>
+                    <h5 class="modal-title" id="dataItemModalLabel">データ項目</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                     <div class="form-group row">
-                        <label for="data_item_id" class="col-sm-3 col-form-label">Data Item ID</label>
+                    <div class="form-group row d-none">
+                        <label for="data_item_id" class="col-sm-3 col-form-label">データ項目ID</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="data_item_id" name="data_item_id" required>
                         </div>
                     </div>
                     <div class="form-group row mt-3">
-                        <label for="data_item_name" class="col-sm-3 col-form-label">Data Item Name</label>
+                        <label for="data_item_name" class="col-sm-3 col-form-label">データ項目名</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="data_item_name" name="data_item_name" required>
                         </div>
                     </div>
-                    <div class="form-group row mt-3">
-                        <label for="data_format_id" class="col-sm-3 col-form-label">Data Format</label>
-                        <div class="col-sm-9">
-                             <select class="form-control" id="data_format_id" name="data_format_id" required>
-                                 <option value="">---------</option>
-                                 {# Options will be populated dynamically if needed, or use existing list #}
-                                 {% for format in data_formats %}
-                                     <option value="{{ format.id }}">{{ format.data_format_name }} ({{ format.file_format.file_format_name }})</option>
+                    <div class="setting-form row mt-3">
+                        <div class="form-group col-6 row w-100">
+                            <label for="index-value" class="col-sm-5 col-form-label">表示順位</label>
+                             <input class="form-control col-sm-5" type="number" name="index_value" value="0" id="index-value">
+                        </div>
+                        <div class="form-group col-6 row w-100">
+                            <label class="col-sm-5 col-form-label">表示可能</label>
+                            <input type="checkbox" id="toggle-display" name="display" class="toggle-display-input">
+                            <label for="toggle-display" class="toggle-display-label">
+                                <span class="toggle-display-button"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-form row mt-3">
+                        <div class="form-group col-6 row w-100">
+                            <label for="format-value" class="col-sm-5 col-form-label">データ型</label>
+                             <select class="form-control col-sm-5" id="format-value" name="format_value" required>
+                                 <option value="">選択してください</option>
+                                 {% for data_type, data_val in data_type_choices %}
+                                     <option value="{{ data_type }}">{{ data_val }}</option>
                                  {% endfor %}
                              </select>
                         </div>
+                        <div class="form-group col-6 row w-100">
+                            <label class="col-sm-5 col-form-label">手入力可能</label>
+                            <input type="checkbox" id="toggle-edit" name="edit_value" class="toggle-edit-input">
+                            <label for="toggle-edit" class="toggle-edit-label">
+                                <span class="toggle-edit-button"></span>
+                            </label>
+                        </div>
                     </div>
 
-                    <!-- Placeholder for Edit-specific fields (DataItemType details) -->
-                    <div id="editSpecificFields" class="mt-4" style="display: none;">
-                        <h6>Type Specific Settings</h6>
-                        <hr>
-                        {% for type_val, type_name in data_type_choices %}
-                        <div class="type-settings-group mb-3 p-3 border rounded">
-                             <h7><strong>{{ type_name }}</strong></h7>
-                             <div class="form-group row mt-2">
-                                 <label class="col-sm-3 col-form-label">Display</label>
-                                 <div class="col-sm-9">
-                                     <input type="checkbox" class="form-check-input" id="display_{{ type_val }}" name="display_{{ type_val }}">
-                                 </div>
-                             </div>
-                             <div class="form-group row mt-2">
-                                 <label class="col-sm-3 col-form-label">Editable</label>
-                                 <div class="col-sm-9">
-                                     <input type="checkbox" class="form-check-input" id="edit_{{ type_val }}" name="edit_{{ type_val }}">
-                                 </div>
-                             </div>
-                             <div class="form-group row mt-2">
-                                 <label for="format_{{ type_val }}" class="col-sm-3 col-form-label">Format Value</label>
-                                 <div class="col-sm-9">
-                                     <select class="form-control" id="format_{{ type_val }}" name="format_{{ type_val }}">
-                                         {% for f_val, f_name in data_item_type_format_choices %}
-                                             <option value="{{ f_val }}">{{ f_name }}</option>
-                                         {% endfor %}
-                                     </select>
-                                 </div>
-                             </div>
-                             <div class="form-group row mt-2">
-                                 <label for="index_{{ type_val }}" class="col-sm-3 col-form-label">Index</label>
-                                 <div class="col-sm-9">
-                                     <input type="number" class="form-control" id="index_{{ type_val }}" name="index_{{ type_val }}" value="0" required>
-                                 </div>
-                             </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                     <div id="formErrors" class="text-danger mt-2"></div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary" id="saveDataItem">Save</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">閉じる</button>
+                    <button type="submit" class="btn btn-primary" id="saveDataItem">保存</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-
-<!-- Delete Confirmation Modal (existing) -->
-<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa trường dữ liệu "<span id="itemName"></span>"?</p>
-                <p class="text-danger font-weight-bold">Thao tác này không thể hoàn tác.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Xóa</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock content %}
 
 {% block javascripts %}
-<script src="{% static 'web/vendor/jquery/dist/jquery.min.js' %}"></script> {# Ensure jQuery is loaded first #}
-<script src="{% static 'web/vendor/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script> {# Ensure Bootstrap JS is loaded for modals #}
+<script src="{% static 'web/vendor/jquery/dist/jquery.min.js' %}"></script>
+<script src="{% static 'web/vendor/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'web/vendor/datatables.net/js/dataTables.bootstrap5.js' %}"></script>
-<script src="{% static 'web/js/toast.js' %}"></script> {# Assuming toast.js is available for notifications #}
+<script src="{% static 'web/js/toast.js' %}"></script>
 
 <script>
-    $(document).ready(function() {
-        const dataItemTable = $('#dataItemTable').DataTable({
+$(document).ready(function() {
+
+    if (typeof $.fn.scrollbar === 'function') {
+        $('.scrollbar-inner').scrollbar();
+    }
+
+    function updateColumnVisibility() {
+        const dataType = $('#dataTypeSelect').val();
+
+        if (dataType === 'input' || dataType === 'output' || dataType === 'agency') {
+            $('.display-column, .edit-column, .format-column').addClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').hide();
+        } else {
+            $('.display-column, .edit-column, .format-column').removeClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').show();
+        }
+
+        if (dataItemTable) {
+            dataItemTable.columns.adjust();
+        }
+    }
+
+    let dataItemTable;
+    try {
+        dataItemTable = $('#dataItemTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: {
@@ -304,28 +395,53 @@
                 data: function (d) {
                     d.file_format_id = $('#fileFormatSelect').val();
                     d.data_type_name = $('#dataTypeSelect').val();
+                },
+                beforeSend: function() {
+                    $('#tableLoadingOverlay').show();
+                },
+                complete: function() {
+                    $('#tableLoadingOverlay').hide();
+                },
+                error: function(xhr, error, thrown) {
+                    $('#tableLoadingOverlay').hide();
+                    console.error("DataTable AJAX error:", error, thrown);
+                    createToast('error', 'データの読み込み中にエラーが発生しました。');
                 }
             },
             columns: [
-                { data: "data_item_id", name: "data_item_id" },
+                {
+                    data: "no",
+                    name: "no",
+                    searchable: false
+                },
                 { data: "data_item_name", name: "data_item_name" },
-                { data: "file_format_name", name: "file_format_name", orderable: false },
+                {
+                    data: "index_value",
+                    orderable: true,
+                    name: "index_value"
+                },
                 {
                     data: "display",
-                    name: "target_type_display",
+                    name: "display",
+                    className: "display-column",
                     render: function (data, type, row) {
                         return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
                     }
                 },
                 {
                     data: "edit_value",
-                    name: "target_type_edit_value",
+                    name: "edit_value",
+                    className: "edit-column",
                     render: function (data, type, row) {
                         return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
                     }
                 },
-                { data: "index_value", name: "target_type_index_value" },
                 {
+                    data: "format_value_label",
+                    name: "format_value_label",
+                    className: "format-column",
+                },
+                 {
                     data: "id",
                     orderable: false,
                     searchable: false,
@@ -339,174 +455,242 @@
                             </button>
                         `;
                     }
-                }
+                },
             ],
             language: {
-                url: "{% static 'web/vendor/datatables.net/language/ja.json' %}"
+                url: "{% static 'web/vendor/datatables.net/language/ja.json' %}",
+                search: "_INPUT_",
+                searchPlaceholder: "検索..."
             },
             dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
-            lengthMenu: [[10, 25, 50, -1], [10, 25, 50]]
-        });
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 100]],
+            pageLength: false,
+            drawCallback: function() {
 
-        $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                updateColumnVisibility();
+            },
+            initComplete: function() {
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                $('.dataTables_filter label').html($('.dataTables_filter label input'));
+            }
+        });
+    } catch (e) {
+        console.error("Error initializing DataTable:", e);
+        createToast('error', 'テーブルの初期化中にエラーが発生しました。');
+    }
+
+    $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+        if (dataItemTable) {
             dataItemTable.ajax.reload();
-        });
-
-        // --- Modal Handling ---
-
-        const dataItemModal = $('#dataItemModal');
-        const dataItemForm = $('#dataItemForm');
-        const formErrors = $('#formErrors');
-        const editSpecificFields = $('#editSpecificFields');
-
-        function resetForm() {
-            dataItemForm[0].reset();
-            $('#editItemId').val('');
-            formErrors.text('');
-            editSpecificFields.hide();
-            $('#data_item_id').prop('readonly', false);
-            dataItemModal.find('.modal-title').text('Add New Data Item');
         }
+        updateColumnVisibility();
+    });
 
-        $('.add-btn').on('click', function(e) {
-            e.preventDefault();
-            resetForm();
-            dataItemModal.modal('show');
+    updateColumnVisibility();
+
+    const dataItemModal = $('#dataItemModal');
+    const dataItemForm = $('#dataItemForm');
+
+    function resetForm() {
+        dataItemForm[0].reset();
+        $('#editItemId').val('');
+        $('#data_item_id').prop('readonly', false);
+        dataItemModal.find('.modal-title').text('データ項目追加');
+
+        updateTypeSettingsVisibility();
+    }
+
+    function updateTypeSettingsVisibility() {
+
+        $('.type-settings-group').each(function() {
+            const groupType = $(this).data('type');
+
+            if (groupType === 'input' || groupType === 'output' || groupType === 'agency') {
+                $(this).find('.display-setting, .edit-setting, .format-setting').hide();
+                $(this).find('.index-setting').show();
+            } else {
+                $(this).find('.display-setting, .edit-setting, .format-setting, .index-setting').show();
+            }
         });
+    }
 
-        $('#dataItemTable tbody').on('click', '.edit-item', function() {
-            const itemId = $(this).data('id');
-            resetForm();
-            dataItemModal.find('.modal-title').text('Edit Data Item');
-            $('#editItemId').val(itemId);
-            $('#data_item_id').prop('readonly', true);
-            editSpecificFields.show();
+    $('#addDataItemBtn').on('click', function() {
+        resetForm();
+        dataItemModal.modal('show');
+    });
 
-            $.ajax({
-                url: `/settings/data-item-detail/${itemId}/`,
-                type: 'GET',
-                success: function(response) {
-                    if (response.status === 'success') {
-                        const item = response.data_item;
-                        const types = response.item_types;
+    $('#dataItemTable tbody').on('click', '.edit-item', function() {
+        const itemId = $(this).data('id');
+        resetForm();
+        dataItemModal.find('.modal-title').text('データ項目編集');
+        $('#editItemId').val(itemId);
+        $('#data_item_id').prop('readonly', true);
 
-                        $('#data_item_id').val(item.data_item_id);
-                        $('#data_item_name').val(item.data_item_name);
-                        $('#data_format_id').val(item.data_format_id);
+        $.ajax({
+            url: `/settings/data-item-detail/${itemId}/`,
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
 
-                        for (const type_val in types) {
-                            const typeData = types[type_val];
-                            $(`#display_${type_val}`).prop('checked', typeData.display);
-                            $(`#edit_${type_val}`).prop('checked', typeData.edit_value);
-                            $(`#format_${type_val}`).val(typeData.format_value);
-                            $(`#index_${type_val}`).val(typeData.index_value);
-                        }
-                        dataItemModal.modal('show');
-                    } else {
-                        createToast('error', response.message || 'Failed to load item details.');
+                if (response.status === 'success') {
+                    const item = response.data_item;
+                    const types = response.item_types;
+
+                    $('#data_item_id').val(item.data_item_id || '');
+                    $('#data_item_name').val(item.data_item_name || '');
+                    $('#data_format_id').val(item.data_format_id || '');
+
+                    for (const type_val in types) {
+                        const typeData = types[type_val] || {};
+
+                        $(`#display_${type_val}`).prop('checked', !!typeData.display);
+                        $(`#edit_${type_val}`).prop('checked', !!typeData.edit_value);
+                        $(`#format_${type_val}`).val(typeData.format_value || 'string');
+                        $(`#index_${type_val}`).val(typeData.index_value || 0);
                     }
-                },
-                error: function() {
-                    createToast('error', 'Error fetching item details.');
+
+                    updateTypeSettingsVisibility();
+                } else {
+                    createToast('error', `${response.message || '詳細を読み込めませんでした。'}</div>`);
                 }
-            });
+            },
+            error: function(xhr) {
+                let errorMsg = 'データ読み込み中にエラーが発生しました。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                 createToast('error', `${errorMsg}</div>`);
+            }
         });
 
-        dataItemForm.on('submit', function(e) {
-            e.preventDefault();
-            formErrors.text('');
-            const itemId = $('#editItemId').val();
-            const url = itemId ? `/settings/data-item-edit/${itemId}/` : "{% url 'create_data_item' %}";
-            const formData = $(this).serialize();
+        dataItemModal.modal('show');
+    });
+
+    dataItemForm.on('submit', function(e) {
+        e.preventDefault();
+
+        const itemId = $('#editItemId').val();
+        const url = itemId ? `/settings/data-item-edit/${itemId}/` : "{% url 'create_data_item' %}";
+
+        const saveBtn = $('#saveDataItem');
+        const saveBtnText = saveBtn.html();
+        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...');
+        saveBtn.prop('disabled', true);
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    dataItemModal.modal('hide');
+                    createToast('success', response.message || '操作が成功しました!');
+                    if (dataItemTable) {
+                        dataItemTable.ajax.reload();
+                    }
+                } else {
+                    if (response.errors) {
+                        let errorHtml = '<div class="alert alert-danger"><ul>';
+                        for (const field in response.errors) {
+                            createToast('error', `${response.errors[field].join(', ')}`);
+                        }
+                    } else {
+                        createToast('error', `${response.message || 'エラーが発生しました。'}`);
+                    }
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'リクエスト中にエラーが発生しました。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    let errorHtml = '<div class="alert alert-danger"><ul>';
+                    for (const field in xhr.responseJSON.errors) {
+                        errorHtml += `<li>${field}: ${xhr.responseJSON.errors[field].join(', ')}</li>`;
+                    }
+                    saveBtn.html(saveBtnText);
+                    saveBtn.prop('disabled', false);
+                    return;
+                }
+                createToast('error', `${errorMsg}`);
+            },
+            complete: function() {
+                saveBtn.html(saveBtnText);
+                saveBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    $('#dataItemTable tbody').on('click', '.delete-item', function() {
+        const itemId = $(this).data('id');
+        const itemName = $(this).data('name') || '選択した項目';
+
+        $('#itemName').text(itemName);
+        $('#deleteModal').modal('show');
+
+        $('#confirmDelete').off('click').on('click', function() {
+
+            const deleteBtn = $(this);
+            const deleteBtnText = deleteBtn.html();
+            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 削除中...');
+            deleteBtn.prop('disabled', true);
 
             $.ajax({
-                url: url,
+                url: `/settings/data-item-delete/${itemId}/`,
                 type: 'POST',
-                data: formData,
                 headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 success: function(response) {
+                    $('#deleteModal').modal('hide');
+
                     if (response.status === 'success') {
-                        dataItemModal.modal('hide');
-                        createToast('success', response.message || 'Operation successful!');
-                        dataItemTable.ajax.reload();
-                    } else {
-                        if (response.errors) {
-                            let errorHtml = '<ul>';
-                            for (const field in response.errors) {
-                                errorHtml += `<li>${field}: ${response.errors[field].join(', ')}</li>`;
-                            }
-                            errorHtml += '</ul>';
-                            formErrors.html(errorHtml);
-                        } else {
-                            formErrors.text(response.message || 'An error occurred.');
+                        createToast('success', '項目が削除されました');
+                        if (dataItemTable) {
+                            dataItemTable.ajax.reload();
                         }
+                    } else {
+                        createToast('error', response.message || '削除中にエラーが発生しました');
                     }
                 },
                 error: function(xhr) {
-                     let errorMsg = 'An error occurred during submission.';
-                     if (xhr.responseJSON && xhr.responseJSON.message) {
-                         errorMsg = xhr.responseJSON.message;
-                     } else if (xhr.responseJSON && xhr.responseJSON.errors) {
-                         let errorHtml = '<ul>';
-                         for (const field in xhr.responseJSON.errors) {
-                             errorHtml += `<li>${field}: ${xhr.responseJSON.errors[field].join(', ')}</li>`;
-                         }
-                         errorHtml += '</ul>';
-                         formErrors.html(errorHtml);
-                         return;
-                     }
-                     formErrors.text(errorMsg);
+                    $('#deleteModal').modal('hide');
+                    let errorMsg = 'エラーが発生しました。';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    createToast('error', errorMsg);
+                },
+                complete: function() {
+                    deleteBtn.html(deleteBtnText);
+                    deleteBtn.prop('disabled', false);
                 }
             });
         });
+    });
 
-
-        // --- Delete Handling (adapted for modal confirmation) ---
-        $('#dataItemTable tbody').on('click', '.delete-item', function() {
-            const itemId = $(this).data('id');
-            const itemName = $(this).data('name');
-
-            $('#itemName').text(itemName);
-            $('#deleteModal').modal('show');
-
-            $('#confirmDelete').one('click', function() {
-                $.ajax({
-                    url: `/settings/data-item-delete/${itemId}/`,
-                    type: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            $('#deleteModal').modal('hide');
-                            location.reload();
-                        } else {
-                            createToast('error', response.message || 'Đã xảy ra lỗi khi xóa');
-                        }
-                    },
-                    error: function() {
-                        createToast('error', 'Đã xảy ra lỗi kết nối');
-                    }
-                });
-            });
-        });
-
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
             }
-            return cookieValue;
         }
-    });
+        return cookieValue;
+    }
+});
 </script>
 {% endblock javascripts %}
