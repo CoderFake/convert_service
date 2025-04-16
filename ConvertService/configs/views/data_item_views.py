@@ -322,13 +322,16 @@ class DataItemEditView(LoginRequiredMixin, View):
                     data_item_name=data_item_name,
                     data_format__file_format__file_format_id__contains=file_format_id,
                 ).exclude(id=item_id).exists():
-                    errors['data_item_name'] = '列名は既に存在します'
+                    errors['data_item_name'] = '列名は既に存在します。'
 
-                if DataItemType.objects.filter(
+                duplicate_index = DataItemType.objects.filter(
                     type_name=data_type_name,
-                    index_value=index_value
-                ).exclude(data_item=data_item).exists():
-                    errors['index_value'] = '位置はすでに存在しています'
+                    index_value=index_value,
+                    data_item__data_format__file_format__id__contains=file_format_id,
+                ).exclude(data_item=data_item)
+
+                if duplicate_index.exists():
+                    errors['index_value'] = '位置はすでに存在しています。'
 
                 if errors != {}:
                     return JsonResponse({
