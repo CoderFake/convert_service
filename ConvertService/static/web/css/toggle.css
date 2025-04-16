@@ -7,7 +7,7 @@
 
   .toggle-display-label, .toggle-edit-label {
     width: 150px;
-    min-height: 40px;
+    height: 40px;
     display: block;
     background-color: #ccc;
     border-radius: 50px;
