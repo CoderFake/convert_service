@@ -7,7 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.views import View
 from django.db.models.functions import Cast
 
-from home.models import DataItem, FileFormat, DataFormat, DataItemType, DetailedInfo
+from home.models import DataItem, FileFormat, DataFormat, DataItemType, DetailedInfo, DataConversionInfo
 
 import logging
 
@@ -213,16 +213,18 @@ class DataItemCreateView(LoginRequiredMixin, View):
         data_item = DataItem.objects.filter(
             data_item_name=data_item_name,
             data_format__file_format__file_format_id__contains=file_format_id,
+            data_item_types__type_name=data_type_name
         ).first()
 
         if data_item:
-            errors['data_item_name'] = '列名は既に存在します'
+            errors['data_item_name'] = '列名は既に存在します。'
 
         if DataItemType.objects.filter(
             type_name=data_type_name,
-            index_value=index_value
+            index_value=index_value,
+            data_item__data_format__file_format__file_format_id__contains=file_format_id,
         ).first():
-            errors['index_value'] = '位置はすでに存在しています'
+            errors['index_value'] = '位置はすでに存在しています。'
 
         if errors != {}:
             return JsonResponse({
@@ -238,14 +240,14 @@ class DataItemCreateView(LoginRequiredMixin, View):
 
                 data_item_id = f"D000{int(last_data_item.data_item_id.split('D000')[1]) + 1}"
 
-                data_format = DataFormat.objects.filter(
-                    file_format__file_format_id__contains=file_format_id,
+                data_convert = DataConversionInfo.objects.filter(
+                    data_format_before__file_format__file_format_id__contains=file_format_id,
                     tenant=tenant,
                 ).first()
 
                 data_item = DataItem.objects.create(
                     tenant=tenant,
-                    data_format=data_format,
+                    data_format=data_convert.data_format_before,
                     data_item_id=data_item_id,
                     data_item_name=data_item_name
                 )
