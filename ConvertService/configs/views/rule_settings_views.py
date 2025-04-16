@@ -1,19 +1,12 @@
-from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
+from django.db.models import Q
 
-from configs.models import ConvertRule, ConvertDataValue
-from configs.utils import remove_bom
-from home.models import FileFormat, DataFormat, DataItem, DataConversionInfo, DetailedInfo, DataItemType
-
-
-class ConfigsView(LoginRequiredMixin, View):
-    def get(self, request):
-        format_list = list(FileFormat.objects.all())
-        return render(request, 'web/settings/index.html', {'format_list': format_list})
+from configs.models import ConvertRule, ConvertDataValue, ConvertRuleCategory
+from home.models import FileFormat, DataFormat, DetailedInfo, DataItemType, DataItem, DataConversionInfo
 
 
 class RuleSettingsView(LoginRequiredMixin, View):
@@ -30,264 +23,285 @@ class RuleSettingsView(LoginRequiredMixin, View):
         ]
 
         data_item_type_choices = [
-            ('input', '変換前のデータ'),
-            ('format', '画面のデータ'),
-            ('output', '健診システム取り込みデータ'),
-            ('input', '予約代行業者取り込みデータ'),
+            ('input-format', '変換前のデータ -> 画面のデータ'),
+            ('format-output', '画面のデータ -> 健診システム取り込みデータ'),
+            ('format-input', '画面のデータ -> 変換前のデータ'),
         ]
-        data_type_choices = DataItemType.FormatValue.choices
-        data_type_name_choices = DataItemType.TypeName.choices
+
+        rule_categories = ConvertRuleCategory.objects.all()
+        rules = ConvertRule.objects.all().select_related('convert_rule_category')
 
         context = {
             'file_formats': file_formats,
-            "data_type_choices": data_type_choices,
-            "data_type_names": data_type_name_choices,
-            'data_item_type_choices': data_item_type_choices
+            'data_item_type_choices': data_item_type_choices,
+            'rule_categories': rule_categories,
+            'rules': rules
         }
         return render(request, 'web/settings/rule_settings.html', context)
 
+    def get_datatable_data(self, request):
+        try:
+            tenant = request.user.tenant
+            draw = int(request.GET.get('draw', 1))
+            start = int(request.GET.get('start', 0))
+            length = int(request.GET.get('length', 10))
+            search_value = request.GET.get('search[value]', '')
+            file_format_id = request.GET.get('file_format_id', '')
+            from_to_type = request.GET.get('from_to_type', 'input-format')
+
+            data_convert = DataConversionInfo.objects.filter(
+                tenant=tenant,
+                data_format_before__file_format__file_format_id__contains=file_format_id,
+            ).first()
+
+            from_type = from_to_type.split('-')[0]
+            to_type = from_to_type.split('-')[1]
+
+            if not data_convert:
+                return JsonResponse({
+                    'draw': draw,
+                    'recordsTotal': 0,
+                    'recordsFiltered': 0,
+                    'data': [],
+                    'message': 'データ変換情報が見つかりません'
+                })
+
+            base_queryset = DetailedInfo.objects.filter(
+                tenant=tenant,
+                data_convert=data_convert,
+                data_item_type_before__type_name=from_type,
+                data_item_type_after__type_name=to_type
+            ).select_related(
+                'data_item_type_before__data_item',
+                'data_item_type_after__data_item',
+                'convert_rule',
+                'convert_rule__convert_rule_category'
+            )
+
+            if file_format_id:
+                base_queryset = base_queryset.filter(
+                    data_item_type_before__data_item__data_format__file_format__file_format_id__contains=file_format_id
+                )
+
+            if search_value:
+                base_queryset = base_queryset.filter(
+                    Q(data_item_type_before__data_item__data_item_name__icontains=search_value) |
+                    Q(data_item_type_after__data_item__data_item_name__icontains=search_value) |
+                    Q(convert_rule__convert_rule_name__icontains=search_value)
+                )
+
+            total_records = DetailedInfo.objects.filter(tenant=tenant).count()
+            records_filtered = base_queryset.count()
+
+            if int(length) == -1:
+                paginated_items = base_queryset.order_by('-updated_at')
+            else:
+                paginated_items = base_queryset.order_by('-updated_at')[start:start + length]
+
+            data = []
+            for index, item in enumerate(paginated_items, start=start + 1):
+                data.append({
+                    'DT_RowId': f'row_{item.id}',
+                    'no': index,
+                    'id': item.id,
+                    'from_item': item.data_item_type_before.data_item.data_item_name,
+                    'to_item': item.data_item_type_after.data_item.data_item_name,
+                    'rule_id': item.convert_rule.id,
+                    'rule_name': item.convert_rule.convert_rule_name,
+                    'rule_category': item.convert_rule.convert_rule_category.convert_rule_category_name
+                })
+
+            response = {
+                'draw': draw,
+                'recordsTotal': total_records,
+                'recordsFiltered': records_filtered,
+                'data': data,
+                'file_format_id': file_format_id,
+                'from_to_type': from_to_type
+            }
+            return JsonResponse(response)
+
+        except Exception as e:
+            return JsonResponse({
+                'draw': int(request.GET.get('draw', 1)),
+                'recordsTotal': 0,
+                'recordsFiltered': 0,
+                'data': [],
+                'error': str(e)
+            })
+
+
+class RuleDetailView(LoginRequiredMixin, View):
+    def get(self, request, rule_id, file_format_id, from_to_type):
+        if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
+
+        tenant = request.user.tenant
+        try:
+            from_type = from_to_type.split('-')[0]
+            to_type = from_to_type.split('-')[1]
+
+            rule = DetailedInfo.objects.filter(
+                id=rule_id,
+                tenant=tenant,
+                data_item_type_before__data_item__data_format__file_format__file_format_id__contains=file_format_id,
+                data_item_type_before__type_name=from_type,
+                data_item_type_after__type_name=to_type
+            ).select_related(
+                'data_item_type_before__data_item',
+                'data_item_type_after__data_item',
+                'convert_rule'
+            ).first()
+
+            if not rule:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'ルールが見つかりませんでした。'
+                }, status=404)
+
+            from_items = DataItem.objects.filter(
+                tenant=tenant,
+                data_format__file_format__file_format_id__contains=file_format_id,
+                data_item_types__type_name=from_type
+            ).values('id', 'data_item_name').order_by('data_item_types__index_value')
+
+            to_items = DataItem.objects.filter(
+                tenant=tenant,
+                data_format__file_format__file_format_id__contains=file_format_id,
+                data_item_types__type_name=to_type
+            ).values('id', 'data_item_name').order_by('data_item_types__index_value')
+
+            rule_data = {
+                'id': rule.id,
+                'from_item_id': rule.data_item_type_before.data_item.id,
+                'from_item_name': rule.data_item_type_before.data_item.data_item_name,
+                'to_item_id': rule.data_item_type_after.data_item.id,
+                'to_item_name': rule.data_item_type_after.data_item.data_item_name,
+                'rule_id': rule.convert_rule.id,
+                'rule_name': rule.convert_rule.convert_rule_name,
+                'from_items': list(from_items),
+                'to_items': list(to_items)
+            }
+
+            return JsonResponse({
+                'status': 'success',
+                'data': rule_data,
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'予期しないエラーが発生しました: {str(e)}'
+            }, status=500)
+
+
+class GetItemsView(LoginRequiredMixin, View):
     def get(self, request):
         try:
             tenant = request.user.tenant
-            format_id = request.GET.get('format_id')
+            file_format_id = request.GET.get('file_format_id', '')
+            type_name = request.GET.get('type_name', 'input')
 
-            all_data_formats = DataFormat.objects.filter(tenant=tenant).select_related('file_format')
-
-            if not format_id or not all_data_formats.filter(id=format_id).exists():
-                if all_data_formats.exists():
-                    current_data_format = all_data_formats.first()
-                else:
-                    file_format = FileFormat.objects.filter(file_format_id='CSV_C_SJIS').first()
-                    if not file_format:
-                        file_format = FileFormat.objects.create(
-                            file_format_id='CSV_C_SJIS',
-                            file_format_name='CSVファイル（カンマ区切り）SJIS'
-                        )
-                    current_data_format = DataFormat.objects.create(
-                        tenant=tenant,
-                        data_format_id='DF_003',
-                        data_format_name='予約代行業者Bの予約データ',
-                        file_format=file_format
-                    )
-            else:
-                current_data_format = all_data_formats.get(id=format_id)
-
-            data_inputs = DataItem.objects.filter(
+            items = DataItem.objects.filter(
                 tenant=tenant,
-                data_format=current_data_format,
-                data_item_types__type_name='input'
-            ).select_related(
-                'data_format'
-            ).prefetch_related(
-                'data_item_types'
-            ).order_by('data_item_types__index_value')
+                data_format__file_format__file_format_id__contains=file_format_id,
+                data_item_types__type_name=type_name
+            ).values('id', 'data_item_name').order_by('data_item_types__index_value')
 
-            data_formats = DataItem.objects.filter(
-                tenant=tenant,
-                data_format=current_data_format,
-                data_item_types__type_name='format'
-            ).select_related(
-                'data_format'
-            ).prefetch_related(
-                'data_item_types'
-            ).order_by('data_item_types__index_value')
+            return JsonResponse({
+                'status': 'success',
+                'items': list(items)
+            })
 
-            rules = ConvertRule.objects.all().select_related('convert_rule_category')
-
-            data_convert = DataConversionInfo.objects.filter(tenant=tenant).first()
-            existing_rules = []
-
-            if data_convert:
-                detailed_infos = DetailedInfo.objects.filter(
-                    tenant=tenant,
-                    data_convert=data_convert,
-                    data_item_type_before__data_item__data_format=current_data_format
-                ).select_related(
-                    'data_item_type_before__data_item',
-                    'data_item_type_after__data_item',
-                    'convert_rule',
-                    'convert_rule__convert_rule_category'
-                )
-
-                for info in detailed_infos:
-                    existing_rules.append({
-                        'id': info.id,
-                        'input_item': info.data_item_type_before.data_item.data_item_name,
-                        'output_item': info.data_item_type_after.data_item.data_item_name,
-                        'rule_name': info.convert_rule.convert_rule_name,
-                        'rule_category': info.convert_rule.convert_rule_category.convert_rule_category_name,
-                    })
-
-            fixed_data_values = ConvertDataValue.objects.filter(
-                tenant=tenant,
-                data_format=current_data_format
-            ).select_related('convert_rule')
-
-            headers = DataItemType.objects.filter(
-                data_item__tenant=tenant,
-                data_item__data_format=current_data_format
-            ).select_related('data_item')
-
-            context = {
-                'data_inputs': data_inputs,
-                'data_formats': data_formats,
-                'rules': rules,
-                'existing_rules': existing_rules,
-                'fixed_data_values': fixed_data_values,
-                'headers': headers,
-                'all_data_formats': all_data_formats,
-                'current_data_format_id': current_data_format.id,
-                'current_data_format_name': current_data_format.data_format_name
-            }
-
-            return render(request, 'web/settings/rule_settings.html', context)
         except Exception as e:
-            messages.error(request, f"エラーが発生しました: {str(e)}")
-            return redirect('home')
+            return JsonResponse({
+                'status': 'error',
+                'message': f'エラーが発生しました: {str(e)}'
+            })
 
+
+class RuleCreateView(LoginRequiredMixin, View):
     def post(self, request):
+        if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
+
+        tenant = request.user.tenant
+        from_item_id = request.POST.get('from_item_id')
+        to_item_id = request.POST.get('to_item_id')
+        rule_id = request.POST.get('rule_id')
+        file_format_id = request.POST.get('file_format_id')
+        from_to_type = request.POST.get('from_to_type')
+
+        from_type = from_to_type.split('-')[0]
+        to_type = from_to_type.split('-')[1]
+
+        errors = {}
+        if not from_item_id or not to_item_id or not rule_id:
+            if not from_item_id:
+                errors['from_item_id'] = '変換元項目は必須です。'
+            if not to_item_id:
+                errors['to_item_id'] = '変換先項目は必須です。'
+            if not rule_id:
+                errors['rule_id'] = '変換ルールは必須です。'
+
+            return JsonResponse({
+                'status': 'error',
+                'errors': errors,
+            }, status=200)
+
         try:
             with transaction.atomic():
-                tenant = request.user.tenant
-                rule_id = request.POST.get("rule_name")
-                data_item_input_id = request.POST.get("data_item_input")
-                data_item_format_id = request.POST.get("data_item_format")
-                data_format_id = request.POST.get("data_format_id")
+                from_item = get_object_or_404(DataItem, id=from_item_id, tenant=tenant)
+                to_item = get_object_or_404(DataItem, id=to_item_id, tenant=tenant)
+                rule = get_object_or_404(ConvertRule, id=rule_id)
 
-                rule = ConvertRule.objects.get(id=rule_id)
-                data_item_input = DataItem.objects.get(id=data_item_input_id, tenant=tenant)
-                data_item_format = DataItem.objects.get(id=data_item_format_id, tenant=tenant)
-                data_convert = DataConversionInfo.objects.filter(
-                    tenant=tenant,
-                    data_convert_id="C_001"
+                from_type_obj = DataItemType.objects.filter(
+                    data_item=from_item,
+                    type_name=from_type
                 ).first()
 
-                if not data_convert:
-                    messages.error(request, "Không tìm thấy thông tin chuyển đổi dữ liệu.")
-                    return redirect('rule_settings')
-                data_item_type_before = DataItemType.objects.get(
-                    data_item=data_item_input,
-                    type_name='input'
-                )
+                to_type_obj = DataItemType.objects.filter(
+                    data_item=to_item,
+                    type_name=to_type
+                ).first()
 
-                data_item_type_after = DataItemType.objects.get(
-                    data_item=data_item_format,
-                    type_name='format'
-                )
-
-                data_format = None
-                if data_format_id:
-                    try:
-                        data_format = DataFormat.objects.get(id=data_format_id, tenant=tenant)
-                    except DataFormat.DoesNotExist:
-                        messages.error(request, "Không tìm thấy data format.")
-                        return redirect('rule_settings')
-
-                filter_params = {
-                    'tenant': tenant,
-                    'data_convert': data_convert,
-                    'data_item_type_before': data_item_type_before,
-                    'data_item_type_after': data_item_type_after,
-                }
-
-                if data_format:
-                    filter_params['data_format'] = data_format
-
-                detail_info = DetailedInfo.objects.filter(**filter_params).first()
-
-                if detail_info:
-                    detail_info.convert_rule = rule
-                    detail_info.save()
-                    messages.success(request, "Update rule successfully!")
-                else:
-                    create_params = {
-                        'tenant': tenant,
-                        'data_convert': data_convert,
-                        'data_item_type_before': data_item_type_before,
-                        'data_item_type_after': data_item_type_after,
-                        'convert_rule': rule,
-                    }
-
-                    if data_format:
-                        create_params['data_format'] = data_format
-
-                    DetailedInfo.objects.create(**create_params)
-                    messages.success(request, "Add rule successfully!")
-
-                if data_format:
-                    return redirect(f'rule_settings?format_id={data_format.id}')
-                return redirect('rule_settings')
-
-        except Exception as e:
-            messages.error(request, f"エラーが発生しました: {str(e)}")
-            return redirect('rule_settings')
-
-
-class AddFixedDataView(LoginRequiredMixin, View):
-    def post(self, request):
-        try:
-            rule_id = request.POST.get('rule')
-            before_value = request.POST.get('before')
-            after_value = request.POST.get('after')
-            data_format_id = request.POST.get('data_format_id')
-
-            if not rule_id or not before_value or not after_value:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'データが不足しています'
-                })
-
-            convert_rule = ConvertRule.objects.filter(convert_rule_id=rule_id).first()
-            if not convert_rule:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'ルールが見つかりません'
-                })
-
-            data_format = None
-            if data_format_id:
-                try:
-                    data_format = DataFormat.objects.get(id=data_format_id, tenant=request.user.tenant)
-                except DataFormat.DoesNotExist:
+                if not from_type_obj or not to_type_obj:
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'データフォーマットが見つかりません'
+                        'message': 'データアイテムタイプが見つかりません。'
                     })
 
-            filter_params = {
-                'tenant': request.user.tenant,
-                'convert_rule': convert_rule,
-                'data_value_before': before_value
-            }
+                data_convert = DataConversionInfo.objects.filter(
+                    tenant=tenant,
+                    data_format_before__file_format__file_format_id__contains=file_format_id,
+                ).first()
 
-            if data_format:
-                filter_params['data_format'] = data_format
+                existing = DetailedInfo.objects.filter(
+                    tenant=tenant,
+                    data_convert=data_convert,
+                    data_item_type_before=from_type_obj,
+                    data_item_type_after=to_type_obj
+                ).first()
 
-            existing = ConvertDataValue.objects.filter(**filter_params).first()
-
-            if existing:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'この値は既に存在します'
-                })
-
-            create_params = {
-                'tenant': request.user.tenant,
-                'convert_rule': convert_rule,
-                'data_value_before': before_value,
-                'data_value_after': after_value
-            }
-
-            if data_format:
-                create_params['data_format'] = data_format
-
-            fixed_data = ConvertDataValue.objects.create(**create_params)
-
-            return JsonResponse({
-                'status': 'success',
-                'id': fixed_data.id,
-                'rule_name': convert_rule.convert_rule_name
-            })
+                if existing:
+                    errors['from_item_id'] = '既に変換ルールが存在します。'
+                    errors['to_item_id'] = '既に変換ルールが存在します。'
+                    return JsonResponse({
+                        'status': 'error',
+                        'errors': errors,
+                    })
+                else:
+                    DetailedInfo.objects.create(
+                        tenant=tenant,
+                        data_convert=data_convert,
+                        data_item_type_before=from_type_obj,
+                        data_item_type_after=to_type_obj,
+                        convert_rule=rule
+                    )
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'ルールが作成されました。'
+                    })
 
         except Exception as e:
             return JsonResponse({
@@ -296,44 +310,80 @@ class AddFixedDataView(LoginRequiredMixin, View):
             })
 
 
-class DeleteFixedDataView(LoginRequiredMixin, View):
-    def post(self, request):
-        try:
-            fixed_data_id = request.POST.get('id')
-            data_format_id = request.POST.get('data_format_id')
+class RuleEditView(LoginRequiredMixin, View):
+    def post(self, request, rule_id):
+        if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
 
-            if not fixed_data_id:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'IDが無効です'
-                })
+        tenant = request.user.tenant
+        from_item_id = request.POST.get('from_item_id')
+        to_item_id = request.POST.get('to_item_id')
+        rule_id_new = request.POST.get('rule_id')
+        from_to_type = request.POST.get('from_to_type')
 
-            filter_params = {
-                'id': fixed_data_id,
-                'tenant': request.user.tenant
-            }
+        from_type = from_to_type.split('-')[0]
+        to_type = from_to_type.split('-')[1]
 
-            if data_format_id:
-                try:
-                    data_format = DataFormat.objects.get(id=data_format_id)
-                    filter_params['data_format'] = data_format
-                except DataFormat.DoesNotExist:
-                    pass
-
-            fixed_data = ConvertDataValue.objects.filter(**filter_params).first()
-
-            if not fixed_data:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': '削除するデータが見つかりません'
-                })
-
-            fixed_data.delete()
+        errors = {}
+        if not from_item_id or not to_item_id or not rule_id_new:
+            if not from_item_id:
+                errors['from_item_id'] = '変換元項目は必須です。'
+            if not to_item_id:
+                errors['to_item_id'] = '変換先項目は必須です。'
+            if not rule_id_new:
+                errors['rule_id'] = '変換ルールは必須です。'
 
             return JsonResponse({
-                'status': 'success',
-                'message': '削除に成功しました'
-            })
+                'status': 'error',
+                'errors': errors,
+            }, status=200)
+
+        try:
+            with transaction.atomic():
+                detailed_info = get_object_or_404(DetailedInfo, id=rule_id, tenant=tenant)
+
+                from_item = get_object_or_404(DataItem, id=from_item_id, tenant=tenant)
+                to_item = get_object_or_404(DataItem, id=to_item_id, tenant=tenant)
+                rule = get_object_or_404(ConvertRule, id=rule_id_new)
+
+                from_type_obj = DataItemType.objects.filter(
+                    data_item=from_item,
+                    type_name=from_type
+                ).first()
+
+                to_type_obj = DataItemType.objects.filter(
+                    data_item=to_item,
+                    type_name=to_type
+                ).first()
+
+                if not from_type_obj or not to_type_obj:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'データアイテムタイプが見つかりません。'
+                    })
+
+                existing = DetailedInfo.objects.filter(
+                    tenant=tenant,
+                    data_convert=detailed_info.data_convert,
+                    data_item_type_before=from_type_obj,
+                    data_item_type_after=to_type_obj
+                ).exclude(id=rule_id).first()
+
+                if existing:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'この変換項目の組み合わせは既に存在します。'
+                    })
+
+                detailed_info.data_item_type_before = from_type_obj
+                detailed_info.data_item_type_after = to_type_obj
+                detailed_info.convert_rule = rule
+                detailed_info.save()
+
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'ルールが更新されました。'
+                })
 
         except Exception as e:
             return JsonResponse({
@@ -342,189 +392,20 @@ class DeleteFixedDataView(LoginRequiredMixin, View):
             })
 
 
-class DeleteRuleView(LoginRequiredMixin, View):
-    def post(self, request):
+class RuleDeleteView(LoginRequiredMixin, View):
+    def post(self, request, rule_id):
+        if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
+
+        tenant = request.user.tenant
         try:
-            rule_id = request.POST.get('rule_id')
-            data_format_id = request.POST.get('data_format_id')
-
-            if not rule_id:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'IDが無効です'
-                })
-
-            filter_params = {
-                'id': rule_id,
-                'tenant': request.user.tenant
-            }
-
-            if data_format_id:
-                try:
-                    data_format = DataFormat.objects.get(id=data_format_id)
-                    filter_params['data_format'] = data_format
-                except DataFormat.DoesNotExist:
-                    pass
-
-            detailed_info = DetailedInfo.objects.filter(**filter_params).first()
-
-            if not detailed_info:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': '削除するルールが見つかりません'
-                })
-
+            detailed_info = get_object_or_404(DetailedInfo, id=rule_id, tenant=tenant)
             detailed_info.delete()
 
             return JsonResponse({
                 'status': 'success',
-                'message': 'ルールの削除に成功しました'
+                'message': 'ルールが削除されました。'
             })
-
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'エラーが発生しました: {str(e)}'
-            })
-
-
-class SaveDataItemView(LoginRequiredMixin, View):
-    def post(self, request):
-        try:
-            data = request.POST
-
-            data_format = DataFormat.objects.filter(tenant=request.user.tenant, data_format_id="DF_003").first()
-            if not data_format:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Không tìm thấy data format'
-                })
-
-            data_list = {}
-            for key in data.keys():
-                try:
-                    if key.startswith('input') or key.startswith('format') or key.startswith('output'):
-                        header_name = remove_bom(key.split('[')[1].split(']')[0])
-                        field_type = key.split('[')[0]
-                        format_key = remove_bom(key)
-                        data_list[format_key] = data.get(key)
-
-                        data_item, created = DataItem.objects.get_or_create(
-                            data_format=data_format,
-                            tenant=request.user.tenant,
-                            data_item_name=header_name,
-                        )
-
-                        if created:
-                            data_item.data_item_id = f"D000{DataItem.objects.count() + 1}"
-                            data_item.save()
-
-                        data_item_type, _ = DataItemType.objects.update_or_create(
-                            data_item=data_item,
-                            type_name=field_type
-                        )
-                except Exception as e:
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': f'Lỗi xử lý khóa {key}: {str(e)}'
-                    })
-
-            data_item_types = DataItemType.objects.filter(
-                data_item__tenant=request.user.tenant,
-                data_item__data_format=data_format
-            )
-
-            for data_item_type in data_item_types:
-                header_name = data_item_type.data_item.data_item_name
-                if data_item_type.type_name == 'input':
-                    data_item_type.index_value = int(data_list.get(f"input[{header_name}][index]", "0"))
-                    data_item_type.display = bool(int(data_list.get(f"input[{header_name}][display]", "0")))
-                    data_item_type.edit_value = bool(int(data_list.get(f"input[{header_name}][edit]", "0")))
-                    data_item_type.format_value = data_list.get(f"input[{header_name}][type]", "string")
-                elif data_item_type.type_name == 'format':
-                    data_item_type.index_value = int(data_list.get(f"format[{header_name}][index]", "0"))
-                    data_item_type.display = bool(int(data_list.get(f"format[{header_name}][display]", "0")))
-                    data_item_type.edit_value = bool(int(data_list.get(f"format[{header_name}][edit]", "0")))
-                    data_item_type.format_value = data_list.get(f"format[{header_name}][type]", "string")
-                elif data_item_type.type_name == 'output':
-                    data_item_type.index_value = int(data_list.get(f"output[{header_name}][index]", "0"))
-                    data_item_type.display = bool(int(data_list.get(f"output[{header_name}][display]", "0")))
-                    data_item_type.edit_value = bool(int(data_list.get(f"output[{header_name}][edit]", "0")))
-                    data_item_type.format_value = data_list.get(f"output[{header_name}][type]", "string")
-
-                try:
-                    data_item_type.save()
-                except Exception as e:
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': f'Lỗi lưu data_item_type: {str(e)}'
-                    })
-
-            return JsonResponse({
-                "status": "success",
-                "message": "Dữ liệu đã được lưu thành công!"
-            })
-
-        except Exception as e:
-            return JsonResponse({
-                "status": "error",
-                "message": f"Đã xảy ra lỗi: {str(e)}"
-            })
-
-
-class SaveHeaderSettingsView(LoginRequiredMixin, View):
-    def post(self, request):
-        try:
-            with transaction.atomic():
-                data = request.POST
-                data_format_id = data.get('data_format_id')
-
-                data_format = None
-                if data_format_id:
-                    try:
-                        data_format = DataFormat.objects.get(id=data_format_id, tenant=request.user.tenant)
-                    except DataFormat.DoesNotExist:
-                        return JsonResponse({
-                            'status': 'error',
-                            'message': 'データフォーマットが見つかりません'
-                        })
-
-                filter_params = {
-                    'data_item__tenant': request.user.tenant
-                }
-
-                if data_format:
-                    filter_params['data_item__data_format'] = data_format
-
-                for key, value in data.items():
-                    if key.startswith('display_') or key.startswith('edit_') or key.startswith(
-                            'format_') or key.startswith('index_'):
-                        parts = key.split('_')
-                        prefix = parts[0]
-                        header_id = parts[1]
-
-                        header = DataItemType.objects.filter(
-                            id=header_id,
-                            **filter_params
-                        ).first()
-
-                        if header:
-                            if prefix == 'display':
-                                header.display = (value == 'on')
-                            elif prefix == 'edit':
-                                header.edit_value = (value == 'on')
-                            elif prefix == 'format':
-                                header.format_value = value
-                            elif prefix == 'index':
-                                if value.isdigit():
-                                    header.index_value = int(value)
-
-                            header.save()
-
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'ヘッダー設定が保存されました'
-                })
 
         except Exception as e:
             return JsonResponse({
