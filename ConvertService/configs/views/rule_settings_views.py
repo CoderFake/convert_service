@@ -18,6 +18,35 @@ class ConfigsView(LoginRequiredMixin, View):
 
 class RuleSettingsView(LoginRequiredMixin, View):
     def get(self, request):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return self.get_datatable_data(request)
+        else:
+            return self.render_page(request)
+
+    def render_page(self, request):
+        file_formats = [
+            ('CSV', 'CSV'),
+            ('EXCEL', 'EXCEL')
+        ]
+
+        data_item_type_choices = [
+            ('input', '変換前のデータ'),
+            ('format', '画面のデータ'),
+            ('output', '健診システム取り込みデータ'),
+            ('input', '予約代行業者取り込みデータ'),
+        ]
+        data_type_choices = DataItemType.FormatValue.choices
+        data_type_name_choices = DataItemType.TypeName.choices
+
+        context = {
+            'file_formats': file_formats,
+            "data_type_choices": data_type_choices,
+            "data_type_names": data_type_name_choices,
+            'data_item_type_choices': data_item_type_choices
+        }
+        return render(request, 'web/settings/rule_settings.html', context)
+
+    def get(self, request):
         try:
             tenant = request.user.tenant
             format_id = request.GET.get('format_id')

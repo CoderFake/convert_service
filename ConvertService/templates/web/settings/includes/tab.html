@@ -8,12 +8,12 @@
              </a>
          </div>
          <div class="nav-item pr-2">
-             <a class="nav-link rounded rounded-3{% if request.path == "/settings/rule-settings/" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'home' %}">
+             <a class="nav-link rounded rounded-3{% if request.path == "/settings/rule-settings/" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'rule_settings' %}">
                  <span class="nav-link-text">変換ルール設定</span>
              </a>
          </div>
          <div class="nav-item pr-2">
-             <a class="nav-link rounded rounded-3{% if request.path == "/settings/fixed-data" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'home' %}">
+             <a class="nav-link rounded rounded-3{% if request.path == "/settings/fixed-data/" %} bg-primary {% else %} bg-light {% endif %}" href="{% url 'home' %}">
                  <span class="nav-link-text">固定データ設定</span>
              </a>
          </div>

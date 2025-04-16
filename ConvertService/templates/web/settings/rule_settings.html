@@ -1,12 +1,31 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} Rule Settings {% endblock title %}
+{% block title %} Data Item Management {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
           href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/toggle.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/error-form.css' %}"/>
     <style>
+        .filter-row {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .filter-row label {
+            margin-bottom: 0;
+            margin-right: 0.5rem;
+            font-weight: 500;
+        }
+        .filter-row .form-select {
+            min-width: 150px;
+            height: 40px;
+            color: #525f7f;
+        }
+
         .card {
             margin-bottom: 20px;
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
@@ -15,47 +34,179 @@
             background-color: #f8f9fa;
             border-bottom: 1px solid #e3e6f0;
         }
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .select2-container {
-            width: 100% !important;
-        }
-        .tab-content {
-            padding: 20px 0;
-        }
         .nav-tabs .nav-link.active {
             font-weight: bold;
             color: #5e72e4;
         }
-        .fixed-data-table {
-            max-height: 400px;
-            overflow-y: auto;
+
+        .filter-row .form-select, .dataTables_filter input{
+            height: 40px;
+            border-radius: 0.375rem !important;
+            border: 1px solid #efefef !important;
         }
-        .fixed-data-row:hover {
-            background-color: #f1f1f1;
+
+        .filter-row #fileFormatSelect{
+            min-width: 160px;
         }
-        .badge-rule {
+
+        .filter-row #dataTypeSelect{
+            min-width: 248px;
+        }
+
+        .format-badge {
             font-size: 85%;
             font-weight: normal;
-            padding: 5px 8px;
+            padding: 3px 6px;
+            border-radius: 3px;
         }
-        .existing-rule {
-            background-color: rgba(94, 114, 228, 0.1);
-            border: 1px solid #5e72e4;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 10px;
+
+        .bg-light{
+            background: #efefef !important;
         }
-        .delete-btn {
-            color: #f5365c;
-            cursor: pointer;
+
+        .badge-excel {
+            background-color: #1D6F42;
+            color: white;
         }
-        .rule-header {
-            font-weight: bold;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+        .badge-csv {
+            background-color: #4F81BD;
+            color: white;
+        }
+        .dataTables_filter, .dataTables_length{
+            width: 100% !important;
+            display: flex;
+            justify-content: start;
+            align-content: center;
+        }
+
+        .dataTables_length{
+            justify-content: end;
+        }
+
+        .dataTables_length select{
+            height: 40px;
+            width: 60px !important;
+            background: none;
+            border-radius: 0.375rem !important;
+            border: 1px solid #e9ecef !important;
+        }
+
+        .dataTables_wrapper .row label{
+            margin-bottom: 0;
+        }
+
+        .dataTables_filter label {
+            width: 100%;
+            margin-bottom: 0;
+        }
+
+        .dataTables_filter input{
+            margin: 0 !important;
+            padding: 5px;
+            width: 422px !important;
+        }
+
+        .dataTables_filter label:before {
+            content: '' !important;
+        }
+
+        #dataItemTable th:last-child,
+        #dataItemTable td:last-child {
+            width: 100px;
+            text-align: center;
+        }
+        #dataItemTable td:last-child .btn {
+            margin-right: 5px;
+        }
+        #dataItemTable td:last-child .btn:last-child {
+            margin-right: 0;
+        }
+
+        #dataItemTable_filter label {
+            position: relative;
+            z-index: 1;
+        }
+
+        #dataItemTable_filter label input{
+            position: absolute;
+            z-index: 99;
+            left: 0;
+        }
+
+        .dataTables_info{
+            display: none;
+        }
+
+        .setting-form select, .setting-form input{
+            min-width: 150px !important;
+        }
+
+        .custom-switch {
+            padding-left: 2.25rem;
+        }
+        .custom-control-input {
+            position: absolute;
+            left: 0;
+            z-index: -1;
+            width: 1rem;
+            height: 1.25rem;
+            opacity: 0;
+        }
+        .custom-control-label {
+            position: relative;
+            margin-bottom: 0;
+            vertical-align: top;
+        }
+        .custom-control-label::before {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1.75rem;
+            height: 1rem;
+            content: "";
+            background-color: #e9ecef;
+            border-radius: 0.5rem;
+        }
+        .custom-control-label::after {
+            position: absolute;
+            top: 0.25rem;
+            left: -2.25rem;
+            display: block;
+            width: 1rem;
+            height: 1rem;
+            content: "";
+            background-color: #fff;
+            border-radius: 0.5rem;
+            transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            transform: translateX(0);
+        }
+        .custom-control-input:checked ~ .custom-control-label::before {
+            background-color: #5e72e4;
+        }
+        .custom-control-input:checked ~ .custom-control-label::after {
+            transform: translateX(0.75rem);
+        }
+
+        .hide-column {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
         }
     </style>
 {% endblock stylesheets %}
@@ -64,260 +215,60 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">設定ルール</h6>
-                </div>
-                <div class="card-body">
-                    <ul class="nav nav-tabs" id="myTab" role="tablist">
-                        <li class="nav-item">
-                            <a class="nav-link active" id="rule-settings-tab" data-toggle="tab" href="#rule-settings" role="tab"
-                               aria-controls="rule-settings" aria-selected="true">ルール設定</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="fixed-data-tab" data-toggle="tab" href="#fixed-data" role="tab"
-                               aria-controls="fixed-data" aria-selected="false">固定値データ</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="display-settings-tab" data-toggle="tab" href="#display-settings" role="tab"
-                               aria-controls="display-settings" aria-selected="false">表示設定</a>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="myTabContent">
-                        <div class="tab-pane fade show active" id="rule-settings" role="tabpanel" aria-labelledby="rule-settings-tab">
-                            <div class="row">
-                                <div class="col-12 col-lg-8">
-                                    <form id="rule-settings-form" method="post">
-                                        {% csrf_token %}
-                                        <div class="form-group">
-                                            <label for="data_item_input">入力データ項目</label>
-                                            <select class="form-select select2" id="data_item_input" name="data_item_input">
-                                                <option value="0">データ項目を選択</option>
-                                                {% for data_item in data_inputs %}
-                                                    <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="data_item_format">出力データ項目</label>
-                                            <select class="form-select select2" id="data_item_format" name="data_item_format">
-                                                <option value="0">データ項目を選択</option>
-                                                {% for data_item in data_formats %}
-                                                    <option value="{{ data_item.id }}">{{ data_item.index_value }} - {{ data_item.data_item_name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="rule_name">ルール名</label>
-                                            <select class="form-select select2" id="rule_name" name="rule_name">
-                                                <option value="0">ルールを選択</option>
-                                                {% for rule in rules %}
-                                                    <option value="{{ rule.id }}"
-                                                        data-rule-id="{{ rule.convert_rule_id }}"
-                                                        data-category="{{ rule.convert_rule_category.convert_rule_category_name }}">
-                                                        {{ rule.convert_rule_name }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                            <small class="form-text text-muted">
-                                                <span id="rule_category" class="badge badge-info"></span>
-                                                <span id="rule_id" class="badge badge-light"></span>
-                                            </small>
-                                        </div>
-
-                                        <button type="submit" class="btn btn-primary">登録</button>
-                                    </form>
-                                </div>
-
-                                <div class="col-12 col-lg-4">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="m-0 font-weight-bold">既存のルール</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="existing-rules-container">
-                                                <!-- 既存ルールがここに表示される -->
-                                                {% for rule in existing_rules %}
-                                                <div class="existing-rule">
-                                                    <div class="rule-header d-flex justify-content-between">
-                                                        <span>{{ rule.input_item }} → {{ rule.output_item }}</span>
-                                                        <i class="fas fa-trash delete-btn" data-rule-id="{{ rule.id }}"></i>
-                                                    </div>
-                                                    <div>
-                                                        <span class="badge badge-rule">{{ rule.rule_name }}</span>
-                                                        <small class="text-muted">{{ rule.rule_category }}</small>
-                                                    </div>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    </div>
+            <div class="card shadow mt-6">
+                <div class="card-body pt-3">
+                    <div class="container-fluid mb-3" style="padding: 0 !important;">
+                        <div class="row">
+                            {% include "web/settings/includes/tab.html" %}
+                            <div class="col-3">
+                                <div class="d-flex justify-content-end">
+                                    <button id="addDataItemBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="tab-pane fade" id="fixed-data" role="tabpanel" aria-labelledby="fixed-data-tab">
-                            <div class="row mb-4">
-                                <div class="col-12">
-                                    <form id="add-fixed-data-form" class="form-inline">
-                                        {% csrf_token %}
-                                        <div class="form-group mr-2">
-                                            <label for="fixed_rule" class="mr-2">ルール:</label>
-                                            <select class="form-select" id="fixed_rule" name="fixed_rule">
-                                                <option value="">ルールを選択</option>
-                                                <option value="CR_GROUP_NO">顧客名→団体番号１</option>
-                                                <option value="CR_TIME_CODE1">予約時間→（必須）時間帯コード</option>
-                                                <option value="CR_CAUSE_CODE1">顧客コース名→予約コース１</option>
-                                                <option value="CR_TIME_START">予約時間→受付時間開始</option>
-                                                <option value="CR_TIME_END">予約時間→受付時間終了</option>
-                                                <option value="CR_FIXED_VALUE">固定データ用の規則</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group mr-2">
-                                            <label for="fixed_before" class="mr-2">変換前:</label>
-                                            <input type="text" class="form-control" id="fixed_before" name="fixed_before">
-                                        </div>
-                                        <div class="form-group mr-2">
-                                            <label for="fixed_after" class="mr-2">変換後:</label>
-                                            <input type="text" class="form-control" id="fixed_after" name="fixed_after">
-                                        </div>
-                                        <button type="submit" class="btn btn-primary">追加</button>
-                                    </form>
-                                </div>
-                            </div>
+                    <!-- Filter Row -->
+                    <div class="filter-row">
+                        <div>
+                            <select id="fileFormatSelect" class="form-select form-select-sm">
+                                {% for format_id, format_name in file_formats %}
+                                    <option value="{{ format_id }}">{{format_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <select id="dataTypeSelect" class="form-select form-select-sm">
+                                {% for value, name in data_item_type_choices %}
+                                    <option value="{{ value }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
 
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                                            <h6 class="m-0 font-weight-bold text-primary">固定値データ一覧</h6>
-                                            <div class="form-inline">
-                                                <select id="filter-fixed-rule" class="form-select form-control-sm mr-2">
-                                                    <option value="">全てのルール</option>
-                                                    <option value="CR_GROUP_NO">顧客名→団体番号１</option>
-                                                    <option value="CR_TIME_CODE1">予約時間→（必須）時間帯コード</option>
-                                                    <option value="CR_CAUSE_CODE1">顧客コース名→予約コース１</option>
-                                                    <option value="CR_TIME_START">予約時間→受付時間開始</option>
-                                                    <option value="CR_TIME_END">予約時間→受付時間終了</option>
-                                                    <option value="CR_FIXED_VALUE">固定データ用の規則</option>
-                                                </select>
-                                                <input type="text" id="search-fixed-data" class="form-control form-control-sm" placeholder="検索...">
-                                            </div>
-                                        </div>
-                                        <div class="card-body fixed-data-table">
-                                            <table class="table table-bordered table-hover" id="fixed-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>ID</th>
-                                                        <th>ルール</th>
-                                                        <th>変換前の値</th>
-                                                        <th>変換後の値</th>
-                                                        <th>操作</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for item in fixed_data_values %}
-                                                    <tr class="fixed-data-row" data-rule="{{ item.convert_rule.convert_rule_id }}">
-                                                        <td>{{ item.id }}</td>
-                                                        <td>{{ item.convert_rule.convert_rule_name }}</td>
-                                                        <td>{{ item.data_value_before }}</td>
-                                                        <td>{{ item.data_value_after }}</td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-danger delete-fixed-data" data-id="{{ item.id }}">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
+                    <!-- DataTable with loading overlay -->
+                    <div class="table-responsive mt-3 position-relative">
+                        <div id="tableLoadingOverlay" class="loading-overlay">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Loading...</span>
                             </div>
                         </div>
-
-                        <div class="tab-pane fade" id="display-settings" role="tabpanel" aria-labelledby="display-settings-tab">
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> 各データ項目の表示設定や編集可能設定を管理します。
-                            </div>
-
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                                            <h6 class="m-0 font-weight-bold text-primary">ヘッダー設定</h6>
-                                            <div class="form-inline">
-                                                <select id="header-type-filter" class="form-select form-control-sm mr-2">
-                                                    <option value="input">入力データ</option>
-                                                    <option value="format">フォーマットデータ</option>
-                                                    <option value="output">出力データ</option>
-                                                </select>
-                                                <input type="text" id="search-headers" class="form-control form-control-sm" placeholder="検索...">
-                                            </div>
-                                        </div>
-                                        <div class="card-body">
-                                            <form id="header-settings-form">
-                                                {% csrf_token %}
-                                                <table class="table table-bordered table-hover" id="header-settings-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>項目名</th>
-                                                            <th>表示</th>
-                                                            <th>編集可能</th>
-                                                            <th>データ型</th>
-                                                            <th>インデックス</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for header in headers %}
-                                                        <tr class="header-row" data-type="{{ header.type_name }}">
-                                                            <td>{{ header.data_item.data_item_name }}</td>
-                                                            <td>
-                                                                <div class="custom-control custom-switch">
-                                                                    <input type="checkbox" class="custom-control-input"
-                                                                        id="display_{{ header.id }}" name="display_{{ header.id }}"
-                                                                        {% if header.display %}checked{% endif %}>
-                                                                    <label class="custom-control-label" for="display_{{ header.id }}"></label>
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <div class="custom-control custom-switch">
-                                                                    <input type="checkbox" class="custom-control-input"
-                                                                        id="edit_{{ header.id }}" name="edit_{{ header.id }}"
-                                                                        {% if header.edit_value %}checked{% endif %}>
-                                                                    <label class="custom-control-label" for="edit_{{ header.id }}"></label>
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <select class="form-select form-control-sm" name="format_{{ header.id }}">
-                                                                    <option value="string" {% if header.format_value == 'string' %}selected{% endif %}>文字列</option>
-                                                                    <option value="number" {% if header.format_value == 'number' %}selected{% endif %}>数値</option>
-                                                                    <option value="date" {% if header.format_value == 'date' %}selected{% endif %}>日付</option>
-                                                                    <option value="time" {% if header.format_value == 'time' %}selected{% endif %}>時間</option>
-                                                                    <option value="datetime" {% if header.format_value == 'datetime' %}selected{% endif %}>日時</option>
-                                                                    <option value="boolean" {% if header.format_value == 'boolean' %}selected{% endif %}>真偽値</option>
-                                                                    <option value="period" {% if header.format_value == 'period' %}selected{% endif %}>時間帯</option>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <input type="number" class="form-control form-control-sm"
-                                                                    name="index_{{ header.id }}" value="{{ header.index_value }}" min="0">
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                                <button type="submit" class="btn btn-primary mt-3">設定を保存</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <table class="table table-bordered" id="dataItemTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>項目名</th>
+                                    <th>インデックス値</th>
+                                    <th class="display-column">表示可能</th>
+                                    <th class="edit-column">手入力可能</th>
+                                    <th class="format-column">データ型</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded via AJAX -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -325,18 +276,19 @@
     </div>
 </div>
 
-<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteConfirmModalLabel">削除確認</h5>
+                <h5 class="modal-title" id="deleteModalLabel">削除確認</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>この項目を削除してもよろしいですか？</p>
-                <p class="text-danger">この操作は元に戻せません。</p>
+                <p>このアイテムを削除しますが、よろしいでしょうか？</p>
+                <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
@@ -345,203 +297,455 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="dataItemModal" tabindex="-1" role="dialog" aria-labelledby="dataItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form id="dataItemForm">
+                {% csrf_token %}
+                <input type="hidden" id="editItemId" name="item_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dataItemModalLabel">データ項目</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <input type="hidden" id="file-format-id" name="file_format_id" value="">
+                <input type="hidden" id="data-type-name" name="data_type_name" value="">
+
+                <div class="modal-body">
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">閉じる</button>
+                    <button type="submit" class="btn btn-primary" id="saveDataItem">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
 {% endblock content %}
 
 {% block javascripts %}
 <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    $(document).ready(function() {
-        $('.select2').select2({
-            placeholder: "選択してください",
-            allowClear: true
-        });
+$(document).ready(function() {
 
-        $('#fixed-data-table').DataTable({
-            "paging": true,
-            "ordering": true,
-            "info": true,
-            "searching": true,
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Japanese.json"
-            }
-        });
+    input_and_output_html =`
+         <div class="form-group row mt-3">
+            <label for="data_item_name" class="col-sm-3 col-form-label">データ項目名</label>
+            <div class="col-sm-9">
+                <input type="text" class="form-control" id="data_item_name" name="data_item_name">
+                <div class="invalid-feedback" id="data_item_name_error"></div>
+            </div>
+        </div>
 
-        $('#rule_name').on('change', function() {
-            const selectedOption = $(this).find('option:selected');
-            const ruleId = selectedOption.data('rule-id');
-            const category = selectedOption.data('category');
+        <div class="form-group row mt-3">
+            <label for="index-value" class="col-sm-3 col-form-label">表示順位</label>
+            <div class="col-sm-9">
+                <input class="form-control" type="number" name="index_value" id="index-value" value="0">
+                <div class="invalid-feedback" id="index_value_error"></div>
+            </div>
+        </div>
+        <input type="hidden" value="string" name="format_value">
+        <input type="hidden" name="edit_value" value="off">
+        <input type="hidden" name="display" value="off">
+    `
 
-            $('#rule_id').text(ruleId);
-            $('#rule_category').text(category);
-        });
+    format_html =`
+        <div class="form-group row mt-3 mb-5 px-5 d-flex flex-row justify-content-center">
+            <label for="data_item_name" class="col-form-label">データ項目名</label>
+            <div class="col-sm-9">
+                <input type="text" class="form-control" id="data_item_name" name="data_item_name">
+                <div class="invalid-feedback" id="data_item_name_error"></div>
+            </div>
+        </div>
+        <div class="container mt-4 d-flex flex-column">
+            <div class="row justify-content-center">
+                <div class="form-group col-6 row">
+                    <label for="index-value" class="col-sm-4 col-form-label">表示順位</label>
+                    <div class="col-sm-6">
+                        <input class="form-control" type="number" name="index_value" id="index-value" value="0">
+                        <div class="invalid-feedback" id="index_value_error"></div>
+                    </div>
+                </div>
+                <div class="form-group col-6 row">
+                    <label class="col-sm-5 col-form-label">表示可能</label>
+                    <input type="checkbox" id="toggle-display" name="display" class="toggle-display-input">
+                    <label for="toggle-display" class="toggle-display-label">
+                        <span class="toggle-display-button"></span>
+                    </label>
+                    <div class="invalid-feedback" id="display_error"></div>
+                </div>
+            </div>
+            <div class="row justify-content-center">
+                <div class="form-group col-6 row w-100">
+                    <label for="format-value" class="col-sm-4 col-form-label">データ型</label>
+                    <div class="col-sm-6" >
+                        <select class="form-control" id="format-value" name="format_value">
+                            {% for data_type, data_val in data_type_choices %}
+                                <option value="{{ data_type }}">{{ data_val }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback" id="format_value_error"></div>
+                    </div>
+                </div>
+                <div class="form-group col-6 row w-100">
+                    <label class="col-sm-5 col-form-label">手入力可能</label>
+                    <input type="checkbox" id="toggle-edit" name="edit_value" class="toggle-edit-input">
+                    <label for="toggle-edit" class="toggle-edit-label">
+                        <span class="toggle-edit-button"></span>
+                    </label>
+                    <div class="invalid-feedback" id="edit_value_error"></div>
+                </div>
+            </div>
+        </div>
+    `
 
-        $('#filter-fixed-rule').on('change', function() {
-            const value = $(this).val();
-            if (value === '') {
-                $('.fixed-data-row').show();
-            } else {
-                $('.fixed-data-row').hide();
-                $(`.fixed-data-row[data-rule="${value}"]`).show();
-            }
-        });
-
-        $('#search-fixed-data').on('keyup', function() {
-            const value = $(this).val().toLowerCase();
-            $('.fixed-data-row').filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-            });
-        });
-
-        $('#header-type-filter').on('change', function() {
-            const value = $(this).val();
-            $('.header-row').hide();
-            $(`.header-row[data-type="${value}"]`).show();
-        });
-
-        $('#search-headers').on('keyup', function() {
-            const value = $(this).val().toLowerCase();
-            $('.header-row:visible').filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-            });
-        });
-
-        $('#add-fixed-data-form').on('submit', function(e) {
-            e.preventDefault();
-
-            const rule = $('#fixed_rule').val();
-            const before = $('#fixed_before').val();
-            const after = $('#fixed_after').val();
-
-            if (!rule || !before || !after) {
-                alert('すべての項目を入力してください。');
-                return;
-            }
-
-            $.ajax({
-                url: '{% url "add_fixed_data" %}',
-                type: 'POST',
-                data: {
-                    'rule': rule,
-                    'before': before,
-                    'after': after,
-                    'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+    let dataItemTable;
+    try {
+        dataItemTable = $('#dataItemTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "/settings/data-items/",
+                type: "GET",
+                data: function (d) {
+                    d.file_format_id = $('#fileFormatSelect').val();
+                    d.data_type_name = $('#dataTypeSelect').val();
                 },
-                success: function(response) {
-                    if (response.status === 'success') {
-                        const newRow = `
-                            <tr class="fixed-data-row" data-rule="${rule}">
-                                <td>${response.id}</td>
-                                <td>${response.rule_name}</td>
-                                <td>${before}</td>
-                                <td>${after}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-danger delete-fixed-data" data-id="${response.id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
+                beforeSend: function() {
+                    $('#tableLoadingOverlay').show();
+                },
+                complete: function() {
+                    $('#tableLoadingOverlay').hide();
+                },
+                error: function(xhr, error, thrown) {
+                    $('#tableLoadingOverlay').hide();
+                    createToast('error', 'データの読み込み中にエラーが発生しました。');
+                }
+            },
+            columns: [
+                {
+                    data: "no",
+                    name: "no",
+                    searchable: false
+                },
+                { data: "data_item_name", name: "data_item_name" },
+                {
+                    data: "index_value",
+                    orderable: true,
+                    name: "index_value"
+                },
+                {
+                    data: "display",
+                    name: "display",
+                    className: "display-column",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                {
+                    data: "edit_value",
+                    name: "edit_value",
+                    className: "edit-column",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                {
+                    data: "format_value_label",
+                    name: "format_value_label",
+                    className: "format-column",
+                },
+                 {
+                    data: "id",
+                    orderable: false,
+                    searchable: false,
+                    render: function (data, type, row) {
+                        return `
+                            <button class="btn btn-info btn-sm edit-item" data-id="${data}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm delete-item" data-id="${data}" data-name="${row.data_item_name}">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         `;
-                        $('#fixed-data-table tbody').append(newRow);
-
-                        $('#add-fixed-data-form')[0].reset();
-
-                        createToast('success', '固定データが追加されました');
-                    } else {
-                        createToast('error', response.message);
                     }
                 },
-                error: function() {
-                    createToast('error', 'エラーが発生しました');
+            ],
+            language: {
+                url: "/static/web/vendor/datatables.net/language/ja.json",
+                search: "_INPUT_",
+                searchPlaceholder: "検索..."
+            },
+            dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, '全て']],
+            pageLength: false,
+            drawCallback: function() {
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                updateColumnVisibility();
+            },
+            initComplete: function() {
+                $('#dataItemTable thead tr').find('th').first().text('No');
+
+
+                updateModal();
+            }
+        });
+    } catch (e) {
+        createToast('error', 'テーブルの初期化中にエラーが発生しました。');
+    }
+
+    $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+        if (dataItemTable) {
+            dataItemTable.ajax.reload();
+        }
+        updateColumnVisibility();
+        updateModal();
+    });
+
+    function updateModal(){
+        const appendForm = $('#dataItemModal .modal-body');
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
+
+        appendForm.html('')
+        if(dataTypeValue === 'input' || dataTypeValue === 'output')
+            appendForm.append(input_and_output_html);
+        else {
+            appendForm.append(format_html);
+            if(!$('#toggle-display').val() || !$('#toggle-edit').val()){
+                $('#toggle-display').val('off');
+                $('#toggle-edit').val('off');
+            }
+        }
+
+        $('#dataItemModal #file-format-id').val(fileFormatValue);
+        $('#dataItemModal #data-type-name').val(dataTypeValue);
+    }
+
+    function updateColumnVisibility() {
+        const dataType = $('#dataTypeSelect').val();
+
+        $('#dataItemModal #file-format-id').val($('#fileFormatSelect').val());
+        $('#dataItemModal #data-type-name').val(dataType);
+
+        if (dataType === 'input' || dataType === 'output' || dataType === 'agency') {
+            $('.display-column, .edit-column, .format-column').addClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').hide();
+        } else {
+            $('.display-column, .edit-column, .format-column').removeClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').show();
+        }
+        if (dataItemTable) {
+            dataItemTable.columns.adjust();
+        }
+    }
+
+    updateColumnVisibility();
+
+    const dataItemModal = $('#dataItemModal');
+    const dataItemForm = $('#dataItemForm');
+
+    function resetForm() {
+        dataItemForm[0].reset();
+        $('#editItemId').val('');
+        dataItemModal.find('.modal-title').text('データ項目追加');
+        resetFormErrors();
+
+        updateTypeSettingsVisibility();
+    }
+
+    function resetFormErrors() {
+        $('.invalid-feedback').empty();
+        $('.is-invalid').removeClass('is-invalid');
+        dataItemForm.removeClass('was-validated');
+    }
+
+    function updateTypeSettingsVisibility() {
+        $('.type-settings-group').each(function() {
+            const groupType = $(this).data('type');
+
+            $(this).find('.index-setting').show();
+
+            if (groupType === 'input' || groupType === 'output' || groupType === 'agency') {
+                $(this).find('.display-setting, .edit-setting, .format-setting').hide();
+                $(this).find('input[id^="display_"]').prop('checked', false);
+                $(this).find('input[id^="edit_"]').prop('checked', false);
+                $(this).find('select[id^="format_"]').val('string');
+            } else {
+                $(this).find('.display-setting, .edit-setting, .format-setting').show();
+            }
+        });
+    }
+
+    function displayFormErrors(errors) {
+        resetFormErrors();
+
+        for (const field in errors) {
+            let errorMessages = errors[field];
+            const errorContainer = $(`#${field}_error`);
+            errorContainer.closest('.form-group').find('input').addClass('is-invalid');
+            errorContainer.html(errorMessages);
+        }
+    }
+
+    $('#addDataItemBtn').on('click', function() {
+        resetForm();
+        dataItemModal.modal('show');
+    });
+
+    $('#dataItemTable tbody').on('click', '.edit-item', function() {
+        const itemId = $(this).data('id');
+        resetForm();
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
+
+        dataItemModal.find('.modal-title').text('データ項目編集');
+        $('#editItemId').val(itemId);
+
+        $.ajax({
+            url: `/settings/data-item-detail/${itemId}/${fileFormatValue}/${dataTypeValue}/`,
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    const item = response.data_item;
+                    $('#data_item_id').val(item.data_item_id || '');
+                    $('#data_item_name').val(item.data_item_name || '');
+                    $('#data_format_id').val(item.data_format_id || '');
+                    $('#index-value').val(item.index_value || 0);
+                    $('#toggle-edit').prop('checked', !!item.edit_value);
+                    $('#toggle-display').prop('checked', !!item.display);
+                    $('#format-value').val(item.format_value || '文字列');
+               }
+            },
+            error: function(xhr) {
+                let errorMsg = 'データ読み込み中にエラーが発生しました。';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
                 }
-            });
+                createToast('error', errorMsg);
+            }
         });
 
-        $(document).on('click', '.delete-fixed-data', function() {
-            const id = $(this).data('id');
-            $('#deleteConfirmModal').modal('show');
+        dataItemModal.modal('show');
+    });
 
-            $('#confirmDelete').off('click').on('click', function() {
-                $.ajax({
-                    url: '{% url "delete_fixed_data" %}',
-                    type: 'POST',
-                    data: {
-                        'id': id,
-                        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
-                    },
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            // 行を削除
-                            $(`button.delete-fixed-data[data-id="${id}"]`).closest('tr').remove();
-                            createToast('success', '固定データが削除されました');
-                        } else {
-                            createToast('error', response.message);
-                        }
-                        $('#deleteConfirmModal').modal('hide');
-                    },
-                    error: function() {
-                        createToast('error', 'エラーが発生しました');
-                        $('#deleteConfirmModal').modal('hide');
+    dataItemForm.on('submit', function(e) {
+        e.preventDefault();
+        resetFormErrors();
+
+        const itemId = $('#editItemId').val();
+        const url = itemId ? `/settings/data-item-edit/${itemId}/` : '/settings/data-item-create/';
+
+        const saveBtn = $('#saveDataItem');
+        const saveBtnText = saveBtn.html();
+        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status" style="width:20px; height:20px;" aria-hidden="true"></span> 保存中...');
+        saveBtn.prop('disabled', true);
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    dataItemModal.modal('hide');
+                    createToast('success', response.message || '操作が成功しました!');
+                    if (dataItemTable) {
+                        dataItemTable.ajax.reload();
                     }
-                });
-            });
+                } else {
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                    }
+                }
+            },
+            error: function(xhr, status, response) {
+                createToast('error', response.message);
+            },
+            complete: function() {
+                saveBtn.html(saveBtnText);
+                saveBtn.prop('disabled', false);
+            }
         });
+    });
 
-        $('#header-settings-form').on('submit', function(e) {
-            e.preventDefault();
+    $('#dataItemTable tbody').on('click', '.delete-item', function() {
+        const itemId = $(this).data('id');
+        const itemName = $(this).data('name') || '選択した項目';
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
 
-            const formData = $(this).serialize();
+        $('#itemName').text(itemName);
+        $('#deleteModal').modal('show');
+
+        $('#confirmDelete').off('click').on('click', function() {
+            const deleteBtn = $(this);
+            const deleteBtnText = deleteBtn.html();
+            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 削除中...');
+            deleteBtn.prop('disabled', true);
 
             $.ajax({
-                url: '{% url "save_header_settings" %}',
+                url: `/settings/data-item-delete/${itemId}/${fileFormatValue}/${dataTypeValue}/`,
                 type: 'POST',
-                data: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 success: function(response) {
+                    $('#deleteModal').modal('hide');
+
                     if (response.status === 'success') {
-                        createToast('success', 'ヘッダー設定が保存されました');
+                        createToast('success', '項目が削除されました');
+                        if (dataItemTable) {
+                            dataItemTable.ajax.reload();
+                        }
                     } else {
-                        createToast('error', response.message);
+                        createToast('error', response.message || '削除中にエラーが発生しました');
                     }
                 },
-                error: function() {
-                    createToast('error', 'エラーが発生しました');
+                error: function(xhr) {
+                    $('#deleteModal').modal('hide');
+                    let errorMsg = 'エラーが発生しました。';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    createToast('error', errorMsg);
+                },
+                complete: function() {
+                    deleteBtn.html(deleteBtnText);
+                    deleteBtn.prop('disabled', false);
                 }
             });
         });
-
-        // 既存のルール削除
-        $(document).on('click', '.delete-btn', function() {
-            const ruleId = $(this).data('rule-id');
-            $('#deleteConfirmModal').modal('show');
-
-            $('#confirmDelete').off('click').on('click', function() {
-                $.ajax({
-                    url: '{% url "delete_rule" %}',
-                    type: 'POST',
-                    data: {
-                        'rule_id': ruleId,
-                        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
-                    },
-                    success: function(response) {
-                        if (response.status === 'success') {
-
-                            $(`.delete-btn[data-rule-id="${ruleId}"]`).closest('.existing-rule').remove();
-                            createToast('success', 'ルールが削除されました');
-                        } else {
-                            createToast('error', response.message);
-                        }
-                        $('#deleteConfirmModal').modal('hide');
-                    },
-                    error: function() {
-                        createToast('error', 'エラーが発生しました');
-                        $('#deleteConfirmModal').modal('hide');
-                    }
-                });
-            });
-        });
-
-        // 最初に表示するフィルター適用
-        $('#header-type-filter').trigger('change');
     });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
 </script>
 {% endblock javascripts %}
