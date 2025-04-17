@@ -88,7 +88,7 @@ class RuleSettingsView(LoginRequiredMixin, View):
                     Q(data_item_type_before__data_item__data_item_name__icontains=search_value) |
                     Q(data_item_type_after__data_item__data_item_name__icontains=search_value) |
                     Q(convert_rule__convert_rule_name__icontains=search_value)
-                )
+                ).distinct()
 
             total_records = DetailedInfo.objects.filter(tenant=tenant).count()
             records_filtered = base_queryset.count()

@@ -39,6 +39,12 @@
             color: #5e72e4;
         }
 
+        .filter-row .form-select, .dataTables_wrapper .row:first-child input{
+            height: 40px;
+            border-radius: 0.375rem !important;
+            border: 1px solid #efefef !important;
+        }
+
         .filter-row .form-select, .dataTables_filter input{
             height: 40px;
             border-radius: 0.375rem !important;
@@ -95,15 +101,15 @@
             margin-bottom: 0;
         }
 
-        .dataTables_filter label {
-            width: 100%;
-            margin-bottom: 0;
-        }
-
-        .dataTables_filter input{
+        .dataTables_wrapper .row:first-child input{
             margin: 0 !important;
             padding: 5px;
-            width: 422px !important;
+            width: 525px !important;
+        }
+
+        .dataTables_wrapper input:focus,
+        .dataTables_wrapper select:focus{
+            outline: none;
         }
 
         .dataTables_filter label:before {
@@ -372,6 +378,7 @@ $(document).ready(function() {
         ruleTable = $('#ruleTable').DataTable({
             processing: true,
             serverSide: true,
+            ordering: false,
             ajax: {
                 url: "/settings/rule-settings/",
                 type: "GET",
@@ -425,7 +432,18 @@ $(document).ready(function() {
             pageLength: false,
             drawCallback: function() {
                 $('#ruleTable thead tr').find('th').first().text('No');
+            },
+            initComplete: function() {
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                $('#ruleTable_filter').hide();
+                $('#ruleTable_wrapper .row').addClass('mb-4');
+                $('#ruleTable_wrapper .row:first-child .col-md-6:first-child').html('')
+                .append(`
+                    <input class="search-input" type="search" name="search_input" placeholder="検索..." aria-controls="dataItemTable">
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換元項目・変換先項目・変換ルール</span>
+                `);
             }
+
         });
     } catch (e) {
         createToast('error', 'テーブルの初期化中にエラーが発生しました。');
@@ -443,6 +461,14 @@ $(document).ready(function() {
         $('#file-format-id').val($('#fileFormatSelect').val());
         $('#from-to-type').val($('#fromToTypeSelect').val());
     }
+
+    $(document).on('keypress', '.search-input', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const searchValue = $(this).val();
+            ruleTable.search(searchValue).draw();
+        }
+    });
 
     function loadItemOptions() {
         const fileFormatId = $('#fileFormatSelect').val();
