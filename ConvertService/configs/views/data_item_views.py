@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.views import View
 from django.db.models.functions import Cast
 
+from configs.data_type import Mess
 from home.models import DataItem, FileFormat, DataFormat, DataItemType, DetailedInfo, DataConversionInfo
 
 import logging
@@ -266,12 +267,15 @@ class DataItemCreateView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': f'データ項目「{data_item_name}」が正常に作成されました。'
+                    'message': Mess.CREATE.value
                 })
 
         except Exception as e:
             logger.error(f"Error in create_datatable_data: {str(e)}", exc_info=True)
-            return JsonResponse({}, status=200)
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemEditView(LoginRequiredMixin, View):
@@ -372,12 +376,15 @@ class DataItemEditView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': f'データ項目「{data_item_name}」が正常に更新されました。'
+                    'message': Mess.UPDATE.value
                 })
 
         except Exception as e:
             logger.error(f"Error in update_datatable_data: {str(e)}", exc_info=True)
-            return JsonResponse({}, status=200)
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemDetailView(LoginRequiredMixin, View):
@@ -434,7 +441,7 @@ class DataItemDetailView(LoginRequiredMixin, View):
             logger.error(f"Error fetching DataItem: {e}")
             return JsonResponse({
                 'status': 'error',
-                'message': f'予期しないエラーが発生しました: {str(e)}'
+                'message': Mess.ERROR.value
             }, status=500)
 
 
@@ -462,10 +469,16 @@ class DataItemDeleteView(LoginRequiredMixin, View):
                 if not DataItemType.objects.filter(data_item=data_item).exists():
                     data_item.delete()
 
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({
+                'status': 'success',
+                'messages': Mess.DELETE.value
+            })
         except Exception as e:
             logger.error(f"Delete error: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)})
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemTypeUpdateView(LoginRequiredMixin, View):
@@ -493,5 +506,5 @@ class DataItemTypeUpdateView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'success'})
 
         except Exception as e:
-            logger.error(f"Lỗi khi cập nhật DataItemType: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)})
+            logger.error(f"Error while updating DataItemType: {e}")
+            return JsonResponse({'status': 'error', 'message': Mess.ERROR.value}, status=500)

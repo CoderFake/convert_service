@@ -5,6 +5,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.db.models import Q
 
+from configs.data_type import Mess
 from configs.models import ConvertRule, ConvertDataValue, ConvertRuleCategory
 from home.models import FileFormat, DataFormat, DetailedInfo, DataItemType, DataItem, DataConversionInfo
 
@@ -23,9 +24,9 @@ class RuleSettingsView(LoginRequiredMixin, View):
         ]
 
         data_item_type_choices = [
-            ('input-format', '変換前のデータ -> 画面のデータ'),
-            ('format-output', '画面のデータ -> 健診システム取り込みデータ'),
-            ('format-input', '画面のデータ -> 変換前のデータ'),
+            ('input-format', '変換前のデータ ⇒ 画面のデータ'),
+            ('format-output', '画面のデータ ⇒ 健診システム取り込みデータ'),
+            ('format-input', '画面のデータ ⇒ 予約代行業者取り込みデータ'),
         ]
 
         rule_categories = ConvertRuleCategory.objects.all()
@@ -191,7 +192,7 @@ class RuleDetailView(LoginRequiredMixin, View):
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'予期しないエラーが発生しました: {str(e)}'
+                'message': Mess.ERROR.value
             }, status=500)
 
 
@@ -216,8 +217,8 @@ class GetItemsView(LoginRequiredMixin, View):
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'エラーが発生しました: {str(e)}'
-            })
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class RuleCreateView(LoginRequiredMixin, View):
@@ -268,8 +269,8 @@ class RuleCreateView(LoginRequiredMixin, View):
                 if not from_type_obj or not to_type_obj:
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'データアイテムタイプが見つかりません。'
-                    })
+                        'message': Mess.ERROR.value
+                    }, status=500)
 
                 data_convert = DataConversionInfo.objects.filter(
                     tenant=tenant,
@@ -300,14 +301,14 @@ class RuleCreateView(LoginRequiredMixin, View):
                     )
                     return JsonResponse({
                         'status': 'success',
-                        'message': 'ルールが作成されました。'
+                        'message': Mess.CREATE.value
                     })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'エラーが発生しました: {str(e)}'
-            })
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class RuleEditView(LoginRequiredMixin, View):
@@ -370,9 +371,11 @@ class RuleEditView(LoginRequiredMixin, View):
                 ).exclude(id=rule_id).first()
 
                 if existing:
+                    errors['from_item_id'] = '変換元項目は必須です。'
+                    errors['to_item_id'] = '変換先項目は必須です。'
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'この変換項目の組み合わせは既に存在します。'
+                        'message': errors,
                     })
 
                 detailed_info.data_item_type_before = from_type_obj
@@ -382,14 +385,14 @@ class RuleEditView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': 'ルールが更新されました。'
+                    'message': Mess.UPDATE.value
                 })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'エラーが発生しました: {str(e)}'
-            })
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class RuleDeleteView(LoginRequiredMixin, View):
@@ -404,11 +407,11 @@ class RuleDeleteView(LoginRequiredMixin, View):
 
             return JsonResponse({
                 'status': 'success',
-                'message': 'ルールが削除されました。'
+                'message': Mess.DELETE.value
             })
 
         except Exception as e:
             return JsonResponse({
                 'status': 'error',
-                'message': f'エラーが発生しました: {str(e)}'
-            })
+                'message': Mess.ERROR.value
+            }, status=500)
