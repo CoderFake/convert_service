@@ -39,7 +39,7 @@
             color: #5e72e4;
         }
 
-        .filter-row .form-select, .dataTables_filter input{
+        .filter-row .form-select, .dataTables_wrapper .row:first-child input{
             height: 40px;
             border-radius: 0.375rem !important;
             border: 1px solid #efefef !important;
@@ -95,15 +95,15 @@
             margin-bottom: 0;
         }
 
-        .dataTables_filter label {
-            width: 100%;
-            margin-bottom: 0;
-        }
-
-        .dataTables_filter input{
+        .dataTables_wrapper .row:first-child input{
             margin: 0 !important;
             padding: 5px;
             width: 422px !important;
+        }
+
+        .dataTables_wrapper input:focus,
+        .dataTables_wrapper select:focus{
+            outline: none;
         }
 
         .dataTables_filter label:before {
@@ -125,12 +125,6 @@
         #dataItemTable_filter label {
             position: relative;
             z-index: 1;
-        }
-
-        #dataItemTable_filter label input{
-            position: absolute;
-            z-index: 99;
-            left: 0;
         }
 
         .dataTables_info{
@@ -411,6 +405,7 @@ $(document).ready(function() {
         dataItemTable = $('#dataItemTable').DataTable({
             processing: true,
             serverSide: true,
+            ordering: false,
             ajax: {
                 url: "/settings/data-items/",
                 type: "GET",
@@ -433,13 +428,14 @@ $(document).ready(function() {
                 {
                     data: "no",
                     name: "no",
-                    searchable: false
+                    searchable: false,
+
                 },
                 { data: "data_item_name", name: "data_item_name" },
                 {
                     data: "index_value",
-                    orderable: true,
-                    name: "index_value"
+                    name: "index_value",
+                    orderable: false,
                 },
                 {
                     data: "display",
@@ -492,13 +488,18 @@ $(document).ready(function() {
             },
             initComplete: function() {
                 $('#dataItemTable thead tr').find('th').first().text('No');
-
+                $('#dataItemTable_filter').hide();
+                $('#dataItemTable_wrapper .row').addClass('mb-4');
+                $('#dataItemTable_wrapper .row:first-child .col-md-6:first-child').html('')
+                .append(`
+                    <input class="search-input" type="search" name="search_input" placeholder="検索..." aria-controls="dataItemTable">
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 項目名・インデックス値</span>
+                `);
 
                 updateModal();
             }
         });
     } catch (e) {
-        console.error("Error initializing DataTable:", e);
         createToast('error', 'テーブルの初期化中にエラーが発生しました。');
     }
 
@@ -508,6 +509,14 @@ $(document).ready(function() {
         }
         updateColumnVisibility();
         updateModal();
+    });
+
+    $(document).on('keypress', '.search-input', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const searchValue = $(this).val();
+            dataItemTable.search(searchValue).draw();
+        }
     });
 
     function updateModal(){
