@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.views import View
 from django.db.models.functions import Cast
 
+from configs.data_type import Mess
 from home.models import DataItem, FileFormat, DataFormat, DataItemType, DetailedInfo, DataConversionInfo
 
 import logging
@@ -69,79 +70,79 @@ class DataItemListView(LoginRequiredMixin, View):
 
             if search_value:
                 base_queryset = base_queryset.filter(
-                    Q(data_item_id__icontains=search_value) |
-                    Q(data_item_name__icontains=search_value)
-                )
+                    Q(
+                        data_item_types__index_value__icontains=search_value,
+                        data_item_types__type_name=data_type_name
+                    ) | Q(data_item_name__icontains=search_value)
+                ).distinct()
 
             total_records = DataItem.objects.filter(tenant=tenant).count()
             records_filtered = base_queryset.distinct().count()
 
-            item_types_dict = {}
-            for item_type in DataItemType.objects.filter(
-                    data_item__in=base_queryset,
-                    type_name=data_type_name
-            ).select_related('data_item'):
-                item_types_dict[item_type.data_item_id] = item_type
+            item_types = DataItemType.objects.filter(
+                data_item__tenant=tenant,
+                type_name=data_type_name
+            ).select_related('data_item')
 
-            unique_ids = list(base_queryset.values(
+            item_types_dict = {}
+            for item_type in item_types:
+                item_types_dict[item_type.data_item.data_item_id] = item_type.index_value
+
+            items = list(base_queryset.values(
                 'id',
                 'data_item_id',
-                'data_format__file_format__file_format_id'
+                'data_item_name',
+                'data_format__file_format__file_format_id',
+                'data_format__file_format__file_format_name'
             ).distinct())
 
-            sorted_ids = sorted(
-                unique_ids,
+            sorted_items = sorted(
+                items,
                 key=lambda x: (
-                    item_types_dict.get(x['data_item_id'], DataItemType()).index_value or 0,
-                    x['id']
+                    item_types_dict.get(x['data_item_id'], float('inf'))
                 )
             )
 
             if int(length) == -1:
-                paginated_data = sorted_ids
+                paginated_items = sorted_items
             else:
-                paginated_data = sorted_ids[start:start + length]
+                paginated_items = sorted_items[start:start + length]
 
-            paginated_ids = [item['id'] for item in paginated_data]
+            paginated_item_ids = [item['data_item_id'] for item in paginated_items]
+            item_types_for_paginated = DataItemType.objects.filter(
+                data_item__data_item_id__in=paginated_item_ids,
+                type_name=data_type_name
+            ).select_related('data_item')
 
-            paginated_items = list(
-                DataItem.objects.filter(id__in=paginated_ids).select_related('data_format__file_format'))
-
-            item_types = {}
-            for item_type in DataItemType.objects.filter(
-                    data_item__in=paginated_items,
-                    type_name=data_type_name
-            ).select_related('data_item'):
-                item_types[item_type.data_item.id] = item_type
-
-            id_dict = {item.id: item for item in paginated_items}
-
-            ordered_items = [id_dict[id] for id in paginated_ids if id in id_dict]
+            item_type_info = {}
+            for item_type in item_types_for_paginated:
+                item_type_info[item_type.data_item.data_item_id] = {
+                    'display': item_type.display,
+                    'edit_value': item_type.edit_value,
+                    'index_value': item_type.index_value,
+                    'format_value': item_type.format_value
+                }
 
             format_value_dict = dict(DataItemType.FormatValue.choices)
 
             data = []
-            for index, item in enumerate(ordered_items, start=start + 1):
-                item_type = item_types.get(item.id)
-                display = item_type.display if item_type else False
-                edit_value = item_type.edit_value if item_type else False
-                index_value = item_type.index_value if item_type else 0
+            for index, item in enumerate(paginated_items, start=start + 1):
+                item_id = item['data_item_id']
+                info = item_type_info.get(item_id, {})
 
-                format_value_code = item_type.format_value if item_type else 'string'
+                format_value_code = info.get('format_value', 'string')
                 format_value_label = format_value_dict.get(format_value_code, '文字列')
 
-                file_format_name = item.data_format.file_format.file_format_name
-
                 data.append({
-                    'DT_RowId': f'row_{item.id}',
+                    'DT_RowId': f'row_{item["id"]}',
                     'no': index,
-                    'id': item.id,
-                    'data_item_id': item.data_item_id,
-                    'data_item_name': item.data_item_name,
-                    'file_format_name': file_format_name,
-                    'display': display,
-                    'edit_value': edit_value,
-                    'index_value': index_value,
+                    'id': item['id'],
+                    'data_item_id': item_id,
+                    'data_item_name': item['data_item_name'],
+                    'file_format_name': item['data_format__file_format__file_format_name'],
+                    'display': info.get('display', False),
+                    'edit_value': info.get('edit_value', False),
+                    'index_value': info.get('index_value', 0),
                     'format_value': format_value_code,
                     'format_value_label': format_value_label
                 })
@@ -266,12 +267,15 @@ class DataItemCreateView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': f'データ項目「{data_item_name}」が正常に作成されました。'
+                    'message': Mess.CREATE.value
                 })
 
         except Exception as e:
             logger.error(f"Error in create_datatable_data: {str(e)}", exc_info=True)
-            return JsonResponse({}, status=200)
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemEditView(LoginRequiredMixin, View):
@@ -372,12 +376,15 @@ class DataItemEditView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': f'データ項目「{data_item_name}」が正常に更新されました。'
+                    'message': Mess.UPDATE.value
                 })
 
         except Exception as e:
             logger.error(f"Error in update_datatable_data: {str(e)}", exc_info=True)
-            return JsonResponse({}, status=200)
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemDetailView(LoginRequiredMixin, View):
@@ -434,7 +441,7 @@ class DataItemDetailView(LoginRequiredMixin, View):
             logger.error(f"Error fetching DataItem: {e}")
             return JsonResponse({
                 'status': 'error',
-                'message': f'予期しないエラーが発生しました: {str(e)}'
+                'message': Mess.ERROR.value
             }, status=500)
 
 
@@ -462,10 +469,16 @@ class DataItemDeleteView(LoginRequiredMixin, View):
                 if not DataItemType.objects.filter(data_item=data_item).exists():
                     data_item.delete()
 
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({
+                'status': 'success',
+                'messages': Mess.DELETE.value
+            })
         except Exception as e:
             logger.error(f"Delete error: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)})
+            return JsonResponse({
+                'status': 'error',
+                'message': Mess.ERROR.value
+            }, status=500)
 
 
 class DataItemTypeUpdateView(LoginRequiredMixin, View):
@@ -493,5 +506,5 @@ class DataItemTypeUpdateView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'success'})
 
         except Exception as e:
-            logger.error(f"Lỗi khi cập nhật DataItemType: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)})
+            logger.error(f"Error while updating DataItemType: {e}")
+            return JsonResponse({'status': 'error', 'message': Mess.ERROR.value}, status=500)
