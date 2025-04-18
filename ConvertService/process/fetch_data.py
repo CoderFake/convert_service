@@ -58,7 +58,8 @@ class HeaderFetcher:
                         'header_name': item.data_item.data_item_name,
                         'format_value': item.format_value,
                         'edit_value': item.edit_value,
-                        'index_value': item.index_value
+                        'index_value': item.index_value,
+                        'display': item.display,
                     } for item in data_item_types
                 ]
 
@@ -74,7 +75,8 @@ class HeaderFetcher:
                         'header_name': item.data_item.data_item_name,
                         'index_value': item.index_value,
                         'edit_value': item.edit_value,
-                        'format_value': item.format_value
+                        'format_value': item.format_value,
+                        'display':item.display,
                     }
                     for item in data_item_types
                 ]

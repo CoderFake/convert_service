@@ -1,14 +1,12 @@
-import json
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction, IntegrityError
-from django.db.models import Q, F, Subquery, IntegerField, OuterRef, Max
+from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views import View
-from django.db.models.functions import Cast
 
 from configs.data_type import Mess
-from home.models import DataItem, FileFormat, DataFormat, DataItemType, DetailedInfo, DataConversionInfo
+from home.models import DataItem, DataItemType, DetailedInfo, DataConversionInfo
 
 import logging
 
@@ -34,6 +32,7 @@ class DataItemListView(LoginRequiredMixin, View):
             ('output', '健診システム取り込みデータ'),
             ('input', '予約代行業者取り込みデータ'),
         ]
+
         data_type_choices = DataItemType.FormatValue.choices
         data_type_name_choices = DataItemType.TypeName.choices
 
@@ -246,15 +245,36 @@ class DataItemCreateView(LoginRequiredMixin, View):
                     tenant=tenant,
                 ).first()
 
+                display_val = True if display == 'on' else False
+                edit_val = True if edit_value == 'on' else False
+
+                data_item = DataItem.objects.filter(
+                    data_item_name=data_item_name,
+                    tenant=tenant,
+                    data_format=data_convert.data_format_before,
+                ).first()
+
+                if data_item:
+                    DataItemType.objects.create(
+                        data_item=data_item,
+                        type_name=data_type_name,
+                        index_value=index_value,
+                        display=display_val,
+                        edit_value=edit_val,
+                        format_value=format_value,
+                    )
+
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': Mess.CREATE.value
+                    })
+
                 data_item = DataItem.objects.create(
                     tenant=tenant,
                     data_format=data_convert.data_format_before,
                     data_item_id=data_item_id,
                     data_item_name=data_item_name
                 )
-
-                display_val = True if display == 'on' else False
-                edit_val = True if edit_value == 'on' else False
 
                 DataItemType.objects.create(
                     data_item=data_item,
@@ -324,16 +344,24 @@ class DataItemEditView(LoginRequiredMixin, View):
             with transaction.atomic():
                 data_item = get_object_or_404(DataItem, id=item_id, tenant=tenant)
 
+                data_convert = DataConversionInfo.objects.filter(
+                    data_format_before__file_format__file_format_id__contains=file_format_id,
+                    tenant=tenant,
+                ).first()
+
                 if DataItem.objects.filter(
-                    data_item_name=data_item_name,
-                    data_format__file_format__file_format_id__contains=file_format_id,
+                        data_item_name=data_item_name,
+                        data_format=data_convert.data_format_before,
+                        data_item_types__type_name=data_type_name
                 ).exclude(id=item_id).exists():
                     errors['data_item_name'] = '列名は既に存在します。'
+
+
 
                 duplicate_index = DataItemType.objects.filter(
                     type_name=data_type_name,
                     index_value=index_value,
-                    data_item__data_format__file_format__id__contains=file_format_id,
+                    data_item__data_format=data_convert.data_format_before,
                 ).exclude(data_item=data_item)
 
                 if duplicate_index.exists():
@@ -345,13 +373,9 @@ class DataItemEditView(LoginRequiredMixin, View):
                         'errors': errors,
                     }, status=200)
 
-                data_format = DataFormat.objects.filter(
-                    file_format__file_format_id__contains=file_format_id,
-                    tenant=tenant,
-                ).first()
 
                 data_item.data_item_name = data_item_name
-                data_item.data_format = data_format
+                data_item.data_format = data_convert.data_format_before
                 data_item.save()
 
                 display_val = True if display == 'on' else False

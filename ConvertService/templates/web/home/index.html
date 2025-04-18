@@ -1,7 +1,7 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} Dashboard {% endblock title %}
+{% block title %} 一括変換 {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
@@ -336,26 +336,8 @@
                         </div>
                         <div class="table-responsive overflow-hidden mt-2">
                             <table id="inputData" class="table table-bordered w-100">
-                                <thead class="bg-info">
-                                <tr>
-                                    {% for header in headers %}
-                                        <th>{{ header }}</th>
-                                    {% endfor %}
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {% if processed_files %}
-                                    {% for file in processed_files %}
-                                        {% for row in file.data %}
-                                            <tr>
-                                                {% for cell in row %}
-                                                    <td>{{ cell }}</td>
-                                                {% endfor %}
-                                            </tr>
-                                        {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                </tbody>
+                                <thead class="bg-info"><tr></tr></thead>
+                                <tbody></tbody>
                             </table>
                             <div id="paginationInfo" class="d-none">0/0 行表示中</div>
                             <div class="table-resize-handle"></div>

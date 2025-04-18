@@ -1,7 +1,7 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} 変換ルールの設定 {% endblock title %}
+{% block title %} 変換ルール設定 {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
@@ -290,7 +290,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p>このルールを削除しますが、よろしいでしょうか？</p>
+                <p>このアイテムを削除しますが、よろしいでしょうか？</p>
                 <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
@@ -345,10 +345,11 @@
                         <label for="rule_id" class="col-sm-3 col-form-label">変換ルール</label>
                         <div class="col-sm-9">
                             <select class="form-control" id="rule_id" name="rule_id">
-                                <option value="">選択してください</option>
+                                <option class="border-1 " value="">選択してください</option>
                                 {% for rule in rules %}
                                     <option value="{{ rule.id }}">{{ rule.convert_rule_name }}</option>
                                 {% endfor %}
+
                             </select>
                             <div class="invalid-feedback" id="rule_id_error"></div>
                         </div>
@@ -439,7 +440,7 @@ $(document).ready(function() {
                 $('#ruleTable_wrapper .row').addClass('mb-4');
                 $('#ruleTable_wrapper .row:first-child .col-md-6:first-child').html('')
                 .append(`
-                    <input class="search-input" type="search" name="search_input" placeholder="検索..." aria-controls="dataItemTable">
+                    <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="dataItemTable">
                     <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換前のデータ項目名・変換後のデータ項目名・変換ルール</span>
                 `);
             }
