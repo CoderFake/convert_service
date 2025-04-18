@@ -113,20 +113,21 @@ class DisplayData:
             return []
 
     @staticmethod
-    def get_paginated_data(redis_client, keys, hidden_formatted_header, page=1, page_size=20):
+    def get_paginated_data(redis_client, keys, all_formatted_header, page=1, page_size=20):
         try:
-            visible_indices = [
-                header.get('index_value') for header in hidden_formatted_header
-                if header.get('index_value', False)
-            ]
+
+            sorted_headers = sorted(all_formatted_header, key=lambda h: h.get('index_value', float('inf')))
+            hidden_positions = []
+            for i, header in enumerate(sorted_headers):
+                if header.get('display') == False:
+                    hidden_positions.append(i)
 
             all_rows_with_global_index = []
             total_rows = 0
             current_global_index = 0
 
-            # Sort keys to process files in order
             sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
-                                 if k.decode('utf-8').split(':')[1].isdigit() else 0)
+            if k.decode('utf-8').split(':')[1].isdigit() else 0)
 
             for key in sorted_keys:
                 try:
@@ -140,16 +141,15 @@ class DisplayData:
 
                     for i, row in enumerate(data):
                         if isinstance(row, list):
-                            new_row = list(row)
-                            # Remove hidden columns
-                            for idx in sorted(visible_indices, reverse=True):
-                                if idx < len(new_row):
-                                    new_row.pop(idx)
-                            # Store the row data along with its global index (starting from 0)
+                            new_row = []
+                            for pos, value in enumerate(row):
+                                if pos not in hidden_positions:
+                                    new_row.append(value)
+
                             all_rows_with_global_index.append({
                                 "global_index": current_global_index,
                                 "data": new_row,
-                                "original_key": key.decode('utf-8') # Keep original key if needed
+                                "original_key": key.decode('utf-8')
                             })
                         current_global_index += 1
 
@@ -157,7 +157,6 @@ class DisplayData:
                     logger.error(f"Reading Redis key failed {key}: {e}")
                     continue
 
-            # Paginate the flattened list
             start_idx = (page - 1) * page_size
             end_idx = start_idx + page_size
             paginated_rows = all_rows_with_global_index[start_idx:end_idx]

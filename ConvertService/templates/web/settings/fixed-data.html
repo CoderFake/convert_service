@@ -1,0 +1,987 @@
+{% extends 'web/layouts/base.html' %}
+{% load static %}
+{% load i18n %}
+{% block title %} 変換ルール設定 {% endblock title %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" type="text/css"
+          href="{% static 'web/vendor/datatables.net/css/dataTables.bootstrap5.min.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/toggle.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'web/css/error-form.css' %}"/>
+    <style>
+        .filter-row {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .filter-row label {
+            margin-bottom: 0;
+            margin-right: 0.5rem;
+            font-weight: 500;
+        }
+        .filter-row .form-select {
+            min-width: 150px;
+            height: 40px;
+            color: #525f7f;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            color: #5e72e4;
+        }
+
+        .filter-row .form-select, .dataTables_wrapper .row:first-child input{
+            height: 40px;
+            border-radius: 0.375rem !important;
+            border: 1px solid #efefef !important;
+        }
+
+        .filter-row #fileFormatSelect{
+            min-width: 160px;
+        }
+
+        .filter-row #fromToTypeSelect{
+            min-width: 340px;
+        }
+
+        .format-badge {
+            font-size: 85%;
+            font-weight: normal;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+
+        .bg-light{
+            background: #efefef !important;
+        }
+
+        .badge-excel {
+            background-color: #1D6F42;
+            color: white;
+        }
+        .badge-csv {
+            background-color: #4F81BD;
+            color: white;
+        }
+        .dataTables_filter, .dataTables_length{
+            width: 100% !important;
+            display: flex;
+            justify-content: start;
+            align-content: center;
+        }
+
+        .dataTables_length{
+            justify-content: end;
+        }
+
+        .dataTables_length select{
+            height: 40px;
+            width: 60px !important;
+            background: none;
+            border-radius: 0.375rem !important;
+            border: 1px solid #e9ecef !important;
+        }
+
+        .dataTables_wrapper .row label{
+            margin-bottom: 0;
+        }
+
+        .dataTables_wrapper .row:first-child input{
+            margin: 0 !important;
+            padding: 5px;
+            width: 450px !important;
+        }
+
+        .dataTables_wrapper input:focus,
+        .dataTables_wrapper select:focus{
+            outline: none;
+        }
+
+        .dataTables_filter label:before {
+            content: '' !important;
+        }
+
+        /* Modal specific styles */
+        .modal-dialog-wider {
+            max-width: 850px;
+        }
+
+        .modal-content {
+            position: relative;
+        }
+
+        .modal-table th, .modal-table td {
+            padding: 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        /* Value input fields styling */
+        .value-input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .value-input:focus {
+            border-color: #80bdff;
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        .delete-btn {
+            color: #fff;
+            background-color: #dc3545;
+            border-color: #dc3545;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+
+        .add-row-btn {
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .add-row-btn i {
+            margin-right: 5px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 15px;
+        }
+
+        .pagination-controls button {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+
+        .pagination-controls button.active {
+            background-color: #4e73df;
+            color: white;
+            border-color: #4e73df;
+        }
+
+        .pagination-controls button:hover:not(.active) {
+            background-color: #e9ecef;
+        }
+
+        .save-cancel-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* Side panel styling */
+        .side-panel {
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            padding: 15px;
+            overflow-y: auto;
+            min-height: 200px;
+            max-height: 400px;
+        }
+
+        .side-panel h6 {
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 8px;
+        }
+
+        .side-panel-item {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .side-panel-item:hover {
+            background-color: #e9ecef;
+        }
+
+        #fixedRuleTable th:last-child,
+        #fixedRuleTable td:last-child {
+            width: 100px;
+            text-align: center;
+        }
+
+        #fixedRuleTable td:last-child .btn {
+            margin-right: 5px;
+        }
+
+        #fixedRuleTable td:last-child .btn:last-child {
+            margin-right: 0;
+        }
+
+        #fixedRuleTable_filter label {
+            position: relative;
+            z-index: 1;
+        }
+
+        .dataTables_info{
+            display: none;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mt-6">
+                <div class="card-body pt-3">
+                    <div class="container-fluid mb-3" style="padding: 0 !important;">
+                        <div class="row">
+                            {% include "web/settings/includes/tab.html" %}
+                            <div class="col-3">
+                                <div class="d-flex justify-content-end">
+                                    <button id="addFixedDataBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DataTable with loading overlay -->
+                    <div class="table-responsive mt-3 position-relative">
+                        <div id="tableLoadingOverlay" class="loading-overlay">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                        </div>
+                        <table class="table table-bordered" id="fixedRuleTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>No.</th>
+                                    <th>変換ルール</th>
+                                    <th>変換ロジック</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded via AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">削除確認</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>このアイテムを削除しますが、よろしいでしょうか？</p>
+                <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fixed Data Modal -->
+<div class="modal fade" id="fixedDataModal" tabindex="-1" role="dialog" aria-labelledby="fixedDataModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-wider" role="document">
+        <div class="modal-content">
+            <form id="fixedDataForm">
+                {% csrf_token %}
+                <input type="hidden" id="editRuleId" name="rule_id">
+                <input type="hidden" id="file-format-id" name="file_format_id">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fixedDataModalLabel">変換ルール</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Error messages area -->
+                    <div id="generalErrors" class="alert alert-danger d-none">
+                        <!-- General form errors will be displayed here -->
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <!-- Conversion rule and type selection -->
+                            <div class="d-flex justify-content-start align-items-center mb-3">
+                                <div class="mr-3">
+                                    <span class="font-weight-bold">変換ルール:</span>
+                                    <span class="ml-2 conversion-rule-label">予約時間-受付時間終了</span>
+                                </div>
+                                <div class="ml-4">
+                                    <span class="font-weight-bold">変換ロジック:</span>
+                                    <span class="ml-2 conversion-logic-label">ふくおか公衆衛生用変換 (顧客名-団体番号1)</span>
+                                </div>
+                            </div>
+
+                            <!-- Keyword search input -->
+                            <div class="form-group">
+                                <input type="text" class="form-control mb-3" id="keywordSearch" placeholder="キーワード入力">
+                                <div class="invalid-feedback" id="keyword_error"></div>
+                            </div>
+
+                            <!-- Fixed Data Items Table -->
+                            <div class="table-responsive mb-3">
+                                <table class="table table-bordered modal-table" id="fixedDataItemsTable">
+                                    <thead class="bg-info text-white">
+                                        <tr>
+                                            <th style="width: 80px;">No.</th>
+                                            <th>変換前データ値</th>
+                                            <th>変換後データ値</th>
+                                            <th style="width: 80px;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>1</td>
+                                            <td>
+                                                <div class="form-group mb-0">
+                                                    <input type="text" class="form-control value-input" value="10:00">
+                                                    <div class="invalid-feedback" id="before_1_error"></div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-group mb-0">
+                                                    <input type="text" class="form-control value-input" value="10:30">
+                                                    <div class="invalid-feedback" id="after_1_error"></div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn delete-btn">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Add new row button -->
+                            <div class="d-flex justify-content-start mb-3">
+                                <button type="button" class="add-row-btn" id="addRowBtn">
+                                    <i class="fas fa-plus"></i>
+                                    入力行を追加
+                                </button>
+                            </div>
+
+                            <!-- Pagination controls -->
+                            <div class="pagination-controls">
+                                <button type="button" class="prev-page">←</button>
+                                <button type="button" class="page-number active">1</button>
+                                <button type="button" class="page-number">2</button>
+                                <button type="button" class="page-number">3</button>
+                                <button type="button" class="next-page">→</button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <!-- Side panel for related info or help text -->
+                            <div class="side-panel">
+                                <h6>右側のリスト</h6>
+                                <div class="side-panel-item">予約時間-受付時間終了</div>
+                                <div class="side-panel-item">ふくおか公衆衛生用変換 (顧客名-団体番号1)</div>
+                                <div class="side-panel-item">変換前データ値</div>
+                                <div class="side-panel-item">変換後データ値</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <div class="d-flex justify-content-between w-100">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-primary" id="saveFixedData">保存</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+<script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+<script>
+$(document).ready(function() {
+    let fixedRuleTable;
+    let currentPage = 1;
+    let totalPages = 1;
+    let pageSize = 10;
+    let currentItems = [];
+    let allItems = [];
+    let selectedRuleId = null;
+    try {
+        fixedRuleTable = $('#fixedRuleTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ordering: false,
+            ajax: {
+                url: "/settings/fixed-data/",
+                type: "GET",
+                data: function (d) {
+                    d.file_format_id = $('#fileFormatSelect').val();
+                    d.rule_id = $('#fromToTypeSelect').val();
+                },
+                beforeSend: function() {
+                    $('#tableLoadingOverlay').show();
+                },
+                complete: function() {
+                    $('#tableLoadingOverlay').hide();
+                },
+                error: function(xhr, error, thrown) {
+                    $('#tableLoadingOverlay').hide();
+                    createToast('error', 'データの読み込み中にエラーが発生しました。');
+                }
+            },
+            columns: [
+                {
+                    data: "no",
+                    name: "no",
+                    searchable: false
+                },
+                { data: "convert_rule_id", name: "convert_rule_id" },
+                { data: "convert_rule_name", name: "convert_rule_name" },
+                {
+                    data: "id",
+                    orderable: false,
+                    searchable: false,
+                    render: function (data, type, row) {
+                        return `
+                            <button class="btn btn-info btn-sm edit-item" data-id="${data}" data-rule-id="${row.rule_id}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm delete-item" data-id="${data}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
+                    }
+                },
+            ],
+            language: {
+                url: "/static/web/vendor/datatables.net/language/ja.json",
+                search: "_INPUT_",
+                searchPlaceholder: "検索..."
+            },
+            dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, '全て']],
+            pageLength: 10,
+            drawCallback: function() {
+                $('#fixedRuleTable thead tr').find('th').first().text('No.');
+            },
+            initComplete: function() {
+                $('#fixedRuleTable_filter').hide();
+                $('#fixedRuleTable_wrapper .row').addClass('mb-4');
+                $('#fixedRuleTable_wrapper .row:first-child .col-md-6:first-child').html('')
+                .append(`
+                    <input class="search-input" type="search" name="search_input" placeholder="検索..." aria-controls="fixedRuleTable">
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換前のデータ値・変換後のデータ値・変換ルール</span>
+                `);
+            }
+        });
+    } catch (e) {
+        console.error('Error initializing table:', e);
+        createToast('error', 'テーブルの初期化中にエラーが発生しました。');
+    }
+    $('#fileFormatSelect, #fromToTypeSelect').on('change', function() {
+        if (fixedRuleTable) {
+            fixedRuleTable.ajax.reload();
+        }
+    });
+    $(document).on('keypress', '.search-input', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const searchValue = $(this).val();
+            fixedRuleTable.search(searchValue).draw();
+        }
+    });
+    $('#keywordSearch').on('keyup', function() {
+        const keyword = $(this).val().toLowerCase();
+        filterModalItems(keyword);
+    });
+    $('#addFixedDataBtn').on('click', function() {
+        $('#fromToTypeSelect').val('');
+        openfromToTypeSelectionModal();
+    });
+    $('#fixedRuleTable tbody').on('click', '.edit-item', function() {
+        const itemId = $(this).data('id');
+        const ruleId = $(this).data('rule-id');
+        selectedRuleId = ruleId;
+        loadFixedDataItems(ruleId);
+    });
+    $('#fixedRuleTable tbody').on('click', '.delete-item', function() {
+        const itemId = $(this).data('id');
+        prepareDeleteModal(itemId);
+    });
+    $('#addRowBtn').on('click', function() {
+        addNewRow();
+    });
+    $('#fixedDataItemsTable').on('click', '.delete-btn', function() {
+        $(this).closest('tr').remove();
+        renumberRows();
+    });
+    $('#fixedDataForm').on('submit', function(e) {
+        e.preventDefault();
+        saveFixedData();
+    });
+    $('.page-number').on('click', function() {
+        const newPage = parseInt($(this).text());
+        goToPage(newPage);
+    });
+
+    $('.prev-page').on('click', function() {
+        if (currentPage > 1) {
+            goToPage(currentPage - 1);
+        }
+    });
+
+    $('.next-page').on('click', function() {
+        if (currentPage < totalPages) {
+            goToPage(currentPage + 1);
+        }
+    });
+    $('.side-panel-item').on('click', function() {
+        const text = $(this).text();
+        if (text.includes('予約時間')) {
+            $('.conversion-rule-label').text(text);
+        } else if (text.includes('ふくおか')) {
+            $('.conversion-logic-label').text(text);
+        } else if (text.includes('変換前')) {
+            $('#fixedDataItemsTable tbody tr:first-child td:eq(1) input').focus();
+        } else if (text.includes('変換後')) {
+            $('#fixedDataItemsTable tbody tr:first-child td:eq(2) input').focus();
+        }
+    });
+    function resetModalForm() {
+        $('#fixedDataForm')[0].reset();
+        $('#editRuleId').val('');
+        $('#fixedDataItemsTable tbody').html('');
+        currentItems = [];
+        allItems = [];
+        currentPage = 1;
+        totalPages = 1;
+        resetFormErrors();
+    }
+
+    function resetFormErrors() {
+        $('#generalErrors').addClass('d-none').html('');
+        $('.invalid-feedback').empty();
+        $('.is-invalid').removeClass('is-invalid');
+        $('form').removeClass('was-validated');
+    }
+
+    function displayFormErrors(errors) {
+        resetFormErrors();
+        if (errors.general) {
+            $('#generalErrors').removeClass('d-none').html(`<p>${errors.general}</p>`);
+        }
+        for (const field in errors) {
+            if (field !== 'general') {
+                const errorMessage = errors[field];
+                const errorElement = $(`#${field}_error`);
+
+                if (errorElement.length) {
+                    errorElement.html(errorMessage);
+                    errorElement.closest('.form-group').find('input, select, textarea').addClass('is-invalid');
+                } else if (field === 'items') {
+                    $('#generalErrors').removeClass('d-none').html(`<p>${errorMessage}</p>`);
+                }
+            }
+        }
+
+        $('form').addClass('was-validated');
+    }
+
+    function openfromToTypeSelectionModal() {
+        const selectedOption = $('#fromToTypeSelect option:selected');
+        if (selectedOption.val()) {
+            selectedRuleId = selectedOption.val();
+            loadFixedDataItems(selectedRuleId);
+        } else {
+            const firstRuleOption = $('#fromToTypeSelect option:eq(1)');
+            if (firstRuleOption.length) {
+                selectedRuleId = firstRuleOption.val();
+                $('#fromToTypeSelect').val(selectedRuleId);
+                loadFixedDataItems(selectedRuleId);
+            } else {
+                createToast('error', '変換ルールが見つかりません。');
+            }
+        }
+    }
+
+    function loadFixedDataItems(ruleId) {
+        resetModalForm();
+        $('#editRuleId').val(ruleId);
+        const fileFormatId = $('#fileFormatSelect').val();
+        $('#file-format-id').val(fileFormatId);
+        $('#tableLoadingOverlay').show();
+        $.ajax({
+            url: `/settings/fixed-data-detail/${ruleId}/`,
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    const ruleData = response.data;
+                    $('.conversion-rule-label').text(ruleData.rule_name || '予約時間-受付時間終了');
+                    $('.conversion-logic-label').text(ruleData.rule_category || 'ふくおか公衆衛生用変換 (顧客名-団体番号1)');
+                    allItems = ruleData.items.map(item => ({
+                        'before': item.data_value_before,
+                        'after': item.data_value_after
+                    }));
+                    $('#fixedDataModal .modal-title').text('固定データ編集');
+                    totalPages = Math.ceil(allItems.length / pageSize) || 1;
+                    goToPage(1);
+                    updatePaginationUI();
+                    $('#fixedDataModal').modal('show');
+                } else {
+                    createToast('error', response.message || 'データの読み込み中にエラーが発生しました。');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'データの読み込み中にエラーが発生しました。';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.message) {
+                        errorMsg = response.message;
+                    }
+                } catch (e) {}
+                createToast('error', errorMsg);
+            },
+            complete: function() {
+                $('#tableLoadingOverlay').hide();
+            }
+        });
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        currentItems = allItems.slice(startIndex, endIndex);
+        renderItems();
+        updatePaginationUI();
+    }
+
+    function updatePaginationUI() {
+        $('.pagination-controls .page-number').remove();
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage === totalPages) {
+            startPage = Math.max(1, endPage - 4);
+        }
+        let paginationHTML = '';
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHTML += `<button type="button" class="page-number${i === currentPage ? ' active' : ''}">${i}</button>`;
+        }
+        $('.prev-page').after(paginationHTML);
+        $('.page-number').off('click').on('click', function() {
+            const newPage = parseInt($(this).text());
+            goToPage(newPage);
+        });
+        $('.prev-page').prop('disabled', currentPage === 1);
+        $('.next-page').prop('disabled', currentPage === totalPages);
+    }
+
+    function renderItems() {
+        $('#fixedDataItemsTable tbody').empty();
+        if (currentItems.length === 0) {
+            addNewRow();
+        } else {
+            currentItems.forEach(function(item) {
+                addNewRow(item.before, item.after);
+            });
+        }
+    }
+
+    function filterModalItems(keyword) {
+        if (!keyword) {
+            if (window.originalItems) {
+                allItems = [...window.originalItems];
+            }
+        } else {
+            if (!window.originalItems) {
+                window.originalItems = [...allItems];
+            }
+            allItems = window.originalItems.filter(item =>
+                item.before.toLowerCase().includes(keyword) ||
+                item.after.toLowerCase().includes(keyword)
+            );
+        }
+        totalPages = Math.ceil(allItems.length / pageSize) || 1;
+        goToPage(1);
+    }
+
+    function prepareDeleteModal(itemId) {
+        $('#confirmDelete').data('id', itemId);
+        $('#deleteModal').modal('show');
+    }
+
+    $('#confirmDelete').on('click', function() {
+        const itemId = $(this).data('id');
+        deleteFixedDataItem(itemId);
+    });
+
+    function deleteFixedDataItem(itemId) {
+        $.ajax({
+            url: `/settings/fixed-data-delete/${itemId}/`,
+            type: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('#deleteModal').modal('hide');
+                if (response.status === 'success') {
+                    createToast('success', response.message || '削除に成功しました。');
+                    fixedRuleTable.ajax.reload();
+                } else {
+                    createToast('error', response.message || '削除中にエラーが発生しました。');
+                }
+            },
+            error: function() {
+                $('#deleteModal').modal('hide');
+                createToast('error', '削除中にエラーが発生しました。');
+            }
+        });
+    }
+
+    function addNewRow(beforeValue = '', afterValue = '') {
+        const rowCount = $('#fixedDataItemsTable tbody tr').length + 1;
+        const newRow = `
+            <tr>
+                <td>${rowCount}</td>
+                <td>
+                    <div class="form-group mb-0">
+                        <input type="text" class="form-control value-input" name="before_${rowCount}" value="${beforeValue}">
+                        <div class="invalid-feedback" id="before_${rowCount}_error"></div>
+                    </div>
+                </td>
+                <td>
+                    <div class="form-group mb-0">
+                        <input type="text" class="form-control value-input" name="after_${rowCount}" value="${afterValue}">
+                        <div class="invalid-feedback" id="after_${rowCount}_error"></div>
+                    </div>
+                </td>
+                <td>
+                    <button type="button" class="btn delete-btn">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        $('#fixedDataItemsTable tbody').append(newRow);
+    }
+
+    function renumberRows() {
+        $('#fixedDataItemsTable tbody tr').each(function(index) {
+            $(this).find('td:first').text(index + 1);
+        });
+    }
+
+    function validateForm() {
+        let errors = {};
+
+        const ruleId = $('#editRuleId').val();
+        if (!ruleId) {
+            errors['rule_id'] = '変換ルールを選択してください。';
+        }
+
+        const items = [];
+        $('#fixedDataItemsTable tbody tr').each(function() {
+            const beforeValue = $(this).find('td:eq(1) input').val();
+            const afterValue = $(this).find('td:eq(2) input').val();
+
+            if (beforeValue && afterValue) {
+                items.push({
+                    'before': beforeValue,
+                    'after': afterValue
+                });
+            }
+        });
+
+        if (items.length === 0) {
+            errors['items'] = '少なくとも1つのアイテムを追加してください。';
+        }
+
+        return {
+            isValid: Object.keys(errors).length === 0,
+            errors: errors,
+            items: items
+        };
+    }
+
+    function saveFixedData() {
+        resetFormErrors();
+        const validation = validateForm();
+        if (!validation.isValid) {
+            displayFormErrors(validation.errors);
+            return;
+        }
+        saveCurrentPageItems();
+        const allDataItems = allItems.map(item => ({
+            'before': item.before,
+            'after': item.after
+        }));
+        $('#tableLoadingOverlay').show();
+        $.ajax({
+            url: '/settings/fixed-data-batch-save/',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                rule_id: $('#editRuleId').val(),
+                file_format_id: $('#file-format-id').val(),
+                items: allDataItems
+            }),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('#tableLoadingOverlay').hide();
+
+                if (response.status === 'success') {
+                    $('#fixedDataModal').modal('hide');
+                    createToast('success', response.message || '保存に成功しました。');
+                    fixedRuleTable.ajax.reload();
+                } else {
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                    } else {
+                        createToast('error', response.message || '保存中にエラーが発生しました。');
+                    }
+                }
+            },
+            error: function(xhr) {
+                $('#tableLoadingOverlay').hide();
+
+                let errorMsg = '保存中にエラーが発生しました。';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                        return;
+                    } else if (response.message) {
+                        errorMsg = response.message;
+                    }
+                } catch (e) {
+                }
+                createToast('error', errorMsg);
+            }
+        });
+    }
+
+    function saveCurrentPageItems() {
+        $('#fixedDataItemsTable tbody tr').each(function(index) {
+            const beforeValue = $(this).find('td:eq(1) input').val();
+            const afterValue = $(this).find('td:eq(2) input').val();
+
+            if (beforeValue && afterValue && index < currentItems.length) {
+                const itemIndex = (currentPage - 1) * pageSize + index;
+                if (itemIndex < allItems.length) {
+                    allItems[itemIndex].before = beforeValue;
+                    allItems[itemIndex].after = afterValue;
+                } else if (beforeValue && afterValue) {
+                    allItems.push({
+                        'before': beforeValue,
+                        'after': afterValue
+                    });
+                }
+            } else if (beforeValue && afterValue) {
+                allItems.push({
+                    'before': beforeValue,
+                    'after': afterValue
+                });
+            }
+        });
+        totalPages = Math.ceil(allItems.length / pageSize) || 1;
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    updatePaginationUI();
+});
+</script>
+{% endblock javascripts %}

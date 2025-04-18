@@ -322,6 +322,14 @@ class ProcessAndDisplayView:
             client = redis_client.get_client()
             user = Account.objects.get(pk=user_id)
 
+            all_format_header = HeaderFetcher.get_headers(
+                user,
+                HeaderType.FORMAT.value,
+                DisplayType.ALL.value,
+                get_edit_header=True,
+                data_format_id=get_data_format_id_from_redis(request)
+            )
+
             show_formatted_header = HeaderFetcher.get_headers(
                 user,
                 HeaderType.FORMAT.value,
@@ -350,7 +358,7 @@ class ProcessAndDisplayView:
             paginated_rows, total_rows = DisplayData.get_paginated_data(
                 client,
                 format_keys,
-                hidden_formatted_header,
+                all_format_header,
                 page,
                 page_size
             )
