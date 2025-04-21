@@ -14,7 +14,10 @@ from .views import (
     FixedDataListView,
     FixedDataDetailView,
     FixedDataBatchSaveView,
-    FixedDataDeleteView
+    FixedDataDeleteView,
+    # New views for fixed rules
+    FixedRuleCreateView,
+    FixedRuleUpdateView
 )
 
 urlpatterns = [
@@ -43,4 +46,8 @@ urlpatterns = [
     path('settings/fixed-data-delete/<int:item_id>/', FixedDataDeleteView.as_view(), name='delete_fixed_data'),
     path('settings/fixed-data-delete-rule/<int:rule_id>/', FixedDataDeleteView.as_view(),
          name='delete_rule_fixed_data'),
+
+    # New Fixed Rule URLs
+    path('settings/fixed-rule-create/', FixedRuleCreateView.as_view(), name='create_fixed_rule'),
+    path('settings/fixed-rule-update/<int:rule_id>/', FixedRuleUpdateView.as_view(), name='update_fixed_rule'),
 ]
