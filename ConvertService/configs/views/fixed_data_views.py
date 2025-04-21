@@ -1,13 +1,17 @@
+from distutils import errors
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views import View
-from django.db.models import Q
+from math import ceil
 
 from configs.data_type import Mess
 from configs.models import ConvertRule, ConvertDataValue, ConvertRuleCategory
 from home.models import DataFormat, FileFormat
+from collections import defaultdict
 
 import logging
 import json
@@ -21,83 +25,82 @@ class FixedRuleCreateView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
 
         tenant = request.user.tenant
+        rule_fixed_id = request.POST.get('rule_fixed_id')
         rule_name = request.POST.get('rule_name')
-        rule_category = request.POST.get('rule_category')
-        rule_description = request.POST.get('rule_description', '')
 
         errors = {}
-        if not rule_name or not rule_category:
+        if not rule_fixed_id or not rule_name:
+            if not rule_fixed_id:
+                errors['rule_fixed_id'] = 'このフィールドは必須です。'
             if not rule_name:
                 errors['rule_name'] = 'このフィールドは必須です。'
-            if not rule_category:
-                errors['rule_category'] = 'このフィールドは必須です。'
 
             return JsonResponse({
                 'status': 'error',
                 'errors': errors,
             }, status=200)
 
-        try:
-            # Get fixed rule category
-            fixed_category = ConvertRuleCategory.objects.get(id=rule_category)
-            if fixed_category.convert_rule_category_id != 'CRC_FIXED':
-                return JsonResponse({
-                    'status': 'error',
-                    'errors': {'rule_category': '無効なカテゴリです。'}
-                }, status=400)
+        data = request.POST
+        value_to_indices = defaultdict(list)
 
-            # Check if rule with similar name already exists
-            existing_rule = ConvertRule.objects.filter(
-                convert_rule_name=rule_name,
-                convert_rule_category=fixed_category
-            ).first()
+        for key in data:
+            if key.startswith('fixed_values[') and key.endswith('][before]'):
+                row_index = key.split('[')[1].split(']')[0]
+                try:
+                    value = int(data.get(key))
+                    value_to_indices[value].append(row_index)
+                except (ValueError, TypeError):
+                    pass
 
-            if existing_rule:
-                return JsonResponse({
-                    'status': 'error',
-                    'errors': {'rule_name': 'この名前のルールは既に存在します。'}
-                }, status=400)
+        for value, indices in value_to_indices.items():
+            if len(indices) > 1:
+                for row_index in indices:
+                    errors[f'before-value-{row_index}'] = Mess.ERROR_EXIST.value
 
-            # Generate a unique rule ID
-            last_rule = ConvertRule.objects.filter(
-                convert_rule_category=fixed_category
-            ).order_by('-id').first()
+        if errors:
+            return JsonResponse({'status': 'error', 'errors': errors}, status=200)
 
-            rule_id_suffix = '001'
-            if last_rule:
-                # Extract number from last rule ID and increment
-                if last_rule.convert_rule_id.startswith('CR_FIXED_'):
-                    try:
-                        last_num = int(last_rule.convert_rule_id.split('CR_FIXED_')[1])
-                        rule_id_suffix = f"{last_num + 1:03d}"
-                    except (ValueError, IndexError):
-                        pass
+        existing_rule = ConvertRule.objects.filter(convert_rule_id=rule_fixed_id).first()
 
-            # Create the new rule
-            convert_rule_id = f"CR_FIXED_{rule_id_suffix}"
-            new_rule = ConvertRule.objects.create(
-                convert_rule_id=convert_rule_id,
-                convert_rule_name=rule_name,
-                convert_rule_category=fixed_category,
-                convert_rule_description=rule_description
-            )
-
-            return JsonResponse({
-                'status': 'success',
-                'message': Mess.CREATE.value,
-                'data': {
-                    'rule_id': new_rule.id,
-                    'convert_rule_id': new_rule.convert_rule_id,
-                    'convert_rule_name': new_rule.convert_rule_name
-                }
-            })
-
-        except Exception as e:
-            logger.error(f"Error creating fixed rule: {str(e)}", exc_info=True)
+        if existing_rule:
+            errors['rule_fixed_id'] = Mess.ERROR_EXIST.value
             return JsonResponse({
                 'status': 'error',
-                'message': Mess.ERROR.value
-            }, status=500)
+                'errors': errors,
+            })
+
+        try:
+            convert_rule_category = ConvertRuleCategory.objects.filter(convert_rule_category_id="CRC_FIXED").first()
+
+            with transaction.atomic():
+                new_convert_rule_fixed = ConvertRule.objects.create(
+                    convert_rule_id=rule_fixed_id,
+                    convert_rule_name=rule_name,
+                    convert_rule_category=convert_rule_category
+                )
+
+                for key in data:
+                    if key.startswith('fixed_values[') and key.endswith('][before]'):
+                        row_index = key.split('[')[1].split(']')[0]
+                        before_value = data.get(key)
+                        after_value = data.get(f'fixed_values[{row_index}][after]')
+
+                        if before_value and after_value:
+                            ConvertDataValue.objects.create(
+                                convert_rule=new_convert_rule_fixed,
+                                data_value_before=before_value,
+                                data_value_after=after_value
+                            )
+
+                return JsonResponse({
+                    'status': 'success',
+                    'message': Mess.CREATE.value,
+                    'data': {
+                        'rule_id': new_convert_rule_fixed.id
+                    }
+                })
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': Mess.ERROR.value}, status=500)
 
 
 class FixedRuleUpdateView(LoginRequiredMixin, View):
@@ -106,12 +109,14 @@ class FixedRuleUpdateView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
 
         tenant = request.user.tenant
+        rule_fixed_id = request.POST.get('rule_fixed_id')
         rule_name = request.POST.get('rule_name')
         rule_category = request.POST.get('rule_category')
-        rule_description = request.POST.get('rule_description', '')
 
         errors = {}
-        if not rule_name or not rule_category:
+        if not rule_fixed_id or not rule_name or not rule_category:
+            if not rule_fixed_id:
+                errors['rule_fixed_id'] = 'このフィールドは必須です。'
             if not rule_name:
                 errors['rule_name'] = 'このフィールドは必須です。'
             if not rule_category:
@@ -122,18 +127,48 @@ class FixedRuleUpdateView(LoginRequiredMixin, View):
                 'errors': errors,
             }, status=200)
 
+        data = request.POST
+        value_to_indices = defaultdict(list)
+
+        for key in data:
+            if key.startswith('fixed_values[') and key.endswith('][before]'):
+                row_index = key.split('[')[1].split(']')[0]
+                before_value = data.get(key)
+                if before_value:
+                    try:
+                        value = int(before_value)
+                        value_to_indices[value].append(row_index)
+                    except (ValueError, TypeError):
+                        pass
+
+        for value, indices in value_to_indices.items():
+            if len(indices) > 1:
+                for row_index in indices:
+                    errors[f'before-value-{row_index}'] = Mess.ERROR_EXIST.value
+
+        if errors:
+            return JsonResponse({'status': 'error', 'errors': errors}, status=200)
+
         try:
-            # Get the rule to update
             rule = get_object_or_404(ConvertRule, id=rule_id)
             fixed_category = ConvertRuleCategory.objects.get(id=rule_category)
 
             if fixed_category.convert_rule_category_id != 'CRC_FIXED':
                 return JsonResponse({
                     'status': 'error',
-                    'errors': {'rule_category': '無効なカテゴリです。'}
+                    'errors': {'rule_category': Mess.ERROR_EXIST.value},
                 }, status=400)
 
-            # Check for name uniqueness, excluding this rule
+            existing_rule_id = ConvertRule.objects.filter(
+                convert_rule_id=rule_fixed_id
+            ).exclude(id=rule_id).first()
+
+            if existing_rule_id:
+                return JsonResponse({
+                    'status': 'error',
+                    'errors': {'rule_fixed_id': Mess.ERROR_EXIST.value}
+                }, status=400)
+
             existing_rule = ConvertRule.objects.filter(
                 convert_rule_name=rule_name,
                 convert_rule_category=fixed_category
@@ -142,14 +177,29 @@ class FixedRuleUpdateView(LoginRequiredMixin, View):
             if existing_rule:
                 return JsonResponse({
                     'status': 'error',
-                    'errors': {'rule_name': 'この名前のルールは既に存在します。'}
+                    'errors': {'rule_name': Mess.ERROR_EXIST.value},
                 }, status=400)
 
-            # Update the rule
-            rule.convert_rule_name = rule_name
-            rule.convert_rule_category = fixed_category
-            rule.convert_rule_description = rule_description
-            rule.save()
+            with transaction.atomic():
+                rule.convert_rule_id = rule_fixed_id
+                rule.convert_rule_name = rule_name
+                rule.convert_rule_category = fixed_category
+                rule.save()
+
+                ConvertDataValue.objects.filter(convert_rule_id=rule_id).delete()
+
+                for key in data:
+                    if key.startswith('fixed_values[') and key.endswith('][before]'):
+                        row_index = key.split('[')[1].split(']')[0]
+                        before_value = data.get(key)
+                        after_value = data.get(f'fixed_values[{row_index}][after]')
+
+                        if before_value and after_value:
+                            ConvertDataValue.objects.create(
+                                convert_rule=rule,
+                                data_value_before=before_value,
+                                data_value_after=after_value
+                            )
 
             return JsonResponse({
                 'status': 'success',
@@ -177,7 +227,6 @@ class FixedDataListView(LoginRequiredMixin, View):
             return self.render_page(request)
 
     def render_page(self, request):
-        # Get all fixed rule categories to pass to template
         fixed_categories = ConvertRuleCategory.objects.filter(convert_rule_category_id='CRC_FIXED')
         context = {
             'rule_categories': fixed_categories
@@ -191,7 +240,6 @@ class FixedDataListView(LoginRequiredMixin, View):
             length = int(request.GET.get('length', 10))
             search_value = request.GET.get('search[value]', '')
 
-            # Get only fixed category rules
             fixed_category = ConvertRuleCategory.objects.filter(convert_rule_category_id='CRC_FIXED').first()
 
             if not fixed_category:
@@ -214,9 +262,9 @@ class FixedDataListView(LoginRequiredMixin, View):
             records_filtered = base_queryset.count()
 
             if int(length) == -1:
-                paginated_items = base_queryset.order_by('id')
+                paginated_items = base_queryset.order_by('-updated_at')
             else:
-                paginated_items = base_queryset.order_by('id')[start:start + length]
+                paginated_items = base_queryset.order_by('-updated_at')[start:start + length]
 
             data = []
             for index, item in enumerate(paginated_items, start=start + 1):
@@ -224,7 +272,7 @@ class FixedDataListView(LoginRequiredMixin, View):
                     'DT_RowId': f'row_{item.id}',
                     'no': index,
                     'id': item.id,
-                    'rule_id': item.id,  # Add this for edit button
+                    'rule_id': item.id,
                     'convert_rule_id': item.convert_rule_id,
                     'convert_rule_name': item.convert_rule_name
                 })
@@ -267,7 +315,7 @@ class FixedDataDetailView(LoginRequiredMixin, View):
             fixed_data_items = ConvertDataValue.objects.filter(
                 tenant=tenant,
                 convert_rule=rule
-            ).order_by('id')
+            ).order_by('id')[:10]
 
             items = [
                 {
@@ -300,30 +348,75 @@ class FixedDataDetailView(LoginRequiredMixin, View):
             }, status=500)
 
 
-class SearchFixDataItem(LoginRequiredMixin, View):
+class FixedDataValuesView(LoginRequiredMixin, View):
     def get(self, request, rule_id):
         if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
 
         tenant = request.user.tenant
+        try:
+            fixed_category = ConvertRuleCategory.objects.filter(convert_rule_category_id='CRC_FIXED').first()
+            rule = ConvertRule.objects.filter(id=rule_id).first()
 
-        value = request.GET.get('value', None)
-        if not value:
-            data = ConvertDataValue.objects.filter(
-                tenant=tenant,
-                id=rule_id
-            ).order_by('id')
+            if not fixed_category or not rule or rule.convert_rule_category.id != fixed_category.id:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'このルールは固定データ設定に対応していません。'
+                }, status=400)
 
-            if data:
-                items = [
-                    ...
-                ]
+            page = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('page_size', 10))
+            search = request.GET.get('search', '').strip()
 
-        data = ConvertDataValue.objects.filter(
-            Q(tenant=tenant) & Q(
-                id=rule_id, data_value_before__contains=value, data_value_after__contains=value
-            )
-        )
+            query = ConvertDataValue.objects.filter(tenant=tenant, convert_rule=rule)
+
+            if search:
+                query = query.filter(
+                    Q(data_value_before__icontains=search) |
+                    Q(data_value_after__icontains=search)
+                )
+
+            total_items = query.count()
+            total_pages = ceil(total_items / page_size)
+
+            if page < 1:
+                page = 1
+            elif page > total_pages and total_pages > 0:
+                page = total_pages
+
+            start_index = (page - 1) * page_size + 1
+            end_index = min(start_index + page_size - 1, total_items)
+
+            items = query.order_by('id')[(page - 1) * page_size:page * page_size]
+
+            formatted_items = [
+                {
+                    'id': item.id,
+                    'before': item.data_value_before,
+                    'after': item.data_value_after
+                }
+                for item in items
+            ]
+
+            return JsonResponse({
+                'status': 'success',
+                'items': formatted_items,
+                'pagination': {
+                    'current_page': page,
+                    'page_size': page_size,
+                    'total_pages': total_pages,
+                    'total_items': total_items,
+                    'start_index': start_index,
+                    'end_index': end_index
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"Error fetching fixed data values: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'status': 'error',
+                'message': 'データの取得中にエラーが発生しました。'
+            }, status=500)
 
 
 class FixedDataDeleteView(LoginRequiredMixin, View):
@@ -340,7 +433,7 @@ class FixedDataDeleteView(LoginRequiredMixin, View):
                 if not fixed_category or rule.convert_rule_category.id != fixed_category.id:
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'このルールは固定データ設定に対応していません。'
+                        'message': Mess.NOTFOUND.value
                     }, status=400)
 
                 ConvertDataValue.objects.filter(
@@ -372,7 +465,7 @@ class FixedDataDeleteView(LoginRequiredMixin, View):
 
                 return JsonResponse({
                     'status': 'success',
-                    'message': '固定データ値が削除されました。'
+                    'message': Mess.DELETE.value
                 })
             else:
                 return JsonResponse({
@@ -386,6 +479,7 @@ class FixedDataDeleteView(LoginRequiredMixin, View):
                 'status': 'error',
                 'message': Mess.ERROR.value
             }, status=500)
+
 
 class FixedDataBatchSaveView(LoginRequiredMixin, View):
     def post(self, request):
@@ -429,7 +523,6 @@ class FixedDataBatchSaveView(LoginRequiredMixin, View):
                         file_format=file_format
                     ).first()
 
-                # Delete existing items for this rule
                 existing_items = ConvertDataValue.objects.filter(
                     tenant=tenant,
                     convert_rule=rule,
@@ -437,11 +530,9 @@ class FixedDataBatchSaveView(LoginRequiredMixin, View):
                 if data_format:
                     existing_items = existing_items.filter(data_format=data_format)
 
-                # Keep track of IDs to delete and IDs to keep
                 existing_ids = set(existing_items.values_list('id', flat=True))
                 saved_ids = set()
 
-                # Process items
                 for item in items:
                     item_id = item.get('id')
                     before_value = item.get('before')
@@ -451,14 +542,12 @@ class FixedDataBatchSaveView(LoginRequiredMixin, View):
                         continue
 
                     if item_id and int(item_id) in existing_ids:
-                        # Update existing item
                         existing_item = ConvertDataValue.objects.get(id=item_id)
                         existing_item.data_value_before = before_value
                         existing_item.data_value_after = after_value
                         existing_item.save()
                         saved_ids.add(int(item_id))
                     else:
-                        # Create new item
                         new_item = ConvertDataValue.objects.create(
                             tenant=tenant,
                             convert_rule=rule,
