@@ -255,7 +255,6 @@ class FixedDataDetailView(LoginRequiredMixin, View):
 
         tenant = request.user.tenant
         try:
-            # Check if rule exists and is a fixed data rule
             fixed_category = ConvertRuleCategory.objects.filter(convert_rule_category_id='CRC_FIXED').first()
             rule = get_object_or_404(ConvertRule, id=rule_id)
 
@@ -284,6 +283,7 @@ class FixedDataDetailView(LoginRequiredMixin, View):
                 'status': 'success',
                 'data': {
                     'rule_id': rule.id,
+                    'rule_fixed_id': rule.convert_rule_id,
                     'rule_name': rule.convert_rule_name,
                     'rule_category': rule.convert_rule_category.convert_rule_category_name if rule.convert_rule_category else '',
                     'rule_category_id': rule.convert_rule_category.id if rule.convert_rule_category else None,
@@ -298,6 +298,32 @@ class FixedDataDetailView(LoginRequiredMixin, View):
                 'status': 'error',
                 'message': Mess.ERROR.value
             }, status=500)
+
+
+class SearchFixDataItem(LoginRequiredMixin, View):
+    def get(self, request, rule_id):
+        if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid request type'}, status=400)
+
+        tenant = request.user.tenant
+
+        value = request.GET.get('value', None)
+        if not value:
+            data = ConvertDataValue.objects.filter(
+                tenant=tenant,
+                id=rule_id
+            ).order_by('id')
+
+            if data:
+                items = [
+                    ...
+                ]
+
+        data = ConvertDataValue.objects.filter(
+            Q(tenant=tenant) & Q(
+                id=rule_id, data_value_before__contains=value, data_value_after__contains=value
+            )
+        )
 
 
 class FixedDataDeleteView(LoginRequiredMixin, View):

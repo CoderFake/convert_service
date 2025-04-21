@@ -45,33 +45,10 @@
             border: 1px solid #efefef !important;
         }
 
-        .filter-row #fileFormatSelect{
-            min-width: 160px;
-        }
-
-        .filter-row #fromToTypeSelect{
-            min-width: 340px;
-        }
-
-        .format-badge {
-            font-size: 85%;
-            font-weight: normal;
-            padding: 3px 6px;
-            border-radius: 3px;
-        }
-
         .bg-light{
             background: #efefef !important;
         }
 
-        .badge-excel {
-            background-color: #1D6F42;
-            color: white;
-        }
-        .badge-csv {
-            background-color: #4F81BD;
-            color: white;
-        }
         .dataTables_filter, .dataTables_length{
             width: 100% !important;
             display: flex;
@@ -124,9 +101,12 @@
             margin-right: 0;
         }
 
-        #fixedRuleTable_filter label {
-            position: relative;
-            z-index: 1;
+        #fixedValuesTableBody td {
+            padding: 5px 5px;
+        }
+
+        #fixedRuleModal .form-control{
+            height: calc(1.2em + 1.25rem);
         }
 
         .dataTables_info{
@@ -151,174 +131,9 @@
             height: 3rem;
         }
 
-        /* Modal mở rộng */
         .modal-expandable {
             max-width: 850px;
             transition: max-width 0.3s ease;
-        }
-
-        .modal-expanded {
-            max-width: 95%;
-        }
-
-        /* Phần fixed rule */
-        .fixed-rule-section {
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-            margin-bottom: 20px;
-        }
-
-        .rule-header {
-            padding: 15px;
-            background-color: #edf2f7;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .rule-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .rule-info-item {
-            margin-bottom: 5px;
-        }
-
-        .rule-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-right: 10px;
-        }
-
-        .rule-value {
-            font-weight: 400;
-        }
-
-        .expand-button {
-            background-color: #4e73df;
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .expand-button:hover {
-            background-color: #3756a4;
-        }
-
-        .expand-button i {
-            transition: transform 0.3s ease;
-        }
-
-        .expand-button.expanded i {
-            transform: rotate(180deg);
-        }
-
-        .fixed-values-section {
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-        }
-
-        .values-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .values-header h5 {
-            margin: 0;
-        }
-
-        .search-bar {
-            position: relative;
-            max-width: 300px;
-        }
-
-        .search-bar input {
-            padding-right: 35px;
-        }
-
-        .search-bar .search-icon {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-
-        .values-table {
-            margin-top: 15px;
-        }
-
-        .values-table th, .values-table td {
-            vertical-align: middle;
-        }
-
-        .values-actions {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-        }
-
-        .btn-group-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .custom-pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .custom-pagination .btn {
-            padding: 0.25rem 0.5rem;
-            height: 30px;
-        }
-
-        .batch-actions {
-            display: none;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            align-items: center;
-        }
-
-        .batch-actions.visible {
-            display: flex;
-        }
-
-        .batch-actions .selected-count {
-            margin-right: 15px;
-            font-weight: 500;
-        }
-
-        .batch-actions .btn-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        .modal-expandable {
-            max-width: 850px;
-            transition: max-width 1s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-left: auto;
-            margin-right: auto;
         }
 
         .modal-expanded {
@@ -348,6 +163,45 @@
 
         .expand-button.expanded i {
             transform: rotate(180deg);
+        }
+
+        .fixed-data, .fixed-values-container{
+            max-height: 490px;
+        }
+
+        .fixed-values-section {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+
+        .values-table th, .values-table td {
+            vertical-align: middle;
+        }
+
+        .custom-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .custom-pagination .btn {
+            padding: 0.25rem 0.5rem;
+            height: 30px;
+        }
+
+        .add-fixed-value-row {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+        }
+
+        .remove-row-btn {
+            margin-top: 32px;
         }
 
     </style>
@@ -421,127 +275,94 @@
 <div class="modal fade" id="fixedRuleModal" tabindex="-1" role="dialog" aria-labelledby="fixedRuleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-expandable" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="fixedRuleModalLabel">固定変換ルール管理</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-12" id="fixedRuleSectionCol">
-                        <div class="fixed-rule-section">
-                            <div class="rule-header">
-                                <div class="rule-info">
-                                    <div class="rule-info-item">
-                                        <span class="rule-title">変換ルール:</span>
-                                        <span class="rule-value conversion-rule-label">予約時間-受付時間終了</span>
-                                    </div>
-                                    <div class="rule-info-item">
-                                        <span class="rule-title">変換ロジック:</span>
-                                        <span class="rule-value conversion-logic-label">ふくおか公衆衛生用変換 (顧客名-団体番号1)</span>
-                                    </div>
+            <form id="fixedRuleForm">
+                {% csrf_token %}
+                <input type="hidden" id="editRuleId" name="rule_id">
+                <input type="hidden" id="file-format-id" name="file_format_id" value="">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fixedRuleModalLabel">固定変換ルール管理</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-12" id="fixedRuleSectionCol">
+                            <div class="form-group row">
+                                <label for="ruleFixedId" class="col-sm-3 col-form-label">変換ルール</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" id="ruleFixedId" name="rule_fixed_id">
+                                    <div class="invalid-feedback" id="rule_fixed_id_error"></div>
                                 </div>
-                                <button type="button" class="expand-button" id="expandValuesBtn">
-                                    <i class="fas fa-chevron-right"></i>
-                                </button>
                             </div>
 
-                            <form id="fixedRuleForm">
-                                {% csrf_token %}
-                                <input type="hidden" id="editRuleId" name="rule_id">
-                                <input type="hidden" id="file-format-id" name="file_format_id" value="">
-
-                                <div class="form-group">
-                                    <label for="ruleName">ルール名</label>
+                            <div class="form-group row mt-3">
+                                <label for="ruleName" class="col-sm-3 col-form-label">変換ロジック</label>
+                                <div class="col-sm-9">
                                     <input type="text" class="form-control" id="ruleName" name="rule_name">
                                     <div class="invalid-feedback" id="rule_name_error"></div>
                                 </div>
+                            </div>
 
-                                <div class="form-group mt-3">
-                                    <label for="ruleCategory">ルールカテゴリ</label>
-                                    <select class="form-control" id="ruleCategory" name="rule_category">
-                                        <option value="">カテゴリを選択してください</option>
-                                        {% for category in rule_categories %}
-                                            <option value="{{ category.id }}">{{ category.convert_rule_category_name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <div class="invalid-feedback" id="rule_category_error"></div>
-                                </div>
+                            <input type="hidden" id="ruleCategory" name="rule_category" value="2">
 
-                                <div class="form-group mt-3">
-                                    <label for="ruleDescription">ルールの説明</label>
-                                    <textarea class="form-control" id="ruleDescription" name="rule_description" rows="3"></textarea>
-                                    <div class="invalid-feedback" id="rule_description_error"></div>
+                            <div class="mt-4" id="add-fixed-values-section">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <button type="button" class="btn btn-primary btn-sm add-new-value-row">
+                                        <i class="fas fa-plus"></i> 入力行を追加
+                                    </button>
                                 </div>
-                            </form>
+                                <div class="fixed-data overflow-hidden w-100">
+                                    <div class="fixed-values-container overflow-auto">
+                                </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="col-md-6" id="fixedValuesSectionCol" style="display: none;">
-                        <div class="fixed-values-section">
-                            <div class="values-header">
-                                <h5>変換値のリスト</h5>
-                                <div class="search-bar">
-                                    <input type="text" id="valueSearchInput" class="form-control" placeholder="値を検索...">
-                                    <i class="fas fa-search search-icon"></i>
+                        <div class="col-md-6" id="fixedValuesSectionCol" style="display: none;">
+
+                            <div class="fixed-values-section">
+                                <div class="search-fixed-data mb-3">
+                                    <input type="search" class="form-control" placeholder="キーワード入力">
                                 </div>
-                            </div>
-
-                            <!-- Batch actions -->
-                            <div class="batch-actions" id="batchActionsPanel">
-                                <span class="selected-count">0 個の項目が選択されました</span>
-                                <div class="btn-group">
-                                    <button class="btn btn-danger" id="deleteSelectedBtn">
-                                        <i class="fas fa-trash-alt"></i> 選択項目を削除
-                                    </button>
+                                <div class="table-responsive values-table">
+                                    <table class="table table-bordered table-hover">
+                                        <thead class="bg-primary text-white">
+                                            <tr>
+                                                <th style="width: 40px;">No.</th>
+                                                <th>変換前データ値</th>
+                                                <th>変換後データ値</th>
+                                                <th style="width: 80px;">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fixedValuesTableBody">
+                                        </tbody>
+                                    </table>
                                 </div>
-                            </div>
 
-                            <div class="table-responsive values-table">
-                                <table class="table table-bordered table-hover">
-                                    <thead class="bg-info text-white">
-                                        <tr>
-                                            <th style="width: 50px;">
-                                                <input type="checkbox" id="selectAllValues">
-                                            </th>
-                                            <th style="width: 80px;">No.</th>
-                                            <th>変換前データ値</th>
-                                            <th>変換後データ値</th>
-                                            <th style="width: 80px;">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="fixedValuesTableBody">
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="values-actions">
-                                <button class="btn btn-primary" id="addRowBtn">
-                                    <i class="fas fa-plus"></i> 行を追加
-                                </button>
-
-                                <div class="custom-pagination">
-                                    <button class="btn btn-sm btn-outline-primary prev-page">
-                                        <i class="fas fa-chevron-left"></i>
-                                    </button>
-                                    <span class="mx-2 pagination-info">ページ 1/1</span>
-                                    <button class="btn btn-sm btn-outline-primary next-page">
-                                        <i class="fas fa-chevron-right"></i>
-                                    </button>
+                                <div class="values-actions">
+                                    <div class="custom-pagination">
+                                        <button class="btn btn-sm btn-outline-primary prev-page" type="button">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </button>
+                                        <span class="mx-2 pagination-info">ページ 1/1</span>
+                                        <button class="btn btn-sm btn-outline-primary next-page" type="button">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <div class="d-flex justify-content-between w-100">
+
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
-                    <button type="button" class="btn btn-primary" id="saveFixedRule">ルールを保存</button>
-                    <button type="button" class="btn btn-success" id="saveFixedValues" style="display: none;">値を保存</button>
+                    <button type="submit" class="btn btn-primary" id="saveFixedRule">ルールを保存</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
@@ -558,6 +379,7 @@ $(document).ready(function() {
     let currentItems = [];
     let allItems = [];
     let selectedRuleId = null;
+    let isEditing = false;
 
     try {
         fixedRuleTable = $('#fixedRuleTable').DataTable({
@@ -609,103 +431,98 @@ $(document).ready(function() {
             },
             dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, '全て']],
-            pageLength: 10,
-            drawCallback: function() {
-                $('#fixedRuleTable thead tr').find('th').first().text('No.');
-            },
-            initComplete: function() {
-                $('#fixedRuleTable_filter').hide();
-                $('#fixedRuleTable_wrapper .row').addClass('mb-4');
-                $('#fixedRuleTable_wrapper .row:first-child .col-md-6:first-child').html('')
-                .append(`
-                    <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="fixedRuleTable">
-                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換前のデータ値・変換後のデータ値・変換ルール</span>
-                `);
-            }
+            pageLength: 10
         });
     } catch (e) {
         console.error('Error initializing table:', e);
         createToast('error', 'テーブルの初期化中にエラーが発生しました。');
     }
 
-    $(document).on('keypress', '.search-input', function(e) {
-        if (e.which === 13) {
-            e.preventDefault();
-            const searchValue = $(this).val();
-            fixedRuleTable.search(searchValue).draw();
-        }
-    });
-    $('#valueSearchInput').on('keyup', function() {
-        const keyword = $(this).val().toLowerCase();
-        filterModalItems(keyword);
-    });
     $('#addFixedRuleBtn').on('click', function() {
         openAddRuleModal();
     });
+
     $('#fixedRuleTable tbody').on('click', '.edit-item', function() {
         const itemId = $(this).data('id');
         const ruleId = $(this).data('rule-id');
         selectedRuleId = ruleId;
+        isEditing = true;
         loadFixedDataItems(ruleId);
     });
+
     $('#fixedRuleTable tbody').on('click', '.delete-item', function() {
         const itemId = $(this).data('id');
         prepareDeleteModal(itemId);
     });
-    $('#expandValuesBtn').on('click', function() {
+
+    // Add new fixed value row
+    $(document).on('click', '.add-new-value-row', function() {
+        addNewFixedValueRow();
+    });
+
+    // Remove fixed value row
+    $(document).on('click', '.remove-row-btn', function() {
+        $(this).closest('.add-fixed-value-row').remove();
+        updateFixedValueRowNumbers();
+    });
+
+    // Form submit handler
+    $('#fixedRuleForm').on('submit', function(e) {
+        e.preventDefault();
+        if (validateForm()) {
+            saveFixedRule();
+        }
+    });
+
+    // Expand values section
+    $(document).on('click', '#expandValuesBtn', function() {
         toggleFixedValuesSection();
     });
-    $('#addRowBtn').on('click', function() {
-        addNewRow();
+
+    // Inline edit in table
+    $(document).on('blur', '.inline-edit', function() {
+        const $tr = $(this).closest('tr');
+        const itemId = $tr.data('id');
+        const beforeValue = $tr.find('.before-value-edit').val();
+        const afterValue = $tr.find('.after-value-edit').val();
+        saveInlineEdit(itemId, beforeValue, afterValue);
     });
-    $(document).on('click', '.delete-value-btn', function() {
-        $(this).closest('tr').remove();
-        renumberRows();
-        updateSelectedCount();
-    });
-    $('#selectAllValues').on('change', function() {
-        const isChecked = $(this).prop('checked');
-        $('#fixedValuesTableBody input[type="checkbox"]').prop('checked', isChecked);
-        updateSelectedCount();
-        toggleBatchActionsPanel();
-    });
-    $(document).on('change', '#fixedValuesTableBody input[type="checkbox"]', function() {
-        updateSelectedCount();
-        toggleBatchActionsPanel();
-        const allChecked = $('#fixedValuesTableBody input[type="checkbox"]').length ===
-                          $('#fixedValuesTableBody input[type="checkbox"]:checked').length;
-        $('#selectAllValues').prop('checked', allChecked);
-    });
-    $('#deleteSelectedBtn').on('click', function() {
-        deleteSelectedRows();
-    });
-    $('#saveFixedRule').on('click', function() {
-        saveFixedRule();
-    });
-    $('#saveFixedValues').on('click', function() {
-        saveFixedValues();
-    });
-    $('.prev-page').on('click', function() {
+
+    // Pagination controls
+    $(document).on('click', '.prev-page', function() {
         if (currentPage > 1) {
             goToPage(currentPage - 1);
         }
     });
 
-    $('.next-page').on('click', function() {
+    $(document).on('click', '.next-page', function() {
         if (currentPage < totalPages) {
             goToPage(currentPage + 1);
         }
     });
+
+    // Delete fixed value from table
+    $(document).on('click', '.delete-fixed-value', function() {
+        const itemId = $(this).data('id');
+        deleteFixedValue(itemId);
+    });
+
+    // Functions
     function openAddRuleModal() {
         resetModalForms();
+        isEditing = false;
+        selectedRuleId = null;
+
+        $('#expandValuesBtn').hide();
+        $('#fixedValuesSectionCol').hide().removeClass('visible');
         $('#fixedRuleModal .modal-dialog').removeClass('modal-expanded');
         $('#fixedRuleSectionCol').removeClass('col-md-6').addClass('col-12');
-        $('#expandValuesBtn').removeClass('expanded');
+
+        addNewFixedValueRow();
+
+        $('#fixedRuleModal .modal-title').text('固定データ追加');
 
         $('#fixedRuleModal').modal('show');
-        $('#fixedValuesSectionCol').hide();
-        $('#saveFixedRule').show();
-        $('#saveFixedValues').hide();
     }
 
     function resetModalForms() {
@@ -714,50 +531,63 @@ $(document).ready(function() {
         $('.invalid-feedback').empty();
         $('.is-invalid').removeClass('is-invalid');
         $('#fixedValuesTableBody').empty();
+        $('.fixed-values-container').empty();
         currentItems = [];
         allItems = [];
         currentPage = 1;
         updatePaginationInfo();
-        $('#valueSearchInput').val('');
-        $('#batchActionsPanel').hide();
-        $('#selectAllValues').prop('checked', false);
     }
 
-    function toggleFixedValuesSection() {
-        const valuesSection = $('#fixedValuesSectionCol');
-        const expandButton = $('#expandValuesBtn');
-        const modal = $('#fixedRuleModal .modal-dialog');
+    function addNewFixedValueRow() {
+        const rowCount = $('.fixed-values-container .add-fixed-value-row').length + 1;
+        const rowHtml = `
+            <div class="add-fixed-value-row">
+                <div class="form-row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label>変換前データ値 ${rowCount}</label>
+                            <input type="text" class="form-control before-value" name="before_value[]">
+                            <div class="invalid-feedback before-value-error"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label>変換後データ値 ${rowCount}</label>
+                            <input type="text" class="form-control after-value" name="after_value[]">
+                            <div class="invalid-feedback after-value-error"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 pt-2 my-auto">
+                        <button type="button" class="btn btn-danger btn-sm remove-row-btn pt-1 my-auto">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('.fixed-values-container').append(rowHtml);
+        const container = $('.fixed-values-container')[0];
+        container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
 
-        if (valuesSection.hasClass('visible')) {
-            valuesSection.removeClass('visible');
-
-            valuesSection.hide();
-            $('#fixedRuleSectionCol').removeClass('col-md-6').addClass('col-12');
-            $('#saveFixedValues').hide();
-
-            modal.removeClass('modal-expanded');
-            expandButton.removeClass('expanded');
-
-        } else {
-            modal.addClass('modal-expanded');
-            expandButton.addClass('expanded');
-
-            $('#fixedRuleSectionCol').removeClass('col-12').addClass('col-md-6');
-
-            valuesSection.show();
-
-            setTimeout(() => {
-                valuesSection.addClass('visible');
-                $('#saveFixedValues').show();
-            }, 50);
-
-        }
+    function updateFixedValueRowNumbers() {
+        $('.add-fixed-value-row').each(function(index) {
+            $(this).find('label:contains("変換前データ値")').text('変換前データ値 ' + (index + 1));
+            $(this).find('label:contains("変換後データ値")').text('変換後データ値 ' + (index + 1));
+        });
     }
 
     function loadFixedDataItems(ruleId) {
         resetModalForms();
         $('#editRuleId').val(ruleId);
-        $('#tableLoadingOverlay').show();
+
+        $('#expandValuesBtn').show();
+        $('#fixedValuesSectionCol').show().addClass('visible');
+        $('#fixedRuleModal .modal-dialog').addClass('modal-expanded');
+        $('#fixedRuleSectionCol').removeClass('col-12').addClass('col-md-6');
 
         $.ajax({
             url: `/settings/fixed-data-detail/${ruleId}/`,
@@ -768,11 +598,11 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.status === 'success') {
                     const ruleData = response.data;
+
+                    $('#ruleFixedId').val(ruleData.rule_fixed_id || '');
                     $('#ruleName').val(ruleData.rule_name || '');
-                    $('#ruleCategory').val(ruleData.rule_category_id || '');
-                    $('#ruleDescription').val(ruleData.rule_description || '');
-                    $('.conversion-rule-label').text(ruleData.rule_name || '予約時間-受付時間終了');
-                    $('.conversion-logic-label').text(ruleData.rule_category || 'ふくおか公衆衛生用変換');
+
+                    // Load existing fixed values
                     allItems = ruleData.items.map(item => ({
                         'id': item.id,
                         'before': item.data_value_before,
@@ -782,29 +612,191 @@ $(document).ready(function() {
                     totalPages = Math.ceil(allItems.length / pageSize) || 1;
                     goToPage(1);
                     updatePaginationInfo();
+
+                    // Add new fixed value rows
+                    addNewFixedValueRow();
+
                     $('#fixedRuleModal .modal-title').text('固定データ編集');
                     $('#fixedRuleModal').modal('show');
-                    if (allItems.length > 0 && !$('#fixedValuesSectionCol').is(':visible')) {
-                        setTimeout(() => {
-                            toggleFixedValuesSection();
-                        }, 300);
+                }
+            }
+        });
+    }
+
+    function toggleFixedValuesSection() {
+        const valuesSection = $('#fixedValuesSectionCol');
+        const expandButton = $('#expandValuesBtn');
+        const modal = $('#fixedRuleModal .modal-dialog');
+
+        if (valuesSection.hasClass('visible')) {
+            valuesSection.removeClass('visible');
+            valuesSection.hide();
+            $('#fixedRuleSectionCol').removeClass('col-md-6').addClass('col-12');
+            modal.removeClass('modal-expanded');
+            expandButton.removeClass('expanded');
+        } else {
+            modal.addClass('modal-expanded');
+            expandButton.addClass('expanded');
+            $('#fixedRuleSectionCol').removeClass('col-12').addClass('col-md-6');
+            valuesSection.show();
+            setTimeout(() => {
+                valuesSection.addClass('visible');
+            }, 50);
+        }
+    }
+
+    function validateForm() {
+        let isValid = true;
+        $('.invalid-feedback').empty();
+        $('.is-invalid').removeClass('is-invalid');
+
+        // Validate rule name
+        const ruleFixedId = $('#ruleFixedId').val().trim();
+        if (!ruleFixedId) {
+            $('#ruleFixedId').addClass('is-invalid');
+            $('#rule_fixed_id_error').text('このフィールドは必須です。');
+            isValid = false;
+        }
+
+        // Validate rule description
+        const ruleName = $('#ruleName').val().trim();
+        if (!ruleName) {
+            $('#ruleName').addClass('is-invalid');
+            $('#rule_name_error').text('このフィールドは必須です。');
+            isValid = false;
+        }
+
+        // Validate fixed values
+        let hasValidFixedValue = false;
+        const beforeValues = new Set(allItems.map(item => item.before)); // Include existing items
+
+        $('.add-fixed-value-row').each(function() {
+            const beforeValue = $(this).find('.before-value').val().trim();
+            const afterValue = $(this).find('.after-value').val().trim();
+
+            if (beforeValue || afterValue) {
+                if (!beforeValue) {
+                    $(this).find('.before-value').addClass('is-invalid');
+                    $(this).find('.before-value-error').text('このフィールドは必須です。');
+                    isValid = false;
+                } else if (beforeValues.has(beforeValue)) {
+                    $(this).find('.before-value').addClass('is-invalid');
+                    $(this).find('.before-value-error').text('変換前データ値が重複しています。');
+                    isValid = false;
+                } else {
+                    beforeValues.add(beforeValue);
+                }
+
+                if (!afterValue) {
+                    $(this).find('.after-value').addClass('is-invalid');
+                    $(this).find('.after-value-error').text('このフィールドは必須です。');
+                    isValid = false;
+                }
+
+                if (beforeValue && afterValue) {
+                    hasValidFixedValue = true;
+                }
+            }
+        });
+
+        return isValid && hasValidFixedValue;
+    }
+
+    function saveFixedRule() {
+        const ruleId = $('#editRuleId').val();
+        const ruleFixedId = $('#ruleFixedId').val().trim();
+        const ruleName = $('#ruleName').val().trim();
+        const ruleCategory = $('#ruleCategory').val();
+
+        // Collect fixed values
+        const fixedValues = [];
+        $('.add-fixed-value-row').each(function() {
+            const beforeValue = $(this).find('.before-value').val().trim();
+            const afterValue = $(this).find('.after-value').val().trim();
+
+            if (beforeValue && afterValue) {
+                fixedValues.push({
+                    'before': beforeValue,
+                    'after': afterValue
+                });
+            }
+        });
+
+        const saveBtn = $('#saveFixedRule');
+        const saveBtnText = saveBtn.html();
+        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...');
+        saveBtn.prop('disabled', true);
+
+        const url = ruleId ? `/settings/fixed-rule-update/${ruleId}/` : '/settings/fixed-rule-create/';
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+                rule_id: ruleId,
+                rule_fixed_id: ruleFixedId,
+                rule_category: ruleCategory,
+                rule_name: ruleName,
+                csrfmiddlewaretoken: getCookie('csrftoken')
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Save fixed values if any
+                    if (fixedValues.length > 0) {
+                        const ruleIdToUse = ruleId || response.data.rule_id;
+                        saveFixedValues(ruleIdToUse, fixedValues);
+                    } else {
+                        createToast('success', response.message || '保存に成功しました。');
+                        $('#fixedRuleModal').modal('hide');
+                        fixedRuleTable.ajax.reload();
                     }
                 } else {
-                    createToast('error', response.message || 'データの読み込み中にエラーが発生しました。');
+                    displayFormErrors(response.errors);
                 }
             },
             error: function(xhr) {
-                let errorMsg = 'データの読み込み中にエラーが発生しました。';
+                let errorMsg = '保存中にエラーが発生しました。';
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    if (response.message) {
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                        return;
+                    } else if (response.message) {
                         errorMsg = response.message;
                     }
                 } catch (e) {}
                 createToast('error', errorMsg);
             },
             complete: function() {
-                $('#tableLoadingOverlay').hide();
+                saveBtn.html(saveBtnText);
+                saveBtn.prop('disabled', false);
+            }
+        });
+    }
+
+    function saveFixedValues(ruleId, items) {
+        $.ajax({
+            url: '/settings/fixed-data-batch-save/',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                rule_id: ruleId,
+                items: items
+            }),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    createToast('success', response.message || '保存に成功しました。');
+                    $('#fixedRuleModal').modal('hide');
+                    fixedRuleTable.ajax.reload();
+                } else {
+                    displayFormErrors(response.errors);
+                }
+            },
+            error: function(xhr) {
+                createToast('error', '固定値の保存中にエラーが発生しました。');
             }
         });
     }
@@ -826,40 +818,21 @@ $(document).ready(function() {
 
     function renderItems() {
         $('#fixedValuesTableBody').empty();
-        if (currentItems.length === 0) {
-            if (allItems.length === 0) {
-                addNewRow();
-            } else {
-                $('#fixedValuesTableBody').append(`
-                    <tr>
-                        <td colspan="5" class="text-center">表示するデータがありません</td>
-                    </tr>
-                `);
-            }
-        } else {
-            currentItems.forEach(function(item, index) {
-                const rowIndex = (currentPage - 1) * pageSize + index + 1;
-                addTableRow(rowIndex, item.id, item.before, item.after);
-            });
-        }
+        currentItems.forEach(function(item, index) {
+            const rowIndex = (currentPage - 1) * pageSize + index + 1;
+            addTableRow(rowIndex, item.id, item.before, item.after);
+        });
     }
 
     function addTableRow(rowIndex, itemId, beforeValue = '', afterValue = '') {
         const row = `
             <tr data-id="${itemId || ''}">
-                <td class="text-center">
-                    <input type="checkbox" class="value-checkbox">
-                </td>
-                <td class="text-center">${rowIndex}</td>
+                <td>${rowIndex}</td>
+                <td><input type="text" class="form-control inline-edit before-value-edit" value="${beforeValue}" /></td>
+                <td><input type="text" class="form-control inline-edit after-value-edit" value="${afterValue}" /></td>
                 <td>
-                    <input type="text" class="form-control before-value" value="${beforeValue || ''}">
-                </td>
-                <td>
-                    <input type="text" class="form-control after-value" value="${afterValue || ''}">
-                </td>
-                <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-danger delete-value-btn">
-                        <i class="fas fa-trash-alt"></i>
+                    <button class="btn btn-danger btn-sm delete-fixed-value" data-id="${itemId}">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -867,89 +840,56 @@ $(document).ready(function() {
         $('#fixedValuesTableBody').append(row);
     }
 
-    function addNewRow(beforeValue = '', afterValue = '') {
-        if ($('#fixedValuesTableBody tr').length === 1 && $('#fixedValuesTableBody tr td').length === 1) {
-            $('#fixedValuesTableBody').empty();
+    function saveInlineEdit(itemId, beforeValue, afterValue) {
+        if (!beforeValue || !afterValue) {
+            createToast('error', '変換前データ値と変換後データ値は必須です。');
+            return;
         }
 
-        const rowCount = $('#fixedValuesTableBody tr').length + 1;
-        addTableRow(rowCount, '', beforeValue, afterValue);
-        updateSelectedCount();
-    }
-
-    function renumberRows() {
-        $('#fixedValuesTableBody tr').each(function(index) {
-            $(this).find('td:eq(1)').text(index + 1);
-        });
-    }
-
-    function filterModalItems(keyword) {
-        if (!keyword) {
-            if (window.originalItems) {
-                allItems = [...window.originalItems];
-            }
-        } else {
-            if (!window.originalItems) {
-                window.originalItems = [...allItems];
-            }
-            allItems = window.originalItems.filter(item =>
-                (item.before && item.before.toLowerCase().includes(keyword)) ||
-                (item.after && item.after.toLowerCase().includes(keyword))
-            );
+        // Check for duplicate beforeValue
+        const otherBeforeValues = allItems
+            .filter(item => item.id !== itemId)
+            .map(item => item.before);
+        if (otherBeforeValues.includes(beforeValue)) {
+            createToast('error', '変換前データ値が重複しています。');
+            return;
         }
-        totalPages = Math.ceil(allItems.length / pageSize) || 1;
-        goToPage(1);
-    }
 
-    function updateSelectedCount() {
-        const selectedCount = $('#fixedValuesTableBody input[type="checkbox"]:checked').length;
-        $('.selected-count').text(`${selectedCount} 個の項目が選択されました`);
-        toggleBatchActionsPanel();
-    }
-
-    function toggleBatchActionsPanel() {
-        const selectedCount = $('#fixedValuesTableBody input[type="checkbox"]:checked').length;
-        if (selectedCount > 0) {
-            $('#batchActionsPanel').addClass('visible').show();
-        } else {
-            $('#batchActionsPanel').removeClass('visible').hide();
-        }
-    }
-
-    function deleteSelectedRows() {
-        const selectedRows = $('#fixedValuesTableBody input[type="checkbox"]:checked').closest('tr');
-        selectedRows.remove();
-        renumberRows();
-        updateSelectedCount();
-        const selectedIds = [];
-        selectedRows.each(function() {
-            const id = $(this).data('id');
-            if (id) {
-                selectedIds.push(id);
+        $.ajax({
+            url: '/settings/fixed-data-batch-save/',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                rule_id: selectedRuleId,
+                items: [{ id: itemId, before: beforeValue, after: afterValue }]
+            }),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Update local data
+                    const item = allItems.find(item => item.id === itemId);
+                    if (item) {
+                        item.before = beforeValue;
+                        item.after = afterValue;
+                    }
+                    goToPage(currentPage); // Refresh table
+                    createToast('success', '固定値が更新されました。');
+                } else {
+                    createToast('error', response.message || '更新に失敗しました。');
+                }
+            },
+            error: function() {
+                createToast('error', '固定値の更新中にエラーが発生しました。');
             }
         });
-
-        if (selectedIds.length > 0) {
-            allItems = allItems.filter(item => !selectedIds.includes(item.id));
-            totalPages = Math.ceil(allItems.length / pageSize) || 1;
-            if (currentPage > totalPages) {
-                currentPage = totalPages;
-            }
-            goToPage(currentPage);
-        }
     }
 
-    function prepareDeleteModal(itemId) {
-        $('#confirmDelete').data('id', itemId);
-        $('#deleteModal').modal('show');
-    }
+    function deleteFixedValue(itemId) {
+        if (!confirm('この固定値を削除しますか？')) return;
 
-    $('#confirmDelete').on('click', function() {
-        const itemId = $(this).data('id');
-        deleteFixedDataItem(itemId);
-    });
-
-    function deleteFixedDataItem(itemId) {
         $.ajax({
             url: `/settings/fixed-data-delete/${itemId}/`,
             type: 'POST',
@@ -958,205 +898,53 @@ $(document).ready(function() {
                 'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
-                $('#deleteModal').modal('hide');
                 if (response.status === 'success') {
-                    createToast('success', response.message || '削除に成功しました。');
-                    fixedRuleTable.ajax.reload();
+                    // Remove from local data
+                    allItems = allItems.filter(item => item.id !== itemId);
+                    totalPages = Math.ceil(allItems.length / pageSize) || 1;
+                    if (currentPage > totalPages) currentPage = totalPages;
+                    goToPage(currentPage);
+                    createToast('success', response.message || '固定値が削除されました。');
                 } else {
-                    createToast('error', response.message || '削除中にエラーが発生しました。');
+                    createToast('error', response.message || '削除に失敗しました。');
                 }
             },
             error: function() {
-                $('#deleteModal').modal('hide');
-                createToast('error', '削除中にエラーが発生しました。');
+                createToast('error', '固定値の削除中にエラーが発生しました。');
             }
         });
     }
 
-    function saveFixedRule() {
-        const ruleId = $('#editRuleId').val();
-        const ruleName = $('#ruleName').val();
-        const ruleCategory = $('#ruleCategory').val();
-        const ruleDescription = $('#ruleDescription').val();
-
-        if (!ruleName || !ruleCategory) {
-            if (!ruleName) {
-                $('#ruleName').addClass('is-invalid');
-                $('#rule_name_error').text('このフィールドは必須です。');
-            }
-            if (!ruleCategory) {
-                $('#ruleCategory').addClass('is-invalid');
-                $('#rule_category_error').text('このフィールドは必須です。');
-            }
-            return;
-        }
-
-        const saveBtn = $('#saveFixedRule');
-        const saveBtnText = saveBtn.html();
-        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...');
-        saveBtn.prop('disabled', true);
-
-        const url = ruleId ? `/settings/fixed-rule-update/${ruleId}/` : '/settings/fixed-rule-create/';
-        $.ajax({
-            url: url,
-            type: 'POST',
-            data: {
-                rule_id: ruleId,
-                rule_name: ruleName,
-                rule_category: ruleCategory,
-                rule_description: ruleDescription,
-                csrfmiddlewaretoken: getCookie('csrftoken')
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    createToast('success', response.message || '保存に成功しました。');
-                    if (!ruleId && response.data && response.data.rule_id) {
-                        $('#editRuleId').val(response.data.rule_id);
-                        selectedRuleId = response.data.rule_id;
-                    }
-                    if (!$('#fixedValuesSectionCol').is(':visible')) {
-                        setTimeout(() => {
-                            toggleFixedValuesSection();
-                        }, 100);
-                    }
-                    setTimeout(() => {
-                        $('#fixedValuesTableBody tr:first-child .before-value').focus();
-                    }, 300);
-                } else {
-                    if (response.errors) {
-                        displayFormErrors(response.errors);
+    function prepareDeleteModal(itemId) {
+        $('#deleteModal').modal('show');
+        $('#confirmDelete').off('click').on('click', function() {
+            $.ajax({
+                url: `/settings/fixed-data-delete/${itemId}/`,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        createToast('success', response.message);
+                        fixedRuleTable.ajax.reload();
+                        $('#deleteModal').modal('hide');
                     } else {
-                        createToast('error', response.message || '保存中にエラーが発生しました。');
+                        createToast('error', response.message);
                     }
+                },
+                error: function(xhr) {
+                    createToast('error', '削除中にエラーが発生しました。');
                 }
-            },
-            error: function(xhr) {
-                let errorMsg = '保存中にエラーが発生しました。';
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.errors) {
-                        displayFormErrors(response.errors);
-                        return;
-                    } else if (response.message) {
-                        errorMsg = response.message;
-                    }
-                } catch (e) {}
-                createToast('error', errorMsg);
-            },
-            complete: function() {
-                saveBtn.html(saveBtnText);
-                saveBtn.prop('disabled', false);
-            }
+            });
         });
-    }
-
-    function saveFixedValues() {
-        saveCurrentPageItems();
-
-        const ruleId = $('#editRuleId').val();
-        if (!ruleId) {
-            createToast('error', '最初にルールを保存してください。');
-            return;
-        }
-
-        const allDataItems = collectAllFixedValues();
-
-        const saveBtn = $('#saveFixedValues');
-        const saveBtnText = saveBtn.html();
-        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...');
-        saveBtn.prop('disabled', true);
-
-        $.ajax({
-            url: '/settings/fixed-data-batch-save/',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                rule_id: ruleId,
-                items: allDataItems
-            }),
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    createToast('success', response.message || '保存に成功しました。');
-                    loadFixedDataItems(ruleId);
-                } else {
-                    if (response.errors) {
-                        displayFormErrors(response.errors);
-                    } else {
-                        createToast('error', response.message || '保存中にエラーが発生しました。');
-                    }
-                }
-            },
-            error: function(xhr) {
-                let errorMsg = '保存中にエラーが発生しました。';
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.errors) {
-                        displayFormErrors(response.errors);
-                        return;
-                    } else if (response.message) {
-                        errorMsg = response.message;
-                    }
-                } catch (e) {}
-                createToast('error', errorMsg);
-            },
-            complete: function() {
-                saveBtn.html(saveBtnText);
-                saveBtn.prop('disabled', false);
-            }
-        });
-    }
-
-    function saveCurrentPageItems() {
-        $('#fixedValuesTableBody tr').each(function(index) {
-            const rowId = $(this).data('id');
-            const beforeValue = $(this).find('.before-value').val();
-            const afterValue = $(this).find('.after-value').val();
-
-            if (beforeValue && afterValue) {
-                const itemIndex = (currentPage - 1) * pageSize + index;
-                if (rowId && itemIndex < allItems.length) {
-                    allItems[itemIndex].before = beforeValue;
-                    allItems[itemIndex].after = afterValue;
-                } else if (beforeValue && afterValue) {
-                    allItems.push({
-                        'id': null, // Will be assigned by the server
-                        'before': beforeValue,
-                        'after': afterValue
-                    });
-                }
-            }
-        });
-
-        totalPages = Math.ceil(allItems.length / pageSize) || 1;
-    }
-
-    function collectAllFixedValues() {
-        saveCurrentPageItems();
-        return allItems.filter(item => item.before && item.after).map(item => ({
-            'id': item.id || null,
-            'before': item.before,
-            'after': item.after
-        }));
     }
 
     function displayFormErrors(errors) {
-        $('.invalid-feedback').empty();
-        $('.is-invalid').removeClass('is-invalid');
-
-        for (const field in errors) {
-            const errorMsg = errors[field];
-            const errorElement = $(`#${field}_error`);
-
-            if (errorElement.length) {
-                errorElement.text(errorMsg);
-                errorElement.closest('.form-group').find('input, select, textarea').addClass('is-invalid');
-            } else if (field === 'items') {
-                createToast('error', errorMsg);
-            }
+        for (const [field, message] of Object.entries(errors)) {
+            $(`#${field}_error`).text(message).show();
+            $(`#${field}`).addClass('is-invalid');
         }
     }
 
