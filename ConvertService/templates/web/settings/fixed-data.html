@@ -597,15 +597,16 @@ $(document).ready(function() {
 
     });
 
-    $(document).on('blur', '.inline-edit', function() {
-        const $tr = $(this).closest('tr');
-        const itemId = $tr.data('id');
-        const beforeValue = $tr.find('.before-value-edit').val();
-        const afterValue = $tr.find('.after-value-edit').val();
-        console.log("beforeValue", beforeValue);
+    $(document).on('click', '.save-row-btn', function(e) {
+        e.preventDefault();
 
-        const originalBefore = $tr.find('.before-value-edit').data('original');
-        const originalAfter = $tr.find('.after-value-edit').data('original');
+        const itemId = $(this).attr('data-id');
+        const $row = $(this).closest('tr');
+        const beforeValue = $row.find('td:nth-child(2) input').val();
+        const afterValue = $row.find('td:nth-child(3) input').val();
+
+        const originalBefore = $row.find('.before-value-edit').data('original');
+        const originalAfter = $row.find('.after-value-edit').data('original');
 
         if (beforeValue !== originalBefore || afterValue !== originalAfter) {
             updateFixedDataValue(itemId, beforeValue, afterValue);
@@ -1046,9 +1047,12 @@ $(document).ready(function() {
                 <td class="text-center">${rowIndex}</td>
                 <td><input type="text" class="form-control inline-edit before-value-edit" value="${beforeValue}" data-original="${beforeValue}" /></td>
                 <td><input type="text" class="form-control inline-edit after-value-edit" value="${afterValue}" data-original="${afterValue}" /></td>
-                <td>
-                    <button class="btn btn-danger btn-sm delete-fixed-value ml-3" data-id="${itemId}">
+                <td class="d-flex flex-row gap-2 justify-content-center align-content-center">
+                    <button class="btn btn-danger btn-sm delete-fixed-value" data-id="${itemId}">
                         <i class="fas fa-trash"></i>
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm save-row-btn" data-id="${itemId}">
+                        <i class="fas fa-check-square"></i>
                     </button>
                 </td>
             </tr>
