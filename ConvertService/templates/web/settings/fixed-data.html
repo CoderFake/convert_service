@@ -171,7 +171,7 @@
         }
 
         .fixed-data, .fixed-values-container{
-            max-height: 498px;
+            max-height: 512px;
         }
 
         .fixed-values-section {
@@ -723,7 +723,7 @@ $(document).ready(function() {
         const container = $('.fixed-values-container')[0];
         if (container) {
             container.scrollTo({
-                top: container.scrollHeight,
+                top: (container.scrollHeight - container.scrollHeight*0.3),
                 behavior: 'smooth'
             });
         }
