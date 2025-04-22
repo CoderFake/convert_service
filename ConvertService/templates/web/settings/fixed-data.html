@@ -171,7 +171,7 @@
         }
 
         .fixed-data, .fixed-values-container{
-            max-height: 510px;
+            max-height: 498px;
         }
 
         .fixed-values-section {
@@ -340,7 +340,7 @@
                     </button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body pb-0">
                     <div class="row">
                         <div class="col-12" id="fixedRuleSectionCol">
                             <div class="form-group row">
@@ -374,8 +374,9 @@
                         <div class="col-md-6" id="fixedValuesSectionCol" style="display: none;">
 
                             <div class="fixed-values-section">
-                                <div class="search-fixed-data mb-3">
+                                <div class="search-fixed-data mb-1">
                                     <input type="search" class="form-control" placeholder="キーワード入力">
+                                    <span style="font-size: 0.7rem;">※ 検索条件： 変換前データ値・変換後データ値</span>
                                 </div>
                                 <div class="table-responsive values-table">
                                     <table class="table table-bordered table-hover">
@@ -1043,13 +1044,15 @@ $(document).ready(function() {
                 <td class="text-center">${rowIndex}</td>
                 <td><input type="text" class="form-control inline-edit before-value-edit" value="${beforeValue}" data-original="${beforeValue}" /></td>
                 <td><input type="text" class="form-control inline-edit after-value-edit" value="${afterValue}" data-original="${afterValue}" /></td>
-                <td class="d-flex flex-row gap-2 justify-content-center align-content-center">
-                    <button class="btn btn-danger btn-sm delete-fixed-value" data-id="${itemId}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                    <button type="button" class="btn btn-success btn-sm save-row-btn" data-id="${itemId}">
-                        <i class="fas fa-check-square"></i>
-                    </button>
+                <td>
+                    <div class="d-flex flex-row gap-2 justify-content-center align-content-center">
+                        <button class="btn btn-danger btn-sm delete-fixed-value" data-id="${itemId}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm save-row-btn" data-id="${itemId}">
+                            <i class="fas fa-check-square"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
