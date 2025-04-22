@@ -605,12 +605,8 @@ $(document).ready(function() {
         const beforeValue = $row.find('td:nth-child(2) input').val();
         const afterValue = $row.find('td:nth-child(3) input').val();
 
-        const originalBefore = $row.find('.before-value-edit').data('original');
-        const originalAfter = $row.find('.after-value-edit').data('original');
+        updateFixedDataValue(itemId, beforeValue, afterValue);
 
-        if (beforeValue !== originalBefore || afterValue !== originalAfter) {
-            updateFixedDataValue(itemId, beforeValue, afterValue);
-        }
     });
 
     function updateFixedDataValue(itemId, beforeValue, afterValue) {
