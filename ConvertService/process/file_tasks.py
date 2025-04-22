@@ -120,8 +120,7 @@ def process_and_format_file(
                             rules,
                             before_headers,
                             after_headers,
-                            tenant_id,
-                            data_format_id
+                            tenant_id
                         )
 
                         if isinstance(formatted_row, list) and len(formatted_row) > 0:
@@ -138,8 +137,7 @@ def process_and_format_file(
                             rules,
                             before_headers,
                             after_headers,
-                            tenant_id,
-                            data_format_id
+                            tenant_id
                         )
                         formatted_data.append(formatted_row)
 

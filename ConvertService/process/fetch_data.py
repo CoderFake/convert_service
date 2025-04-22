@@ -377,22 +377,12 @@ class RuleFixedID:
 class FixedValueFetcher:
     @staticmethod
     @lru_cache(maxsize=128)
-    def _get_mapping_for_rule(tenant_id, rule_fixed_id, data_format_id=None):
+    def _get_mapping_for_rule(tenant_id, rule_fixed_id):
         try:
             query_filter = {
                 'tenant_id': tenant_id,
                 'convert_rule__convert_rule_id': rule_fixed_id
             }
-
-            if data_format_id:
-                try:
-                    data_format = DataFormat.objects.get(
-                        tenant_id=tenant_id,
-                        data_format_id=data_format_id
-                    )
-                    query_filter['data_format'] = data_format
-                except DataFormat.DoesNotExist:
-                    logger.warning(f"Data format {data_format_id} not found for tenant {tenant_id}, using default.")
 
             fixed_values = ConvertDataValue.objects.filter(**query_filter).values_list("data_value_before", "data_value_after")
 
@@ -403,9 +393,9 @@ class FixedValueFetcher:
             return {}
 
     @classmethod
-    def get_value_mapping(cls, tenant_id, rule_fixed_id, before_value=None, data_format_id=None):
+    def get_value_mapping(cls, tenant_id, rule_fixed_id, before_value=None):
 
-        mapping = cls._get_mapping_for_rule(tenant_id, rule_fixed_id, data_format_id)
+        mapping = cls._get_mapping_for_rule(tenant_id, rule_fixed_id)
 
         if before_value is not None:
             return mapping.get(f"{before_value}", '')
