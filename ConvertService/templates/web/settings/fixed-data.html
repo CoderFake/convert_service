@@ -822,7 +822,11 @@ $(document).ready(function() {
                     totalPages = response.pagination.total_pages;
                     currentPage = response.pagination.current_page;
 
-                    renderItems(response.items, response.pagination.start_index);
+                    if (response.items.length === 0) {
+                        $('#fixedValuesTableBody').html('<tr><td colspan="4" class="text-center">データがありません</td></tr>');
+                    } else {
+                        renderItems(response.items, response.pagination.start_index);
+                    }
 
                     updatePagination(response.pagination);
                 }
