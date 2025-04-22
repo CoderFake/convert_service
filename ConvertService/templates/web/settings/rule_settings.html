@@ -207,12 +207,17 @@
             height: 3rem;
         }
 
-        .rule-category {
-            font-size: 0.85rem;
-            padding: 2px 8px;
-            border-radius: 12px;
-            background-color: #e9ecef;
-            margin-left: 5px;
+        .dataTables_wrapper .dataTables_scrollHead table.dataTable thead th,
+        .dataTables_wrapper table.dataTable thead th {
+            text-transform: none !important;
+        }
+
+        #inputData thead th,
+        #ruleTable thead th,
+        #dataItemTable thead th,
+        #fixedRuleTable thead th {
+            font-size: 0.8125rem !important;
+            text-transform: none !important;
         }
     </style>
 {% endblock stylesheets %}
@@ -294,8 +299,8 @@
                 <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">はい</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">いいえ</button>
             </div>
         </div>
     </div>
@@ -441,7 +446,7 @@ $(document).ready(function() {
                 $('#ruleTable_wrapper .row:first-child .col-md-6:first-child').html('')
                 .append(`
                     <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="dataItemTable">
-                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換前のデータ項目名・変換後のデータ項目名・変換ルール</span>
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">※ 検索条件： 変換前のデータ項目名・変換後のデータ項目名・変換ルール</span>
                 `);
             }
 
@@ -532,7 +537,7 @@ $(document).ready(function() {
     function resetForm() {
         ruleForm[0].reset();
         $('#editRuleId').val('');
-        ruleModal.find('.modal-title').text('変換ルール追加');
+        ruleModal.find('.modal-title').text('追加');
         resetFormErrors();
     }
 
@@ -566,7 +571,7 @@ $(document).ready(function() {
         let fileFormatValue = $('#fileFormatSelect').val();
         let fromToTypeValue = $('#fromToTypeSelect').val();
 
-        ruleModal.find('.modal-title').text('変換ルール編集');
+        ruleModal.find('.modal-title').text('編集');
         $('#editRuleId').val(ruleId);
         updateModalHiddenFields();
 

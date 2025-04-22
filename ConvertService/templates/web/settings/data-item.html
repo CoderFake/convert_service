@@ -202,6 +202,19 @@
             width: 3rem;
             height: 3rem;
         }
+
+        .dataTables_wrapper .dataTables_scrollHead table.dataTable thead th,
+        .dataTables_wrapper table.dataTable thead th {
+            text-transform: none !important;
+        }
+
+        #inputData thead th,
+        #ruleTable thead th,
+        #dataItemTable thead th,
+        #fixedRuleTable thead th {
+            font-size: 0.8125rem !important;
+            text-transform: none !important;
+        }
     </style>
 {% endblock stylesheets %}
 
@@ -282,11 +295,12 @@
             </div>
             <div class="modal-body">
                 <p>このアイテムを削除しますが、よろしいでしょうか？</p>
+                <p><i class="fa fa-warning text-warning"></i>これを削除すると、「変換ルール設定」タブ内のすべての関連データおよびその中の固定データも削除されます。</p>
                 <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">削除</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">はい</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">いいえ</button>
             </div>
         </div>
     </div>
@@ -493,7 +507,7 @@ $(document).ready(function() {
                 $('#dataItemTable_wrapper .row:first-child .col-md-6:first-child').html('')
                 .append(`
                     <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="dataItemTable">
-                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 項目名・インデックス値</span>
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">※ 検索条件： 項目名・インデックス値</span>
                 `);
 
                 updateModal();
@@ -565,7 +579,7 @@ $(document).ready(function() {
     function resetForm() {
         dataItemForm[0].reset();
         $('#editItemId').val('');
-        dataItemModal.find('.modal-title').text('データ項目追加');
+        dataItemModal.find('.modal-title').text('追加');
         resetFormErrors();
 
         updateTypeSettingsVisibility();
@@ -616,7 +630,7 @@ $(document).ready(function() {
         let fileFormatValue = $('#fileFormatSelect').val()
         let dataTypeValue = $('#dataTypeSelect').val();
 
-        dataItemModal.find('.modal-title').text('データ項目編集');
+        dataItemModal.find('.modal-title').text('編集');
         $('#editItemId').val(itemId);
 
         $.ajax({
