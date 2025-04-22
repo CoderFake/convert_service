@@ -185,16 +185,49 @@
             vertical-align: middle;
         }
 
-        .custom-pagination {
+        #fixedRuleModalLabel .dataTables_paginate {
             display: flex;
-            justify-content: end;
+            justify-content: flex-end;
             align-items: center;
-            gap: 5px;
+            margin-top: 10px;
         }
 
-        .custom-pagination .btn {
-            padding: 0.25rem 0.5rem;
-            height: 30px;
+        #fixedRuleModalLabel .paginate_button {
+            box-sizing: border-box;
+            display: inline-block;
+            min-width: 1.5em;
+            padding: 0.5em 1em;
+            text-align: center;
+            text-decoration: none !important;
+            cursor: pointer;
+            color: #333 !important;
+            border: 1px solid transparent;
+            border-radius: 2px;
+            background: transparent;
+        }
+
+        #fixedRuleModalLabel .paginate_button.current {
+            color: #fff !important;
+            border: 1px solid #5e72e4;
+            background-color: #5e72e4;
+        }
+
+        #fixedRuleModalLabel .paginate_button:hover:not(.current):not(.disabled) {
+            color: #333;
+            border: 1px solid #979797;
+            background: linear-gradient(to bottom, #fff 0%, #dcdcdc 100%);
+        }
+
+        #fixedRuleModalLabel .paginate_button.disabled {
+            cursor: default;
+            color: #666 !important;
+            border: 1px solid transparent;
+            background: transparent;
+            opacity: 0.7;
+        }
+
+        #fixedRuleModalLabel .ellipsis {
+            padding: 0 1em;
         }
 
         .add-fixed-value-row {
@@ -349,13 +382,6 @@
 
                                 <div class="values-actions">
                                     <div class="custom-pagination">
-                                        <button class="btn btn-sm btn-outline-primary prev-page" type="button">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </button>
-                                        <span class="mx-2 pagination-info">ページ 1/1</span>
-                                        <button class="btn btn-sm btn-outline-primary next-page" type="button">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -432,11 +458,23 @@ $(document).ready(function() {
             language: {
                 url: "/static/web/vendor/datatables.net/language/ja.json",
                 search: "_INPUT_",
-                searchPlaceholder: "検索..."
             },
             dom: '<"row"<"col-md-6"f><"col-md-6 page-length d-flex align-items-center justify-content-end"l>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, '全て']],
-            pageLength: 10
+            pageLength: 10,
+            drawCallback: function() {
+                $('#fixedRuleTable thead tr').find('th').first().text('No');
+            },
+            initComplete: function() {
+                $('#fixedRuleTable thead tr').find('th').first().text('No');
+                $('#fixedRuleTable_filter').hide();
+                $('#fixedRuleTable_wrapper .row').addClass('mb-4');
+                $('#fixedRuleTable_wrapper .row:first-child .col-md-6:first-child').html('')
+                .append(`
+                    <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="fixedRuleTable">
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">検索条件： 変換ルール・変換ロジック</span>
+                `);
+            }
         });
     } catch (e) {
         createToast('error', 'テーブルの初期化中にエラーが発生しました。');
@@ -457,6 +495,14 @@ $(document).ready(function() {
     $('#fixedRuleTable tbody').on('click', '.delete-item', function() {
         const itemId = $(this).data('id');
         prepareDeleteModal(itemId);
+    });
+
+    $(document).on('keypress', '.search-input', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const searchValue = $(this).val();
+            fixedRuleTable.search(searchValue).draw();
+        }
     });
 
     $(document).on('click', '.add-new-value-row', function() {
@@ -507,9 +553,93 @@ $(document).ready(function() {
     });
 
     $(document).on('click', '.delete-fixed-value', function() {
-        const itemId = $(this).data('id');
-        deleteFixedValue(itemId);
+        const $row = $(this).closest('tr');
+        const beforeValue = $row.find('td:nth-child(2) input').val();
+        const afterValue = $row.find('td:nth-child(3) input').val();
+
+        if (confirm(`変換前のデータ値 "${beforeValue}" を削除しますか？`)) {
+            $.ajax({
+                url: '/settings/fixed-data-delete-value/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    rule_id: selectedRuleId,
+                    before_value: beforeValue,
+                    after_value: afterValue
+                }),
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $row.fadeOut(300, function() {
+                            $(this).remove();
+                        });
+
+                        createToast('success', response.message);
+
+                        if ($('#fixedValuesTableBody tr').length <= 1) {
+                            loadFixedValuesPage(1);
+                        }
+                    } else {
+                        createToast('error', response.message);
+                    }
+                },
+                error: function(xhr) {
+                    createToast('error', xhr.responseJSON?.message || '削除中にエラーが発生しました。');
+                }
+            });
+        }
     });
+
+    $(document).on('blur', '.inline-edit', function() {
+        const $tr = $(this).closest('tr');
+        const itemId = $tr.data('id');
+        const beforeValue = $tr.find('.before-value-edit').val();
+        const afterValue = $tr.find('.after-value-edit').val();
+
+        const originalBefore = $tr.find('.before-value-edit').data('original');
+        const originalAfter = $tr.find('.after-value-edit').data('original');
+
+        if (beforeValue !== originalBefore || afterValue !== originalAfter) {
+            updateFixedDataValue(itemId, beforeValue, afterValue);
+        }
+    });
+
+    function updateFixedDataValue(itemId, beforeValue, afterValue) {
+
+        $.ajax({
+            url: '/settings/fixed-data-update-value/',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                item_id: itemId,
+                rule_id: selectedRuleId,
+                before_value: beforeValue,
+                after_value: afterValue
+            }),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    $(`tr[data-id="${itemId}"] .before-value-edit`).data('original', beforeValue);
+                    $(`tr[data-id="${itemId}"] .after-value-edit`).data('original', afterValue);
+
+                    createToast('success', response.message || '値が正常に更新されました。');
+                } else {
+                    createToast('error', response.message || '更新に失敗しました。');
+
+                    loadFixedValuesPage(currentPage);
+                }
+            },
+            error: function(xhr) {
+                createToast('error', xhr.responseJSON?.message || '更新中にエラーが発生しました。');
+
+                loadFixedValuesPage(currentPage);
+            }
+        });
+    }
 
     function openAddRuleModal() {
         resetModalForms();
@@ -546,7 +676,7 @@ $(document).ready(function() {
         searchKeyword = '';
         currentItems = [];
         currentPage = 1;
-        updatePaginationInfo({
+        updatePagination({
             current_page: 1,
             total_pages: 1,
             total_items: 0,
@@ -674,8 +804,6 @@ $(document).ready(function() {
         currentPage = page;
         $('#fixedValuesTableBody').empty();
 
-        $('#fixedValuesTableBody').html('<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm" role="status" style="width:20px; height: 20px;"></div> ロード中...</td></tr>');
-
         $.ajax({
             url: `/settings/fixed-data-values/${selectedRuleId}/`,
             type: 'GET',
@@ -696,7 +824,8 @@ $(document).ready(function() {
                     currentPage = response.pagination.current_page;
 
                     renderItems(response.items, response.pagination.start_index);
-                    updatePaginationInfo(response.pagination);
+
+                    updatePagination(response.pagination);
                 }
             },
             error: function() {
@@ -841,49 +970,64 @@ $(document).ready(function() {
         });
     }
 
-    function saveFixedValues(ruleId, items) {
-        $.ajax({
-            url: '/settings/fixed-data-batch-save/',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                rule_id: ruleId,
-                items: items
-            }),
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    createToast('success', response.message || '保存に成功しました。');
-                    $('#fixedRuleModal').modal('hide');
-                    fixedRuleTable.ajax.reload();
-                } else {
-                    displayFormErrors(response.errors);
-                }
-            },
-            error: function(xhr) {
-                createToast('error', '固定値の保存中にエラーが発生しました。');
-            }
+    function updatePagination(pagination) {
+        $('.custom-pagination').html(generatePaginationHTML(pagination));
+
+        $('.paginate_button').not('.disabled').on('click', function() {
+            const page = parseInt($(this).data('page'));
+            loadFixedValuesPage(page);
         });
     }
 
-    function updatePaginationInfo(pagination) {
-        totalPages = pagination.total_pages;
-        currentPage = pagination.current_page;
+    function generatePaginationHTML(pagination) {
+        const { current_page, total_pages } = pagination;
+        let html = `
+            <div class="dataTables_paginate paging_simple_numbers">
+                <a class="paginate_button previous ${current_page === 1 ? 'disabled' : ''}"
+                   data-page="${current_page - 1}" ${current_page === 1 ? 'tabindex="-1"' : ''}>前</a>
+                <span>`;
 
-        $('.pagination-info').text(`ページ ${currentPage}/${totalPages}`);
-        $('.prev-page').prop('disabled', currentPage === 1);
-        $('.next-page').prop('disabled', currentPage === totalPages);
+        if (total_pages <= 7) {
+            for (let i = 1; i <= total_pages; i++) {
+                html += `<a class="paginate_button ${i === current_page ? 'current' : ''}"
+                           data-page="${i}">${i}</a>`;
+            }
+        } else {
+            html += `<a class="paginate_button ${current_page === 1 ? 'current' : ''}"
+                      data-page="1">1</a>`;
 
-        const start = pagination.start_index;
-        const end = pagination.end_index;
-        const total = pagination.total_items;
+            let startPage = Math.max(2, current_page - 2);
+            let endPage = Math.min(current_page + 2, total_pages - 1);
 
-        if ($('.pagination-details').length === 0) {
-            $('.custom-pagination').append('<div class="pagination-details text-muted small ml-2"></div>');
+            if (current_page <= 4) {
+                endPage = 5;
+            } else if (current_page >= total_pages - 3) {
+                startPage = total_pages - 4;
+            }
+
+            if (startPage > 2) {
+                html += `<span class="ellipsis">...</span>`;
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<a class="paginate_button ${i === current_page ? 'current' : ''}"
+                          data-page="${i}">${i}</a>`;
+            }
+
+            if (endPage < total_pages - 1) {
+                html += `<span class="ellipsis">...</span>`;
+            }
+
+            html += `<a class="paginate_button ${current_page === total_pages ? 'current' : ''}"
+                      data-page="${total_pages}">${total_pages}</a>`;
         }
+
+        html += `</span>
+                <a class="paginate_button next ${current_page === total_pages ? 'disabled' : ''}"
+                   data-page="${current_page + 1}" ${current_page === total_pages ? 'tabindex="-1"' : ''}>次</a>
+            </div>`;
+
+        return html;
     }
 
     function renderItems(items, startIndex) {
@@ -911,10 +1055,6 @@ $(document).ready(function() {
     }
 
     function saveInlineEdit(itemId, beforeValue, afterValue) {
-        if (!beforeValue || !afterValue) {
-            createToast('error', '変換前データ値と変換後データ値は必須です。');
-            return;
-        }
 
         $.ajax({
             url: '/settings/fixed-data-batch-save/',
@@ -932,52 +1072,13 @@ $(document).ready(function() {
                 if (response.status === 'success') {
 
                     loadFixedValuesPage(currentPage);
-                    createToast('success', '固定値が更新されました。');
+                    createToast('success', response.message);
                 } else {
                     createToast('error', response.message || '更新に失敗しました。');
                 }
             },
-            error: function() {
-                createToast('error', '固定値の更新中にエラーが発生しました。');
-            }
-        });
-    }
-
-    $(document).on('blur', '.inline-edit', function() {
-        const $tr = $(this).closest('tr');
-        const itemId = $tr.data('id');
-        const beforeValue = $tr.find('.before-value-edit').val();
-        const afterValue = $tr.find('.after-value-edit').val();
-
-        const originalBefore = $tr.find('.before-value-edit').attr('data-original') || $tr.find('.before-value-edit').val();
-        const originalAfter = $tr.find('.after-value-edit').attr('data-original') || $tr.find('.after-value-edit').val();
-
-        if (beforeValue !== originalBefore || afterValue !== originalAfter) {
-            saveInlineEdit(itemId, beforeValue, afterValue);
-        }
-    });
-
-    function deleteFixedValue(itemId) {
-        if (!confirm('この固定値を削除しますか？')) return;
-
-        $.ajax({
-            url: `/settings/fixed-data-delete/${itemId}/`,
-            type: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-
-                    loadFixedValuesPage(currentPage);
-                    createToast('success', response.message || '固定値が削除されました。');
-                } else {
-                    createToast('error', response.message || '削除に失敗しました。');
-                }
-            },
-            error: function() {
-                createToast('error', '固定値の削除中にエラーが発生しました。');
+            error: function(xhr, error, thrown) {
+                createToast('error', xhr.responseJSON?.message );
             }
         });
     }
@@ -1035,17 +1136,6 @@ $(document).ready(function() {
         }
         return cookieValue;
     }
-
-    $('#fixedRuleModal').on('shown.bs.modal', function() {
-        resetFormErrors();
-        setTimeout(function() {
-            createOrUpdateExpandButton();
-        }, 300);
-    });
-
-    $('#fixedRuleModal').on('hidden.bs.modal', function() {
-        $(window).off('resize.modal');
-    });
 });
 </script>
 {% endblock javascripts %}

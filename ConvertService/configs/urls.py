@@ -5,19 +5,22 @@ from .views import (
     DataItemEditView,
     DataItemDeleteView,
     DataItemDetailView,
+
     RuleSettingsView,
     RuleDetailView,
     RuleCreateView,
     RuleEditView,
     RuleDeleteView,
     GetItemsView,
+
     FixedDataListView,
     FixedDataDetailView,
-    FixedDataBatchSaveView,
     FixedDataDeleteView,
     FixedRuleCreateView,
     FixedRuleUpdateView,
-    FixedDataValuesView
+    FixedDataValuesView,
+    FixedDataDeleteValueView,
+    FixedDataUpdateValueView
 )
 
 urlpatterns = [
@@ -39,13 +42,12 @@ urlpatterns = [
 
     path('settings/fixed-data/', FixedDataListView.as_view(), name='fixed_data'),
     path('settings/fixed-data-detail/<int:rule_id>/', FixedDataDetailView.as_view(), name='detail_fixed_data'),
-    path('settings/fixed-data-batch-save/', FixedDataBatchSaveView.as_view(), name='batch_save_fixed_data'),
     path('settings/fixed-data-delete/<int:item_id>/', FixedDataDeleteView.as_view(), name='delete_fixed_data'),
-    path('settings/fixed-data-delete-rule/<int:rule_id>/', FixedDataDeleteView.as_view(),
-         name='delete_rule_fixed_data'),
-
+    path('settings/fixed-data-delete-rule/<int:rule_id>/', FixedDataDeleteView.as_view(), name='delete_rule_fixed_data'),
     path('settings/fixed-rule-create/', FixedRuleCreateView.as_view(), name='create_fixed_rule'),
     path('settings/fixed-rule-update/<int:rule_id>/', FixedRuleUpdateView.as_view(), name='update_fixed_rule'),
 
     path('settings/fixed-data-values/<int:rule_id>/', FixedDataValuesView.as_view(), name='fixed_data_values'),
+    path('settings/fixed-data-update-value/', FixedDataUpdateValueView.as_view(), name='update_fixed_data_value'),
+    path('settings/fixed-data-delete-value/', FixedDataDeleteValueView.as_view(), name='delete_fixed_data_value'),
 ]
