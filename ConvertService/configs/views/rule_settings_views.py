@@ -6,8 +6,8 @@ from django.views import View
 from django.db.models import Q
 
 from configs.data_type import Mess
-from configs.models import ConvertRule, ConvertDataValue, ConvertRuleCategory
-from home.models import FileFormat, DataFormat, DetailedInfo, DataItemType, DataItem, DataConversionInfo
+from configs.models import ConvertRule, ConvertRuleCategory
+from home.models import DetailedInfo, DataItemType, DataItem, DataConversionInfo
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,13 +32,15 @@ class RuleSettingsView(LoginRequiredMixin, View):
         ]
 
         rule_categories = ConvertRuleCategory.objects.all()
-        rules = ConvertRule.objects.all().select_related('convert_rule_category')
+        dynamic_rules = ConvertRule.objects.exclude(convert_rule_category__convert_rule_category_id="CRC_FIXED")
+        fixed_rules = ConvertRule.objects.filter(convert_rule_category__convert_rule_category_id="CRC_FIXED")
 
         context = {
             'file_formats': file_formats,
             'data_item_type_choices': data_item_type_choices,
             'rule_categories': rule_categories,
-            'rules': rules
+            'dynamic_rules': dynamic_rules,
+            'fixed_rules': fixed_rules,
         }
         return render(request, 'web/settings/rule_settings.html', context)
 

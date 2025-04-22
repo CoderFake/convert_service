@@ -329,7 +329,6 @@
                         <div class="col-sm-9">
                             <select class="form-control" id="from_item_id" name="from_item_id">
                                 <option value="">選択してください</option>
-                                <!-- Options will be populated dynamically -->
                             </select>
                             <div class="invalid-feedback" id="from_item_id_error"></div>
                         </div>
@@ -340,7 +339,6 @@
                         <div class="col-sm-9">
                             <select class="form-control" id="to_item_id" name="to_item_id">
                                 <option value="">選択してください</option>
-                                <!-- Options will be populated dynamically -->
                             </select>
                             <div class="invalid-feedback" id="to_item_id_error"></div>
                         </div>
@@ -350,11 +348,16 @@
                         <label for="rule_id" class="col-sm-3 col-form-label">変換ルール</label>
                         <div class="col-sm-9">
                             <select class="form-control" id="rule_id" name="rule_id">
-                                <option class="border-1 " value="">選択してください</option>
-                                {% for rule in rules %}
-                                    <option value="{{ rule.id }}">{{ rule.convert_rule_name }}</option>
+                                <option value="">選択してください</option>
+                                {% for dynamic_rule in dynamic_rules %}
+                                    <option value="{{ dynamic_rule.id }}">{{ dynamic_rule.convert_rule_name }}</option>
                                 {% endfor %}
 
+                                <option disabled>-------------------------------------------------</option>
+
+                                {% for fixed_rule in fixed_rules %}
+                                    <option value="{{ fixed_rule.id }}">{{ fixed_rule.convert_rule_name }}</option>
+                                {% endfor %}
                             </select>
                             <div class="invalid-feedback" id="rule_id_error"></div>
                         </div>
