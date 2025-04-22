@@ -7,4 +7,5 @@ class Mess(enum.Enum):
     DELETE = '削除に成功しました。'
     ERROR = 'エラーが発生しました。'
     NOTFOUND = 'データが見つかりません。'
-    ERROR_EXIST = '重複したレコードです。 '
+    ERROR_EXIST = '既に存在しています。'
+    ERROR_REQUIRED= '必須項目です。'

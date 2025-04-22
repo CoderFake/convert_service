@@ -8,6 +8,8 @@ from django.db.models import Q
 from configs.data_type import Mess
 from configs.models import ConvertRule, ConvertDataValue, ConvertRuleCategory
 from home.models import FileFormat, DataFormat, DetailedInfo, DataItemType, DataItem, DataConversionInfo
+import logging
+logger = logging.getLogger(__name__)
 
 
 class RuleSettingsView(LoginRequiredMixin, View):
@@ -123,12 +125,13 @@ class RuleSettingsView(LoginRequiredMixin, View):
             return JsonResponse(response)
 
         except Exception as e:
+            logger.error(e)
             return JsonResponse({
                 'draw': int(request.GET.get('draw', 1)),
                 'recordsTotal': 0,
                 'recordsFiltered': 0,
                 'data': [],
-                'error': str(e)
+                'error': Mess.NOTFOUND.value
             })
 
 
@@ -157,7 +160,7 @@ class RuleDetailView(LoginRequiredMixin, View):
             if not rule:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'ルールが見つかりませんでした。'
+                    'message': Mess.ERROR.NOTFOUND.value
                 }, status=404)
 
             from_items = DataItem.objects.filter(
@@ -190,6 +193,7 @@ class RuleDetailView(LoginRequiredMixin, View):
             })
 
         except Exception as e:
+            logger.error(e)
             return JsonResponse({
                 'status': 'error',
                 'message': Mess.ERROR.value
@@ -239,11 +243,11 @@ class RuleCreateView(LoginRequiredMixin, View):
         errors = {}
         if not from_item_id or not to_item_id or not rule_id:
             if not from_item_id:
-                errors['from_item_id'] = '変換元項目は必須です。'
+                errors['from_item_id'] = Mess.ERROR_REQUIRED.value
             if not to_item_id:
-                errors['to_item_id'] = '変換先項目は必須です。'
+                errors['to_item_id'] = Mess.ERROR_REQUIRED.value
             if not rule_id:
-                errors['rule_id'] = '変換ルールは必須です。'
+                errors['rule_id'] = Mess.ERROR_REQUIRED.value
 
             return JsonResponse({
                 'status': 'error',
@@ -285,8 +289,8 @@ class RuleCreateView(LoginRequiredMixin, View):
                 ).first()
 
                 if existing:
-                    errors['from_item_id'] = '既に変換ルールが存在します。'
-                    errors['to_item_id'] = '既に変換ルールが存在します。'
+                    errors['from_item_id'] = Mess.ERROR_EXIST.value
+                    errors['to_item_id'] = Mess.ERROR_EXIST.value
                     return JsonResponse({
                         'status': 'error',
                         'errors': errors,
@@ -328,11 +332,11 @@ class RuleEditView(LoginRequiredMixin, View):
         errors = {}
         if not from_item_id or not to_item_id or not rule_id_new:
             if not from_item_id:
-                errors['from_item_id'] = '変換元項目は必須です。'
+                errors['from_item_id'] = Mess.ERROR_REQUIRED.value
             if not to_item_id:
-                errors['to_item_id'] = '変換先項目は必須です。'
+                errors['to_item_id'] = Mess.ERROR_REQUIRED.value
             if not rule_id_new:
-                errors['rule_id'] = '変換ルールは必須です。'
+                errors['rule_id'] = Mess.ERROR_REQUIRED.value
 
             return JsonResponse({
                 'status': 'error',
@@ -360,22 +364,36 @@ class RuleEditView(LoginRequiredMixin, View):
                 if not from_type_obj or not to_type_obj:
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'データアイテムタイプが見つかりません。'
+                        'message': Mess.ERROR_EXIST.value
+                    }, status=404)
+
+
+                existing_after = DetailedInfo.objects.filter(
+                    tenant=tenant,
+                    data_convert=detailed_info.data_convert,
+                    data_item_type_after=to_type_obj
+                ).exclude(id=rule_id).first()
+
+                if existing_after:
+                    errors['to_item_id'] = Mess.ERROR_EXIST.value
+                    return JsonResponse({
+                        'status': 'error',
+                        'errors': errors,
                     })
 
-                existing = DetailedInfo.objects.filter(
+                existing_pair = DetailedInfo.objects.filter(
                     tenant=tenant,
                     data_convert=detailed_info.data_convert,
                     data_item_type_before=from_type_obj,
                     data_item_type_after=to_type_obj
                 ).exclude(id=rule_id).first()
 
-                if existing:
-                    errors['from_item_id'] = '変換元項目は必須です。'
-                    errors['to_item_id'] = '変換先項目は必須です。'
+                if existing_pair:
+                    errors['from_item_id'] = Mess.ERROR_EXIST.value
+                    errors['to_item_id'] = Mess.ERROR_EXIST.value
                     return JsonResponse({
                         'status': 'error',
-                        'message': errors,
+                        'errors': errors,
                     })
 
                 detailed_info.data_item_type_before = from_type_obj
@@ -389,6 +407,7 @@ class RuleEditView(LoginRequiredMixin, View):
                 })
 
         except Exception as e:
+            logger.error(f"Error updating rule: {e}")
             return JsonResponse({
                 'status': 'error',
                 'message': Mess.ERROR.value

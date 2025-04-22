@@ -184,13 +184,13 @@ class DataItemCreateView(LoginRequiredMixin, View):
         errors = {}
         if not data_item_name or not index_value or not format_value or not file_format_id or not data_type_name:
             if not data_item_name:
-                errors['data_item_name'] = 'このフィールドは必須です。'
+                errors['data_item_name'] = Mess.ERROR_REQUIRED.value
             if not index_value:
-                errors['index_value'] = 'このフィールドは必須です。'
+                errors['index_value'] = Mess.ERROR_REQUIRED.value
             if not format_value or format_value not in [fm for fm in DataItemType.FormatValue.values]:
-                errors['format_value'] = 'このフィールドは必須です。'
+                errors['format_value'] = Mess.ERROR_REQUIRED.value
             if not data_type_name or data_type_name not in [type_name for type_name in DataItemType.TypeName.values]:
-                errors['data_type_name'] = 'このフィールドは必須です。'
+                errors['data_type_name'] = Mess.ERROR_REQUIRED.value
 
             return JsonResponse({
                 'status': 'error',
@@ -217,14 +217,14 @@ class DataItemCreateView(LoginRequiredMixin, View):
         ).first()
 
         if data_item:
-            errors['data_item_name'] = '列名は既に存在します。'
+            errors['data_item_name'] = Mess.ERROR_EXIST.value
 
         if DataItemType.objects.filter(
             type_name=data_type_name,
             index_value=index_value,
             data_item__data_format__file_format__file_format_id__contains=file_format_id,
         ).first():
-            errors['index_value'] = '位置はすでに存在しています。'
+            errors['index_value'] = Mess.ERROR_EXIST.value
 
         if errors != {}:
             return JsonResponse({
@@ -315,13 +315,13 @@ class DataItemEditView(LoginRequiredMixin, View):
         errors = {}
         if not data_item_name or not index_value or not format_value or not file_format_id or not data_type_name:
             if not data_item_name:
-                errors['data_item_name'] = 'このフィールドは必須です。'
+                errors['data_item_name'] = Mess.ERROR_REQUIRED.value
             if not index_value:
-                errors['index_value'] = 'このフィールドは必須です。'
+                errors['index_value'] =  Mess.ERROR_REQUIRED.value
             if not format_value or format_value not in [fm for fm in DataItemType.FormatValue.values]:
-                errors['format_value'] = 'このフィールドは必須です。'
+                errors['format_value'] =  Mess.ERROR_REQUIRED.value
             if not data_type_name or data_type_name not in [type_name for type_name in DataItemType.TypeName.values]:
-                errors['data_type_name'] = 'このフィールドは必須です。'
+                errors['data_type_name'] = Mess.ERROR_REQUIRED.value
 
             return JsonResponse({
                 'status': 'error',
@@ -354,7 +354,7 @@ class DataItemEditView(LoginRequiredMixin, View):
                         data_format=data_convert.data_format_before,
                         data_item_types__type_name=data_type_name
                 ).exclude(id=item_id).exists():
-                    errors['data_item_name'] = '列名は既に存在します。'
+                    errors['data_item_name'] = Mess.ERROR_EXIST.value
 
 
 
@@ -365,7 +365,7 @@ class DataItemEditView(LoginRequiredMixin, View):
                 ).exclude(data_item=data_item)
 
                 if duplicate_index.exists():
-                    errors['index_value'] = '位置はすでに存在しています。'
+                    errors['index_value'] = Mess.ERROR_EXIST.value
 
                 if errors != {}:
                     return JsonResponse({
@@ -441,7 +441,7 @@ class DataItemDetailView(LoginRequiredMixin, View):
             if not data_item:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'データ項目が見つかりませんでした。'
+                    'message': Mess.ERROR_EXIST.value
                 }, status=404)
 
             data_item_data = {
