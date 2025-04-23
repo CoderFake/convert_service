@@ -68,22 +68,6 @@ class FixedRuleCreateView(LoginRequiredMixin, View):
                 'errors': errors,
             })
 
-        if fixed_values:
-            for row_index, before_value, _ in fixed_values:
-                existing_values = ConvertDataValue.objects.filter(
-                    tenant=tenant,
-                    data_value_before=before_value,
-                    convert_rule_id=rule_fixed_id
-                )
-
-                if existing_values.exists():
-                    errors[
-                        f'before-value-{row_index}'] = Mess.ERROR_EXIST.value
-                    return JsonResponse({
-                        'status': 'error',
-                        'errors': errors,
-                    }, status=400)
-
         try:
             convert_rule_category = ConvertRuleCategory.objects.filter(convert_rule_category_id="CRC_FIXED").first()
 
@@ -94,13 +78,30 @@ class FixedRuleCreateView(LoginRequiredMixin, View):
                     convert_rule_category=convert_rule_category
                 )
 
-                for _, before_value, after_value in fixed_values:
-                    ConvertDataValue.objects.create(
-                        tenant=tenant,
-                        convert_rule=new_convert_rule_fixed,
-                        data_value_before=before_value,
-                        data_value_after=after_value
-                    )
+                if fixed_values:
+                    for row_index, before_value, after_value in fixed_values:
+                        existing_values = ConvertDataValue.objects.filter(
+                            tenant=tenant,
+                            data_value_before=before_value,
+                            convert_rule=new_convert_rule_fixed
+                        )
+
+                        if existing_values.exists():
+                            transaction.set_rollback(True)
+
+                            errors[
+                                f'before-value-{row_index}'] = Mess.ERROR_EXIST.value
+                            return JsonResponse({
+                                'status': 'error',
+                                'errors': errors,
+                            }, status=400)
+
+                        ConvertDataValue.objects.create(
+                            tenant=tenant,
+                            convert_rule=new_convert_rule_fixed,
+                            data_value_before=before_value,
+                            data_value_after=after_value
+                        )
 
                 return JsonResponse({
                     'status': 'success',
