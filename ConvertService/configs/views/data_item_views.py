@@ -350,13 +350,11 @@ class DataItemEditView(LoginRequiredMixin, View):
                 ).first()
 
                 if DataItem.objects.filter(
-                        data_item_name=data_item_name,
-                        data_format=data_convert.data_format_before,
-                        data_item_types__type_name=data_type_name
+                    data_item_name=data_item_name,
+                    data_format=data_convert.data_format_before,
+                    data_item_types__type_name=data_type_name
                 ).exclude(id=item_id).exists():
                     errors['data_item_name'] = Mess.ERROR_EXIST.value
-
-
 
                 duplicate_index = DataItemType.objects.filter(
                     type_name=data_type_name,
@@ -373,24 +371,49 @@ class DataItemEditView(LoginRequiredMixin, View):
                         'errors': errors,
                     }, status=200)
 
-
-                data_item.data_item_name = data_item_name
-                data_item.data_format = data_convert.data_format_before
-                data_item.save()
-
                 display_val = True if display == 'on' else False
                 edit_val = True if edit_value == 'on' else False
 
-                item_type, _ = DataItemType.objects.get_or_create(
+                item_type = get_object_or_404(
+                    DataItemType,
                     data_item=data_item,
-                    type_name=data_type_name,
-                    defaults={
-                        'index_value': index_value,
-                        'display': display_val,
-                        'edit_value': edit_val,
-                        'format_value': format_value,
-                    }
+                    type_name = data_type_name
                 )
+
+                if data_item.data_item_name != data_item_name:
+                    existing_data_item =DataItem.objects.filter(
+                        tenant=tenant,
+                        data_format=data_convert.data_format_before,
+                        data_item_name=data_item_name
+                    ).first()
+                    if not existing_data_item:
+                        last_data_item = DataItem.objects.order_by('-id').first()
+                        data_item_id = f"D000{int(last_data_item.data_item_id.split('D000')[1]) + 1}"
+
+                        new_data_item = DataItem.objects.create(
+                            tenant=tenant,
+                            data_format=data_convert.data_format_before,
+                            data_item_id=data_item_id,
+                            data_item_name=data_item_name
+                        )
+
+                        DataItemType.objects.create(
+                            data_item=new_data_item,
+                            type_name=data_type_name,
+                            index_value=index_value,
+                            display=display_val,
+                            edit_value=edit_val,
+                        )
+
+                        item_type.delete()
+
+                        return JsonResponse({
+                            'status': 'success',
+                            'message': Mess.UPDATE.value
+                        })
+
+                    item_type.data_item=existing_data_item
+                    item_type.save()
 
                 item_type.index_value = index_value
                 item_type.display = display_val
