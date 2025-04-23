@@ -264,7 +264,7 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>項目名</th>
+                                    <th>データ項目名</th>
                                     <th>インデックス値</th>
                                     <th class="display-column">表示可能</th>
                                     <th class="edit-column">手入力可能</th>
@@ -295,7 +295,7 @@
             </div>
             <div class="modal-body">
                 <p>このアイテムを削除しますが、よろしいでしょうか？</p>
-                <p><i class="fa fa-warning text-warning"></i>これを削除すると、「変換ルール設定」タブ内のすべての関連データおよびその中の固定データも削除されます。</p>
+                <p><i class="fa fa-warning text-warning"></i>これを削除すると、「変換ルール設定」タブ内のすべての関連データも削除されます。</p>
                 <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
@@ -353,7 +353,7 @@ $(document).ready(function() {
         </div>
 
         <div class="form-group row mt-3">
-            <label for="index-value" class="col-sm-3 col-form-label">表示順位</label>
+            <label for="index-value" class="col-sm-3 col-form-label">インデックス値</label>
             <div class="col-sm-9">
                 <input class="form-control" type="number" name="index_value" id="index-value" value="0">
                 <div class="invalid-feedback" id="index_value_error"></div>
@@ -375,7 +375,7 @@ $(document).ready(function() {
         <div class="container mt-4 d-flex flex-column">
             <div class="row justify-content-center">
                 <div class="form-group col-6 row">
-                    <label for="index-value" class="col-sm-4 col-form-label">表示順位</label>
+                    <label for="index-value" class="col-sm-4 col-form-label">インデックス値</label>
                     <div class="col-sm-6">
                         <input class="form-control" type="number" name="index_value" id="index-value" value="0">
                         <div class="invalid-feedback" id="index_value_error"></div>
