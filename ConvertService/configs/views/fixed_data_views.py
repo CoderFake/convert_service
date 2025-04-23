@@ -510,14 +510,14 @@ class FixedDataUpdateValueView(LoginRequiredMixin, View):
                 return JsonResponse({
                     'status': 'error',
                     'message': Mess.NOTFOUND.value
-                }, status=200)
+                }, status=404)
 
             current_item = ConvertDataValue.objects.filter(id=item_id).first()
             if not current_item:
                 return JsonResponse({
                     'status': 'error',
                     'message': Mess.NOTFOUND.value
-                }, status=200)
+                }, status=404)
 
             old_before_value = current_item.data_value_before
 
@@ -532,7 +532,7 @@ class FixedDataUpdateValueView(LoginRequiredMixin, View):
                     return JsonResponse({
                         'status': 'error',
                         'message': Mess.ERROR_EXIST.value
-                    }, status=400)
+                    }, status=200)
 
             if before_value != old_before_value:
                 other_rule_values = ConvertDataValue.objects.filter(
@@ -544,7 +544,7 @@ class FixedDataUpdateValueView(LoginRequiredMixin, View):
                     return JsonResponse({
                         'status': 'error',
                         'message': Mess.ERROR_EXIST.value,
-                    }, status=400)
+                    }, status=200)
 
             with transaction.atomic():
                 affected_items = ConvertDataValue.objects.filter(

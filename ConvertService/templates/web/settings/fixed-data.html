@@ -603,14 +603,17 @@ $(document).ready(function() {
 
         const itemId = $(this).attr('data-id');
         const $row = $(this).closest('tr');
-        const beforeValue = $row.find('td:nth-child(2) input').val();
-        const afterValue = $row.find('td:nth-child(3) input').val();
+        const beforeInput = $row.find('td:nth-child(2) input');
+        const afterInput = $row.find('td:nth-child(3) input');
 
-        updateFixedDataValue(itemId, beforeValue, afterValue);
+        updateFixedDataValue(itemId, beforeInput, afterInput);
 
     });
 
-    function updateFixedDataValue(itemId, beforeValue, afterValue) {
+    function updateFixedDataValue(itemId, beforeInput, afterInput) {
+
+        const beforeValue = beforeInput.val();
+        const afterValue = afterInput.val();
 
         $.ajax({
             url: '/settings/fixed-data-update-value/',
@@ -629,18 +632,18 @@ $(document).ready(function() {
                 if (response.status === 'success') {
                     $(`tr[data-id="${itemId}"] .before-value-edit`).data('original', beforeValue);
                     $(`tr[data-id="${itemId}"] .after-value-edit`).data('original', afterValue);
+                    if(beforeInput.hasClass('is-invalid'))
+                        beforeInput.removeClass('is-invalid');
 
                     createToast('success', response.message || '値が正常に更新されました。');
                 } else {
                     createToast('error', response.message || '更新に失敗しました。');
-
-                    loadFixedValuesPage(currentPage);
+                    if(!beforeInput.hasClass('is-invalid'))
+                        beforeInput.addClass('is-invalid');
                 }
             },
             error: function(xhr) {
                 createToast('error', xhr.responseJSON?.message || '更新中にエラーが発生しました。');
-
-                loadFixedValuesPage(currentPage);
             }
         });
     }
@@ -947,8 +950,9 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.status === 'success') {
                    createToast(response.status, response.message);
-                   ruleId ? loadFixedValuesPage(1) : $('#fixedRuleModal').modal('hide') && fixedRuleTable.ajax.reload();
+                   ruleId ? loadFixedValuesPage(1) : $('#fixedRuleModal').modal('hide');
                    $('.fixed-values-container').empty();
+                   fixedRuleTable.ajax.reload();
 
                 } else {
                     displayFormErrors(response.errors);
