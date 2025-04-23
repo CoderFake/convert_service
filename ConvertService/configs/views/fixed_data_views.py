@@ -28,9 +28,9 @@ class FixedRuleCreateView(LoginRequiredMixin, View):
         errors = {}
         if not rule_fixed_id or not rule_name:
             if not rule_fixed_id:
-                errors['rule_fixed_id'] = 'このフィールドは必須です。'
+                errors['rule_fixed_id'] = Mess.ERROR_REQUIRED.value
             if not rule_name:
-                errors['rule_name'] = 'このフィールドは必須です。'
+                errors['rule_name'] = Mess.ERROR_REQUIRED.value
 
             return JsonResponse({
                 'status': 'error',
