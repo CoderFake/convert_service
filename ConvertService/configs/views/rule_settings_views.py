@@ -26,9 +26,9 @@ class RuleSettingsView(LoginRequiredMixin, View):
         ]
 
         data_item_type_choices = [
-            ('input-format', '変換前のデータ ⇒ 画面のデータ'),
-            ('format-output', '画面のデータ ⇒ 健診システム取り込みデータ'),
-            ('format-input', '画面のデータ ⇒ 予約代行業者取り込みデータ'),
+            ('input-display', '変換前のデータ ⇒ 画面のデータ'),
+            ('display-system_output', '画面のデータ ⇒ 健診システム取り込みデータ'),
+            ('display-agency_output', '画面のデータ ⇒ 予約代行業者取り込みデータ'),
         ]
 
         rule_categories = ConvertRuleCategory.objects.all()

@@ -93,7 +93,7 @@ def process_and_format_file(
             return "処理するデータが見つかりません。"
 
         logger.info(f"Found {len(keys)} keys for processing.")
-        type_key = "output" if type_keys == "formatted:*" else "formatted"
+        type_key = "output" if type_keys == "display:*" else "display"
 
         sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
         if k.decode('utf-8').split(':')[1].isdigit() else 0)
@@ -110,12 +110,12 @@ def process_and_format_file(
                 data_dict = json.loads(raw_data.decode('utf-8'))
 
                 if isinstance(data_dict, list):
-                    formatted_data = []
+                    display_data = []
                     for idx, row in enumerate(data_dict):
                         if isinstance(row, dict):
                             row['row_index'] = row_index_counter + idx
 
-                        formatted_row = DataFormatter.format_data_with_rules(
+                        display_row = DataFormatter.format_data_with_rules(
                             row,
                             rules,
                             before_headers,
@@ -123,28 +123,28 @@ def process_and_format_file(
                             tenant_id
                         )
 
-                        if isinstance(formatted_row, list) and len(formatted_row) > 0:
-                            formatted_data.append(formatted_row)
+                        if isinstance(display_row, list) and len(display_row) > 0:
+                            display_data.append(display_row)
 
                 else:
-                    formatted_data = []
+                    display_data = []
                     for idx, (row_key, row) in enumerate(data_dict.items()):
                         if isinstance(row, dict):
                             row['row_index'] = row_index_counter + idx
 
-                        formatted_row = DataFormatter.format_data_with_rules(
+                        display_row = DataFormatter.format_data_with_rules(
                             row,
                             rules,
                             before_headers,
                             after_headers,
                             tenant_id
                         )
-                        formatted_data.append(formatted_row)
+                        display_data.append(display_row)
 
-                formatted_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
-                client.set(formatted_key, json.dumps(formatted_data), ex=3600)
+                display_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
+                client.set(display_key, json.dumps(display_data), ex=3600)
 
-                row_index_counter += len(formatted_data)
+                row_index_counter += len(display_data)
 
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
@@ -164,7 +164,7 @@ def generate_zip_task(zip_key, headers, file_format_id):
         keys = client.keys(zip_key)
 
         if not keys:
-            logger.warning("No formatted data found for ZIP generation.")
+            logger.warning("No display data found for ZIP generation.")
             return None
 
         zip_buffer = io.BytesIO()
@@ -183,8 +183,8 @@ def generate_zip_task(zip_key, headers, file_format_id):
             try:
                 data = client.get(key)
                 if data:
-                    formatted_data = json.loads(data)
-                    all_data.extend(formatted_data)
+                    display_data = json.loads(data)
+                    all_data.extend(display_data)
                 client.delete(key)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
@@ -218,10 +218,10 @@ def generate_zip_task(zip_key, headers, file_format_id):
 @shared_task
 def generate_csv_task(csv_key_pattern, headers, file_format_id):
     """
-    Generate a CSV file from formatted data stored in Redis.
+    Generate a CSV file from display data stored in Redis.
 
     Args:
-        csv_key_pattern: Redis key pattern to find formatted data
+        csv_key_pattern: Redis key pattern to find display data
         headers: List of column headers
         file_format_id: ID of the file format (encoding, delimiter)
 
@@ -233,7 +233,7 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         keys = list(redis_client.scan_keys(csv_key_pattern))
 
         if not keys:
-            logger.warning("No formatted data found for CSV generation.")
+            logger.warning("No display data found for CSV generation.")
             return None
 
         format_details = FileFormatMapper.get_format_details(file_format_id)
@@ -256,8 +256,8 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
             try:
                 data = client.get(key)
                 if data:
-                    formatted_data = json.loads(data)
-                    all_rows.extend(formatted_data)
+                    display_data = json.loads(data)
+                    all_rows.extend(display_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
                 continue
@@ -289,10 +289,10 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
 @shared_task
 def generate_excel_task(excel_key_pattern, headers, sheet_name):
     """
-    Generate an Excel file from formatted data stored in Redis.
+    Generate an Excel file from display data stored in Redis.
 
     Args:
-        excel_key_pattern: Redis key pattern to find formatted data
+        excel_key_pattern: Redis key pattern to find display data
         headers: List of column headers
         sheet_name: Name for the Excel sheet
 
@@ -304,7 +304,7 @@ def generate_excel_task(excel_key_pattern, headers, sheet_name):
         keys = list(redis_client.scan_keys(excel_key_pattern))
 
         if not keys:
-            logger.warning("No formatted data found for Excel generation.")
+            logger.warning("No display data found for Excel generation.")
             return None
 
         import pandas as pd
@@ -326,8 +326,8 @@ def generate_excel_task(excel_key_pattern, headers, sheet_name):
             try:
                 data = client.get(key)
                 if data:
-                    formatted_data = json.loads(data)
-                    all_rows.extend(formatted_data)
+                    display_data = json.loads(data)
+                    all_rows.extend(display_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
                 continue

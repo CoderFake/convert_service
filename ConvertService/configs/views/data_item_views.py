@@ -26,21 +26,13 @@ class DataItemListView(LoginRequiredMixin, View):
             ('EXCEL', 'EXCEL')
         ]
 
-        data_item_type_choices = [
-            ('input', '変換前のデータ'),
-            ('format', '画面のデータ'),
-            ('output', '健診システム取り込みデータ'),
-            ('input', '予約代行業者取り込みデータ'),
-        ]
-
         data_type_choices = DataItemType.FormatValue.choices
         data_type_name_choices = DataItemType.TypeName.choices
 
         context = {
             'file_formats': file_formats,
             "data_type_choices": data_type_choices,
-            "data_type_names": data_type_name_choices,
-            'data_item_type_choices': data_item_type_choices
+            "data_type_names": data_type_name_choices
         }
         return render(request, 'web/settings/data-item.html', context)
 
@@ -52,7 +44,7 @@ class DataItemListView(LoginRequiredMixin, View):
             length = int(request.GET.get('length', 10))
             search_value = request.GET.get('search[value]', '')
             file_format_id = request.GET.get('file_format_id', '')
-            data_type_name = request.GET.get('data_type_name', DataItemType.TypeName.FORMAT)
+            data_type_name = request.GET.get('data_type_name', DataItemType.TypeName.DISPLAY.value)
 
             base_queryset = DataItem.objects.filter(tenant=tenant)
 
@@ -403,6 +395,7 @@ class DataItemEditView(LoginRequiredMixin, View):
                             index_value=index_value,
                             display=display_val,
                             edit_value=edit_val,
+                            format_value=format_value
                         )
 
                         item_type.delete()
@@ -526,32 +519,3 @@ class DataItemDeleteView(LoginRequiredMixin, View):
                 'status': 'error',
                 'message': Mess.ERROR.value
             }, status=500)
-
-
-class DataItemTypeUpdateView(LoginRequiredMixin, View):
-    def post(self, request):
-        try:
-            data_item_id = request.POST.get('data_item_id')
-            type_name = request.POST.get('type_name')
-            field = request.POST.get('field')
-            value = request.POST.get('value')
-
-            data_item = get_object_or_404(DataItem, id=data_item_id, tenant=request.user.tenant)
-            data_item_type, created = DataItemType.objects.get_or_create(
-                data_item=data_item,
-                type_name=type_name
-            )
-            if field == 'display' or field == 'edit_value':
-                setattr(data_item_type, field, value == 'true')
-            elif field == 'index_value':
-                setattr(data_item_type, field, int(value))
-            else:
-                setattr(data_item_type, field, value)
-
-            data_item_type.save()
-
-            return JsonResponse({'status': 'success'})
-
-        except Exception as e:
-            logger.error(f"Error while updating DataItemType: {e}")
-            return JsonResponse({'status': 'error', 'message': Mess.ERROR.value}, status=500)

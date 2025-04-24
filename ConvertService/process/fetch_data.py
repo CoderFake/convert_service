@@ -18,7 +18,7 @@ class HeaderFetcher:
         Fetch headers based on type_name, display flag and optionally data_format_id.
         """
 
-        if type_name not in [HeaderType.BEFORE.value, HeaderType.FORMAT.value, HeaderType.AFTER.value]:
+        if type_name not in [HeaderType.INPUT.value, HeaderType.DISPLAY.value, HeaderType.AGENCY_OUTPUT.value, HeaderType.SYSTEM_OUTPUT.value]:
             logger.error(f"Invalid type_name: {type_name}")
             return []
 

@@ -375,7 +375,7 @@ class FixedDataValuesView(LoginRequiredMixin, View):
 
             items = query.order_by('data_value_before')[(page - 1) * page_size:page * page_size]
 
-            formatted_items = []
+            display_items = []
             for idx, item in enumerate(items, start=1):
                 sample_id = ConvertDataValue.objects.filter(
                     tenant=tenant,
@@ -384,7 +384,7 @@ class FixedDataValuesView(LoginRequiredMixin, View):
                     data_value_after=item['data_value_after']
                 ).values_list('id', flat=True).first() or idx
 
-                formatted_items.append({
+                display_items.append({
                     'id': sample_id,
                     'before': item['data_value_before'],
                     'after': item['data_value_after']
@@ -392,7 +392,7 @@ class FixedDataValuesView(LoginRequiredMixin, View):
 
             return JsonResponse({
                 'status': 'success',
-                'items': formatted_items,
+                'items': display_items,
                 'pagination': {
                     'current_page': page,
                     'page_size': page_size,

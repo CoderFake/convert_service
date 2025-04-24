@@ -52,10 +52,10 @@ class DisplayData:
             return [], []
 
     @staticmethod
-    def get_list_data(redis_client, keys, hidden_formatted_header):
+    def get_list_data(redis_client, keys, hidden_display_header):
         try:
             visible_indices = [
-                header.get('index_value') for header in hidden_formatted_header
+                header.get('index_value') for header in hidden_display_header
                 if header.get('index_value', False)
             ]
 
@@ -104,19 +104,19 @@ class DisplayData:
                                 "key": key.decode('utf-8')
                             })
                 except Exception as e:
-                    logger.error(f"Error reading formatted data from Redis key {key}: {e}")
+                    logger.error(f"Error reading display data from Redis key {key}: {e}")
                     return []
 
             return result
         except Exception as e:
-            logger.error(f"Error combining formatted data: {e}")
+            logger.error(f"Error combining display data: {e}")
             return []
 
     @staticmethod
-    def get_paginated_data(redis_client, keys, all_formatted_header, page=1, page_size=20):
+    def get_paginated_data(redis_client, keys, all_display_header, page=1, page_size=20):
         try:
 
-            sorted_headers = sorted(all_formatted_header, key=lambda h: h.get('index_value', float('inf')))
+            sorted_headers = sorted(all_display_header, key=lambda h: h.get('index_value', float('inf')))
             hidden_positions = []
             for i, header in enumerate(sorted_headers):
                 if header.get('display') == False:

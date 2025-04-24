@@ -408,7 +408,7 @@
                 let hasMoreData = true;
                 let endMessageAdded = false;
                 const PAGE_SIZE = 20;
-                let formattedCounters = {};
+                let displayCounters = {};
                 let lastSeenFormatted = {};
 
                 window.editOptions = window.editOptions || [];
@@ -466,7 +466,7 @@
                     loading = true;
 
                     if (!append) {
-                        formattedCounters = {};
+                        displayCounters = {};
                         lastSeenFormatted = null;
                         $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
                     } else {
@@ -476,13 +476,13 @@
                         $("#inputData tbody tr").each(function() {
                             const dataIndex = $(this).attr("data-index");
                             if (dataIndex) {
-                                const matches = dataIndex.match(/formatted:(\d+)\s+(\d+)/);
+                                const matches = dataIndex.match(/display:(\d+)\s+(\d+)/);
                                 if (matches && matches.length >= 3) {
-                                    const formattedNum = matches[1];
+                                    const displayNum = matches[1];
                                     const counterVal = parseInt(matches[2], 10) + 1;
 
-                                    if (!formattedCounters[formattedNum] || formattedCounters[formattedNum] < counterVal) {
-                                        formattedCounters[formattedNum] = counterVal;
+                                    if (!displayCounters[displayNum] || displayCounters[displayNum] < counterVal) {
+                                        displayCounters[displayNum] = counterVal;
                                     }
                                 }
                             }
@@ -545,19 +545,19 @@
                                     const rowData = item.data;
                                     const originalKey = item.original_key;
 
-                                    const formattedMatch = originalKey.match(/formatted:(\d+)/);
+                                    const displayMatch = originalKey.match(/display:(\d+)/);
                                     let dataIndexValue = globalIndex;
 
-                                    if (formattedMatch && formattedMatch.length >= 2) {
-                                        const formattedNum = formattedMatch[1];
+                                    if (displayMatch && displayMatch.length >= 2) {
+                                        const displayNum = displayMatch[1];
 
-                                        if (typeof formattedCounters[formattedNum] === 'undefined') {
-                                            formattedCounters[formattedNum] = 0;
+                                        if (typeof displayCounters[displayNum] === 'undefined') {
+                                            displayCounters[displayNum] = 0;
                                         }
 
-                                        dataIndexValue = formattedCounters[formattedNum];
-                                        formattedCounters[formattedNum]++;
-                                        lastSeenFormatted = formattedNum;
+                                        dataIndexValue = displayCounters[displayNum];
+                                        displayCounters[displayNum]++;
+                                        lastSeenFormatted = displayNum;
                                     }
 
                                     const rowClass = loopIndex % 2 === 0 ? 'even' : 'odd';
@@ -830,10 +830,10 @@
                         return $(this).text();
                     }).get();
 
-                    const formattedKey = $(this).data('index');
+                    const displayKey = $(this).data('index');
                     const showDataDiv = $('.show-data');
                     showDataDiv.empty();
-                    showDataDiv.attr('data-index', formattedKey);
+                    showDataDiv.attr('data-index', displayKey);
 
                     let rowHTML = '<div class="row">';
                     let colLeft1 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
@@ -979,8 +979,8 @@
                     UpdateFormatData(input);
 
                     const name = input.attr('name');
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
                     targetRow.find(`td.${name}`).text('');
                 });
 
@@ -989,8 +989,8 @@
 
                     const name = $(this).attr('name');
                     const selectedText = $(this).val();
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
                     targetRow.find(`td.${name}`).text(selectedText);
                 });
 
@@ -1009,8 +1009,8 @@
                     const selectedDate = $(this).closest('div').find('input[type="text"]').val();
                     $(".date-picker").val(selectedDate);
 
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
                     targetRow.find('td.row-date').text(selectedDate);
 
                     $(`input[name="${name}"]`).not(this).prop('checked', false);
@@ -1020,8 +1020,8 @@
                 $(document).on('change', '.edit-input', function() {
                     const newText = $(this).val();
                     const name = $(this).attr('name');
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
 
                     targetRow.find(`td.${name}`).text(newText);
                 });

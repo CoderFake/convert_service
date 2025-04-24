@@ -84,9 +84,10 @@ class DataConversionInfo(models.Model):
 class DataItemType(models.Model):
 
     class TypeName(models.TextChoices):
-        BEFORE = 'input', '変換前の列'
-        FORMAT = 'format', '変換中の列'
-        AFTER = 'output', '変換後の列'
+        INPUT = 'input', '変換前のデータ​'
+        DISPLAY = 'display', '画面のデータ'
+        SYSTEM_OUTPUT = 'system_output', '健診システム取り込みデータ​'
+        AGENCY_OUTPUT = 'agency_output', '予約代行業者取り込みデータ'
 
     class FormatValue(models.TextChoices):
         STRING = 'string', '文字列'

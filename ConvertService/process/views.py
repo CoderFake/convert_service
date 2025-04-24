@@ -99,7 +99,7 @@ class ProcessFilesView(LoginRequiredMixin, View):
 
             headers = HeaderFetcher.get_headers(
                 user,
-                HeaderType.BEFORE.value,
+                HeaderType.INPUT.value,
                 DisplayType.ALL.value,
                 False,
                 get_data_format_id_from_redis(request)
@@ -122,7 +122,7 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
             data_format_id = get_data_format_id_from_redis(request)
             before_headers = HeaderFetcher.get_headers(
                 user,
-                HeaderType.BEFORE.value,
+                HeaderType.INPUT.value,
                 DisplayType.ALL.value,
                 True,
                 data_format_id=data_format_id
@@ -130,7 +130,7 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
 
             format_headers = HeaderFetcher.get_headers(
                 user,
-                HeaderType.FORMAT.value,
+                HeaderType.DISPLAY.value,
                 DisplayType.ALL.value,
                 False,
                 data_format_id=data_format_id
@@ -138,8 +138,8 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
 
             rules = RuleFetcher.get_rules(
                 user,
-                HeaderType.BEFORE.value,
-                HeaderType.FORMAT.value,
+                HeaderType.INPUT.value,
+                HeaderType.DISPLAY.value,
                 data_format_id=data_format_id
             )
 
@@ -162,12 +162,12 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
 
 
 class DownloadZipView(LoginRequiredMixin, View):
-    def get(self, request, zip_key="formatted:*"):
+    def get(self, request, zip_key="display:*"):
         try:
             client = redis_client.get_client()
 
             user = Account.objects.get(pk=request.user.id)
-            headers = HeaderFetcher.get_headers(user, HeaderType.AFTER.value, DisplayType.SHOW.value)
+            headers = HeaderFetcher.get_headers(user, HeaderType.AGENCY_OUTPUT.value, DisplayType.SHOW.value)
             file_format = FileFormatFetcher.get_file_format_id(user, before=False)
 
             zip_key = generate_zip_task(zip_key, headers, file_format)
@@ -205,22 +205,22 @@ class DownloadView(LoginRequiredMixin, View):
 
                 format_headers = HeaderFetcher.get_headers(
                     user,
-                    HeaderType.FORMAT.value,
+                    HeaderType.DISPLAY.value,
                     DisplayType.SHOW.value,
                     get_edit_header=True,
                     data_format_id=data_format_id
                 )
                 output_headers = HeaderFetcher.get_headers(
                     user,
-                    HeaderType.AFTER.value,
+                    HeaderType.SYSTEM_OUTPUT.value,
                     DisplayType.ALL.value,
                     data_format_id=data_format_id
                 )
 
                 rules = RuleFetcher.get_rules(
                     user,
-                    HeaderType.FORMAT.value,
-                    HeaderType.AFTER.value,
+                    HeaderType.DISPLAY.value,
+                    HeaderType.SYSTEM_OUTPUT.value,
                     data_format_id=data_format_id
                 )
             else:
@@ -228,21 +228,21 @@ class DownloadView(LoginRequiredMixin, View):
 
                 format_headers = HeaderFetcher.get_headers(
                     user,
-                    HeaderType.FORMAT.value,
+                    HeaderType.DISPLAY.value,
                     DisplayType.ALL.value,
                     get_edit_header=True,
                     data_format_id=data_format_id
                 )
                 output_headers = HeaderFetcher.get_headers(
                     user,
-                    HeaderType.BEFORE.value,
+                    HeaderType.AGENCY_OUTPUT.value,
                     DisplayType.ALL.value,
                     data_format_id=data_format_id
                 )
                 rules = RuleFetcher.get_rules(
                     user,
-                    HeaderType.FORMAT.value,
-                    HeaderType.BEFORE.value,
+                    HeaderType.DISPLAY.value,
+                    HeaderType.AGENCY_OUTPUT.value,
                     data_format_id=data_format_id
                 )
 
@@ -252,7 +252,7 @@ class DownloadView(LoginRequiredMixin, View):
                 format_headers,
                 output_headers,
                 user.tenant.id,
-                type_keys="formatted:*",
+                type_keys="display:*",
                 data_format_id=data_format_id
             )
 
@@ -324,29 +324,21 @@ class ProcessAndDisplayView:
 
             all_format_header = HeaderFetcher.get_headers(
                 user,
-                HeaderType.FORMAT.value,
+                HeaderType.DISPLAY.value,
                 DisplayType.ALL.value,
                 get_edit_header=True,
                 data_format_id=get_data_format_id_from_redis(request)
             )
 
-            show_formatted_header = HeaderFetcher.get_headers(
+            show_display_header = HeaderFetcher.get_headers(
                 user,
-                HeaderType.FORMAT.value,
+                HeaderType.DISPLAY.value,
                 DisplayType.SHOW.value,
                 get_edit_header=True,
                 data_format_id=get_data_format_id_from_redis(request)
             )
 
-            hidden_formatted_header = HeaderFetcher.get_headers(
-                user,
-                HeaderType.FORMAT.value,
-                DisplayType.HIDDEN.value,
-                get_edit_header=True,
-                data_format_id=get_data_format_id_from_redis(request)
-            )
-
-            format_keys = client.keys(f"{session_id}-formatted:*")
+            format_keys = client.keys(f"{session_id}-display:*")
 
             if not format_keys:
                 logger.warning("Can't not find processed data")
@@ -367,7 +359,7 @@ class ProcessAndDisplayView:
 
             return JsonResponse({
                 'status': "success",
-                'headers': show_formatted_header,
+                'headers': show_display_header,
                 'data': paginated_rows,
                 'pagination': {
                     'page': page,
@@ -378,7 +370,7 @@ class ProcessAndDisplayView:
             }, status=200)
 
         except Exception as e:
-            logger.error(f"Lỗi trong process_and_display: {e}")
+            logger.error(f"Error while proccessing process_and_display: {e}")
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
@@ -424,7 +416,7 @@ class SaveFormatFieldView:
 
             header_names = HeaderFetcher.get_headers(
                 user,
-                HeaderType.FORMAT.value,
+                HeaderType.DISPLAY.value,
                 DisplayType.ALL.value,
                 data_format_id=get_data_format_id_from_redis(request)
             )
@@ -484,8 +476,9 @@ class ProcessHeadersView(LoginRequiredMixin, View):
                         if header not in structured_data:
                             structured_data[header] = {
                                 "input": None,
-                                "format": None,
-                                "output": None
+                                "display": None,
+                                "system_output": None,
+                                "agency_output": None
                             }
 
                         data_type = self.determine_data_type(header, file_type)
@@ -498,17 +491,24 @@ class ProcessHeadersView(LoginRequiredMixin, View):
                                 "index": i
                             }
                         elif idx == 1:
-                            structured_data[header]["format"] = {
+                            structured_data[header]["display"] = {
                                 "display": display,
                                 "type": data_type,
                                 "index": i
                             }
                         elif idx == 2:
-                            structured_data[header]["output"] = {
+                            structured_data[header]["system_output"] = {
                                 "display": display,
                                 "type": data_type,
                                 "index": i
                             }
+                        elif idx == 3:
+                            structured_data[header]["agency_output"] = {
+                                "display": display,
+                                "type": data_type,
+                                "index": i
+                            }
+
 
             except Exception as e:
                 logger.error(f"Error processing file {file.name}: {e}")

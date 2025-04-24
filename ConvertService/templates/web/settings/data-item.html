@@ -246,7 +246,7 @@
                         </div>
                         <div>
                             <select id="dataTypeSelect" class="form-select form-select-sm">
-                                {% for value, name in data_item_type_choices %}
+                                {% for value, name in data_type_names %}
                                     <option value="{{ value }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
@@ -539,7 +539,7 @@ $(document).ready(function() {
         let dataTypeValue = $('#dataTypeSelect').val();
 
         appendForm.html('')
-        if(dataTypeValue === 'input' || dataTypeValue === 'output')
+        if(dataTypeValue === 'input' || dataTypeValue === 'system_output' || dataTypeValue === 'agency_output')
             appendForm.append(input_and_output_html);
         else {
             appendForm.append(format_html);
@@ -559,7 +559,7 @@ $(document).ready(function() {
         $('#dataItemModal #file-format-id').val($('#fileFormatSelect').val());
         $('#dataItemModal #data-type-name').val(dataType);
 
-        if (dataType === 'input' || dataType === 'output' || dataType === 'agency') {
+        if (dataType === 'input' || dataType === 'system_output' || dataType === 'agency_output') {
             $('.display-column, .edit-column, .format-column').addClass('hide-column');
             $('.display-setting, .edit-setting, .format-setting').hide();
         } else {
@@ -597,7 +597,7 @@ $(document).ready(function() {
 
             $(this).find('.index-setting').show();
 
-            if (groupType === 'input' || groupType === 'output' || groupType === 'agency') {
+            if (groupType === 'input' || groupType === 'system_output' || groupType === 'agency_output') {
                 $(this).find('.display-setting, .edit-setting, .format-setting').hide();
                 $(this).find('input[id^="display_"]').prop('checked', false);
                 $(this).find('input[id^="edit_"]').prop('checked', false);
@@ -718,7 +718,7 @@ $(document).ready(function() {
         $('#confirmDelete').off('click').on('click', function() {
             const deleteBtn = $(this);
             const deleteBtnText = deleteBtn.html();
-            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 削除中...');
+            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" style="height: 20px; width: 20px;" aria-hidden="true"></span> 削除中...');
             deleteBtn.prop('disabled', true);
 
             $.ajax({
