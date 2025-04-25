@@ -13,12 +13,14 @@
             <div class="col-lg-6 col-md-7">
                 <div class="card bg-secondary shadow border-0">
                     <div class="card-header bg-transparent">
-                        <div class="text-muted text-center mt-2">
-                        </div>
+                        <h1 class="text-center font-weight-bold">
+                            予約情報一括変換サービス
+                        </h1>
                     </div>
                     <div class="card-body px-lg-5 py-lg-5">
                         <form method="POST" id="login-form">
                             {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.GET.next|default:'/' }}">
                             <div class="form-group mb-3">
                                 <label class="form-check-label text-gray" for="username">ユーザーID</label>
                                 <div class="input-group input-group-alternative">
@@ -33,14 +35,14 @@
                                            placeholder="パスワードを入力してください" autocomplete="password">
                                 </div>
                             </div>
-                            <div class="custom-control custom-control-alternative custom-checkbox">
+                            <div class="custom-control custom-control-alternative custom-checkbox d-none">
                                 <input class="custom-control-input" id="customCheckUsername" name="remember_username"
                                        type="checkbox">
                                 <label class="custom-control-label" for="customCheckUsername">
                                     <span class="text-muted">IDを保存</span>
                                 </label>
                             </div>
-                            <div class="custom-control custom-control-alternative custom-checkbox">
+                            <div class="custom-control custom-control-alternative custom-checkbox d-none">
                                 <input class="custom-control-input" id="customCheckPassword" name="remember_password"
                                        type="checkbox" disabled>
                                 <label class="custom-control-label" for="customCheckPassword">
@@ -125,7 +127,7 @@
                             if (re_password && re_username) {
                                 localStorage.setItem("hash_password", response.hash_password);
                             }
-                            window.location.href = '/';
+                            window.location.href = response.redirect_url || '/';
                         } else {
                             createToast(response.status, response.message);
                         }

@@ -2,9 +2,10 @@ import enum
 
 
 class HeaderType(enum.Enum):
-    BEFORE = 'input'
-    FORMAT = 'format'
-    AFTER = 'output'
+    INPUT = 'input'
+    DISPLAY = 'display'
+    SYSTEM_OUTPUT = 'system_output'
+    AGENCY_OUTPUT = 'agency_output'
 
 
 class DisplayType(enum.Enum):
@@ -14,6 +15,7 @@ class DisplayType(enum.Enum):
 
 
 class DownloadType(enum.Enum):
-    SYSTEM = 'system'
-    AGENCY = 'agency'
+    SYSTEM = 'kenkoshisutemu'
+    AGENCY = 'yoyaku_daikou'
+
 

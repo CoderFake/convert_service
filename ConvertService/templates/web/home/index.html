@@ -1,7 +1,7 @@
 {% extends 'web/layouts/base.html' %}
 {% load static %}
 {% load i18n %}
-{% block title %} Dashboard {% endblock title %}
+{% block title %} 一括変換 {% endblock title %}
 
 {% block stylesheets %}
     <link rel="stylesheet" type="text/css"
@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         .table-responsive {
-            max-height: 250px;
+            padding-bottom: 20px !important;
         }
 
         table.dataTable th,
@@ -18,7 +18,7 @@
             cursor: default;
         }
 
-         table.dataTable .truncate-text {
+        table.dataTable .truncate-text {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -26,6 +26,43 @@
             max-width: 250px;
             display: inline-block;
             vertical-align: middle;
+        }
+
+        table.dataTable tbody tr td {
+            min-height: 30px;
+            height: 30px;
+        }
+
+        table.dataTable tbody tr {
+            min-height: 30px;
+        }
+
+        table.dataTable tbody tr td,
+        table.dataTable tbody tr td .truncate-text {
+            line-height: 30px;
+            vertical-align: middle;
+            overflow: hidden;
+
+        }
+         table.dataTable tbody tr td{
+            padding: 0 5px;
+         }
+         table.dataTable thead th {
+            text-transform: none !important;
+        }
+
+        .dataTables_wrapper .dataTables_scrollHead table.dataTable thead th,
+        .dataTables_wrapper table.dataTable thead th {
+            text-transform: none !important;
+        }
+
+        #inputData thead th,
+        #ruleTable thead th,
+        #dataItemTable thead th,
+        #fixedRuleTable thead th {
+            font-size: 0.8125rem !important;
+            text-transform: none !important;
+
         }
 
         .active-row {
@@ -44,6 +81,7 @@
             bottom: 30px;
             right: 30px;
         }
+
         input[type="radio"] {
             left: 35%;
             top: 50%;
@@ -62,6 +100,119 @@
                 bottom: 25px;
             }
         }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #loadingRow {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #007bff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .dataTables_scrollBody {
+            overflow-x: auto !important;
+            margin-bottom: 5px !important;
+            resize: vertical;
+            min-height: 200px;
+            max-height: 80vh !important;
+            position: relative;
+            transition: height 0.2s ease;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .dataTables_scrollBody::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .dataTables_resize_handle {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: transparent;
+            cursor: ns-resize;
+            z-index: 100;
+        }
+
+        .dataTables_resize_handle:hover,
+        .dataTables_resize_handle:active {
+            background-color: rgba(78, 115, 223, 0.3);
+        }
+
+        .dataTables_scrollBody.resize-active {
+            border-bottom: 2px solid #4e73df;
+        }
+
+        .show-data {
+            height: 100%;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .col-12.mt-4.w-100.overflow-hidden {
+            transition: height 0.2s ease;
+        }
+
+        #resize-overlay {
+            background-color: transparent;
+        }
+
+        #paginationInfo {
+            display: none !important;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            text-align: right;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .table-resize-handle {
+            width: 100%;
+            height: 10px;
+            background-color: transparent;
+            cursor: ns-resize;
+            position: absolute;
+            bottom: 20px !important;
+            left: 0;
+            z-index: 100;
+        }
+
+        .table-resize-handle:hover {
+            background-color: rgba(78, 115, 223, 0.3);
+        }
     </style>
 {% endblock stylesheets %}
 
@@ -78,8 +229,9 @@
             {% if tab and tab == "upload-file" %}
                 <div class="container compact drag-drop-file reservation w-90">
                     <div class="header-section">
-                        <h1 class="text-center text-dark font-weight-bold">
-                            予約情報ファイルを各施設様配布用ファイルに一括変換</h1>
+                        <h1 class="text-center text-dark font-weight-bold mt-3" style="font-size: 3rem;">
+                            変換する予約情報ファイルの選択
+                        </h1>
                     </div>
                     <div class="row">
                         <div class="col-lg-12 form-file w-100">
@@ -201,32 +353,16 @@
                         </div>
                         <div class="table-responsive overflow-hidden mt-2">
                             <table id="inputData" class="table table-bordered w-100">
-                                <thead class="bg-info">
-                                <tr>
-                                    {% for header in headers %}
-                                        <th>{{ header }}</th>
-                                    {% endfor %}
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {% if processed_files %}
-                                    {% for file in processed_files %}
-                                        {% for row in file.data %}
-                                            <tr>
-                                                {% for cell in row %}
-                                                    <td>{{ cell }}</td>
-                                                {% endfor %}
-                                            </tr>
-                                        {% endfor %}
-                                    {% endfor %}
-                                {% endif %}
-                                </tbody>
+                                <thead class="bg-info"><tr></tr></thead>
+                                <tbody></tbody>
                             </table>
+                            <div id="paginationInfo" class="d-none">0/0 行表示中</div>
+                            <div class="table-resize-handle"></div>
                         </div>
 
                     </div>
-                    <div class="col-12 mt-4 w-100">
-                        <div class="show-data pr-0 mb-5 mb-sm-0 w-100">
+                    <div class="col-12 mt-4 w-100 overflow-hidden" style="height: calc(100vh - 400px); max-height: 500px;">
+                        <div class="show-data pr-0 mb-5 mb-sm-0 w-100 h-100" style="overflow-x: hidden !important;">
                         </div>
                     </div>
                 </div>
@@ -263,9 +399,96 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
         <script>
+
             $(document).ready(function () {
+
                 let headerInfo = [];
-                function loadProcessedFiles() {
+                let currentPage = 1;
+                let loading = false;
+                let hasMoreData = true;
+                let endMessageAdded = false;
+                const PAGE_SIZE = 20;
+                let displayCounters = {};
+                let lastSeenFormatted = {};
+
+                window.editOptions = window.editOptions || [];
+
+                function loadEditOptions() {
+                    if (window.editOptions && window.editOptions.length > 0) {
+                        return Promise.resolve(window.editOptions);
+                    }
+
+                    return new Promise((resolve) => {
+                        $.ajax({
+                            url: '/get-edit-options/',
+                            type: 'GET',
+                            success: function(response) {
+                                if (response.status === 'success') {
+                                    window.editOptions = response.options;
+                                    resolve(response.options);
+                                } else {
+                                    console.error('Error loading options:', response.message);
+                                    resolve([]);
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                console.error('Error loading options:', error);
+                                resolve([]);
+                            }
+                        });
+                    });
+                }
+
+                function renderOptionField(headerName, currentValue, options) {
+
+                    const optionsList = options || [];
+
+                    let selectHTML = `<select class="form-control edit-input-select" name="${headerName}">`;
+                    selectHTML += `<option value="">選択してください</option>`;
+
+                    optionsList.forEach(option => {
+
+                        const value = Array.isArray(option) ? option[1] : option.value;
+                        const label = Array.isArray(option) ? option[0] : option.label;
+                        const selected = currentValue === value ? 'selected' : '';
+                        selectHTML += `<option value="${value}" ${selected}>${label}</option>`;
+                    });
+
+                    selectHTML += `</select>`;
+                    return selectHTML;
+                }
+
+                window.renderOptionField = renderOptionField;
+
+                function loadProcessedFiles(page = 1, append = false) {
+                    if (loading) return;
+
+                    loading = true;
+
+                    if (!append) {
+                        displayCounters = {};
+                        lastSeenFormatted = null;
+                        $("#inputData tbody").html('<tr><td colspan="100%" class="text-center"><div class="loading-spinner"></div> データを読み込み中...</td></tr>');
+                    } else {
+                        $("#loadingRow").remove();
+                        $("#inputData tbody").append('<tr id="loadingRow"><td colspan="100%" class="text-center"><div class="loading-spinner"></div> 追加データを読み込み中...</td></tr>');
+
+                        $("#inputData tbody tr").each(function() {
+                            const dataIndex = $(this).attr("data-index");
+                            if (dataIndex) {
+                                const matches = dataIndex.match(/display:(\d+)\s+(\d+)/);
+                                if (matches && matches.length >= 3) {
+                                    const displayNum = matches[1];
+                                    const counterVal = parseInt(matches[2], 10) + 1;
+
+                                    if (!displayCounters[displayNum] || displayCounters[displayNum] < counterVal) {
+                                        displayCounters[displayNum] = counterVal;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
                     $.ajax({
                         url: "{% url 'get_data' %}",
                         type: "POST",
@@ -273,75 +496,148 @@
                             'X-CSRFToken': getCookie('csrftoken'),
                             'Content-Type': 'application/json'
                         },
+                        data: JSON.stringify({
+                            page: page,
+                            page_size: PAGE_SIZE
+                        }),
                         success: function(response) {
+                            loading = false;
+                            $("#loadingRow").remove();
+
                             if (response.status === 'success') {
                                 const processedData = response.data || [];
                                 headerInfo = response.headers || [];
 
+                                currentPage = response.pagination.page;
+                                hasMoreData = currentPage < response.pagination.total_pages;
+
                                 const table = $("#inputData");
-                                if ($.fn.DataTable.isDataTable(table)) {
-                                    table.DataTable().destroy();
+
+                                if (!append) {
+                                    if ($.fn.DataTable.isDataTable(table)) {
+                                        table.DataTable().destroy();
+                                    }
+
+                                    const thead = table.find("thead");
+                                    if (thead.length === 0) {
+                                        table.prepend("<thead><tr></tr></thead>");
+                                    }
+
+                                    const headerRow = table.find("thead tr");
+                                    headerRow.empty();
+                                    headerInfo.forEach(header => {
+                                        const headerClass = header.edit_value ? 'bg-success' : '';
+                                        headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
+                                    });
+
+                                    table.find("tbody").empty();
+                                    endMessageAdded = false;
                                 }
 
-                                const thead = table.find("thead");
-                                if (thead.length === 0) {
-                                    table.prepend("<thead><tr></tr></thead>");
-                                }
-
-                                const headerRow = table.find("thead tr");
-                                headerRow.empty();
-                                headerInfo.forEach(header => {
-                                    const headerClass = header.edit_value ? 'bg-success' : '';
-                                    headerRow.append(`<th class="${headerClass}">${header.header_name || ''}</th>`);
-                                });
                                 const tbody = table.find("tbody");
                                 if (tbody.length === 0) {
                                     table.append("<tbody></tbody>");
                                 }
-                                tbody.empty();
-                                processedData.forEach(dataSet => {
-                                    if (dataSet.data && Array.isArray(dataSet.data)) {
-                                        dataSet.data.forEach((row, index) => {
-                                            const rowKey = `${dataSet.key} ${index}`;
-                                            const rowHTML = row.map((cell, cellIndex) => {
-                                                const header = headerInfo[cellIndex];
-                                                const cellClass = header?.edit_value
-                                                    ? header.format_value === 'date' ? 'row-date'
-                                                    : header.format_value === 'time' ? 'row-time'
-                                                    : ''
-                                                    : '';
-                                                return `<td class="${cellClass} ${header?.header_name || ''}">${cell || ''}</td>`;
-                                            }).join('');
-                                            tbody.append(`<tr data-index="${rowKey}">${rowHTML}</tr>`);
-                                        });
+
+                                let rowsAdded = 0;
+                                processedData.forEach((item, loopIndex) => {
+                                    const globalIndex = item.global_index;
+                                    const rowData = item.data;
+                                    const originalKey = item.original_key;
+
+                                    const displayMatch = originalKey.match(/display:(\d+)/);
+                                    let dataIndexValue = globalIndex;
+
+                                    if (displayMatch && displayMatch.length >= 2) {
+                                        const displayNum = displayMatch[1];
+
+                                        if (typeof displayCounters[displayNum] === 'undefined') {
+                                            displayCounters[displayNum] = 0;
+                                        }
+
+                                        dataIndexValue = displayCounters[displayNum];
+                                        displayCounters[displayNum]++;
+                                        lastSeenFormatted = displayNum;
+                                    }
+
+                                    const rowClass = loopIndex % 2 === 0 ? 'even' : 'odd';
+
+                                    if (rowData && Array.isArray(rowData)) {
+                                        const rowHTML = rowData.map((cell, cellIndex) => {
+                                            const header = headerInfo[cellIndex];
+
+                                            const cellClass = header?.edit_value
+                                                ? header.format_value === 'date' ? 'row-date'
+                                                : header.format_value === 'time' ? 'row-time'
+                                                : header.format_value === 'option' ? 'row-option'
+                                                : ''
+                                                : '';
+                                            const headerNameClass = header?.header_name;
+                                            return `<td class="${cellClass} ${headerNameClass}">${cell || ''}</td>`;
+                                        }).join('');
+
+                                        tbody.append(`<tr data-index="${originalKey} ${dataIndexValue}" class="${rowClass}" role="row">${rowHTML}</tr>`);
+                                        rowsAdded++;
                                     }
                                 });
 
-                                if (headerInfo.length > 0) {
+                                if (headerInfo.length > 0 && !append) {
                                     try {
                                         initDataTable(table);
                                     } catch (error) {
-                                        console.error('DataTable initialization error:', error);
                                         createToast("error", "テーブルの初期化中にエラーが発生しました。");
                                     }
+                                } else if (append && rowsAdded > 0) {
+                                    const newRows = table.find('tbody tr').slice(-rowsAdded);
+                                    newRows.find('td').addClass('dt-start');
+
+                                    newRows.find('td').each(function() {
+                                        const $cell = $(this);
+                                        const cellContent = $cell.text();
+                                        if (!$cell.find('.truncate-text').length) {
+                                            $cell.html(`<div class="truncate-text" title="${cellContent}">${cellContent}</div>`);
+                                        }
+                                    });
+
+                                    if ($.fn.DataTable.isDataTable(table)) {
+                                        table.DataTable().columns.adjust();
+                                    }
+                                }
+
+                                const currentRows = $("table#inputData tbody tr").length - (endMessageAdded ? 1 : 0);
+                                const totalRows = response.pagination.total_rows;
+                                $("#paginationInfo").removeClass('d-none').html(`${currentRows}/${totalRows} 行表示中`);
+
+                                if (!hasMoreData && !endMessageAdded) {
+                                    endMessageAdded = true;
+                                }
+
+                                if (rowsAdded > 0) {
+                                    checkIfMoreContentNeeded();
                                 }
                             } else {
                                 createToast("error", response.message || "データの取得に失敗しました。");
                             }
                         },
-                        error: function (error) {
+                        error: function(error) {
+                            loading = false;
+                            $("#loadingRow").remove();
                             createToast("error", "エラーが発生しました。データを取得できませんでした。");
                         }
                     });
                 }
 
                 function initDataTable(idTable) {
+                    $('.table-responsive').css('height', '220px');
+
                     if ($.fn.DataTable.isDataTable(idTable)) {
                         idTable.DataTable().destroy();
                     }
 
-                    return idTable.DataTable({
-                        scrollY: "200px",
+                    $(".table-responsive").css({"height": "220px"});
+
+                    const dataTable = idTable.DataTable({
+                        scrollY: "220px",
                         scrollX: true,
                         scrollCollapse: true,
                         paging: false,
@@ -352,7 +648,7 @@
                         columnDefs: [
                             {
                                 targets: '_all',
-                                className: 'dt-center',
+                                className: 'dt-start',
                                 render: function(data, type, row) {
                                     const displayData = data || '';
                                     return `<div class="truncate-text" title="${displayData}">${displayData}</div>`;
@@ -366,49 +662,196 @@
                         autoWidth: true,
                         initComplete: function(settings, json) {
                             this.api().columns.adjust();
+
+                            $(".dataTables_scrollBody").css("overflow-x", "auto");
+                            $(".dataTables_scrollBody").css({"height": "220px", "min-height": "220px"});
+                            $(".table-responsive").css({"height": "auto"});
+
+                            setupResizeHandle();
+                            setupScrollEvents();
+                        }
+                    });
+
+                    return dataTable;
+                }
+
+                function setupScrollEvents() {
+                    const scrollBodySelector = ".dataTables_scrollBody";
+                    $(scrollBodySelector).off("scroll.infiniteScroll");
+
+                    $(scrollBodySelector).on("scroll.infiniteScroll", function() {
+                        const scrollTop = $(this).scrollTop();
+                        const viewportHeight = $(this).height();
+                        const scrollHeight = $(this)[0].scrollHeight;
+
+                        const denominator = Math.max(1, scrollHeight - viewportHeight);
+                        const scrollPercent = (scrollTop / denominator) * 100;
+
+                        if (!loading && hasMoreData && scrollPercent >= 80 && !endMessageAdded) {
+                            currentPage++;
+                            loadProcessedFiles(currentPage, true);
+                        }
+                    });
+
+                    setTimeout(function() {
+                        checkIfMoreContentNeeded();
+                    }, 300);
+                }
+
+                function checkIfMoreContentNeeded() {
+                    const scrollBody = $(".dataTables_scrollBody");
+                    if (scrollBody.length > 0) {
+                        const scrollHeight = scrollBody[0].scrollHeight;
+                        const clientHeight = scrollBody.height();
+
+                        if (scrollHeight <= clientHeight && hasMoreData && !loading && !endMessageAdded) {
+                            console.log("Auto loading more because content is not enough to scroll");
+                            setTimeout(function() {
+                                currentPage++;
+                                loadProcessedFiles(currentPage, true);
+                            }, 300);
+                        }
+                    }
+                }
+
+                function UpdateFormatData(input) {
+                    const dataIndex = $('.show-data').attr('data-index');
+                    const fieldName = input.attr('name');
+                    const fieldValue = input.val();
+
+                    const postData = {
+                        key: dataIndex,
+                        field_name: fieldName,
+                        field_value: fieldValue,
+                        csrfmiddlewaretoken: getCookie('csrftoken')
+                    };
+
+                    $.ajax({
+                        url: "{% url 'update_format_data' %}",
+                        type: "POST",
+                        data: postData,
+                        error: function(error) {
+                            createToast('error', 'データ送信中にエラーが発生しました。');
                         }
                     });
                 }
 
-                loadProcessedFiles();
+                function setupResizeHandle() {
+                    $('.table-resize-handle').remove();
 
-                $(".btn-export").on('click', function () {
-                    if (this.attributes.id.value === 'system-csv') {
-                        window.location.href = "{% url 'download' 'system' %}";
-                    } else {
-                        window.location.href = "{% url 'download' 'agency' %}";
+                    if ($('.dataTables_scrollBody').length) {
+                        $('.table-responsive').css('position', 'relative');
+                        $('<div class="table-resize-handle"></div>').appendTo('.table-responsive');
+
+                        $('.table-resize-handle').css({
+                            'position': 'absolute',
+                            'bottom': '0',
+                            'left': '0',
+                            'right': '0',
+                            'height': '10px',
+                            'background-color': 'transparent',
+                            'cursor': 'ns-resize',
+                            'z-index': '100'
+                        });
+
+                        initResizeEvents();
+                    }
+                }
+
+                let isResizing = false;
+                let startY, startHeight;
+                const minHeight = 200;
+                let maxHeight = window.innerHeight * 0.8;
+
+                function initResizeEvents() {
+                    $('.table-resize-handle').on('mousedown', function(e) {
+                        isResizing = true;
+                        startY = e.clientY;
+                        startHeight = $('.dataTables_scrollBody').height();
+
+                        $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+                        $('.dataTables_scrollBody').addClass('resize-active');
+                        e.preventDefault();
+                    });
+
+                    $(document).on('mousemove', function(e) {
+                        if (!isResizing) return;
+
+                        const newHeight = startHeight + (e.clientY - startY);
+                        if (newHeight >= minHeight && newHeight <= maxHeight) {
+                            $('.dataTables_scrollBody').height(newHeight);
+                            adjustDataContainer();
+
+                            if ($.fn.DataTable.isDataTable("#inputData")) {
+                                $("#inputData").DataTable().columns.adjust();
+                            }
+                        }
+                    });
+
+                    $(document).on('mouseup', function() {
+                        if (isResizing) {
+                            isResizing = false;
+                            $('#resize-overlay').remove();
+                            $('.dataTables_scrollBody').removeClass('resize-active');
+
+                            const newHeight = $('.dataTables_scrollBody').height();
+                            localStorage.setItem('preferredTableHeight', newHeight);
+                        }
+                    });
+                }
+
+                function adjustDataContainer() {
+                    const scrollBodyHeight = $('.dataTables_scrollBody').height();
+                    const windowHeight = window.innerHeight;
+                    const tableOffset = $('.table-responsive').offset().top;
+                    const footerHeight = 50;
+
+                    const availableSpace = windowHeight - tableOffset - scrollBodyHeight - footerHeight;
+                    $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
+                }
+
+                function applyStoredHeight() {
+                    const storedHeight = localStorage.getItem('preferredTableHeight');
+                    if (storedHeight && $('.dataTables_scrollBody').length) {
+                        $('.dataTables_scrollBody').height(parseInt(storedHeight));
+                        adjustDataContainer();
+                    }
+                }
+
+                $('#inputData').on('click', 'tbody tr', function() {
+                    if ($(this).attr('id') === 'endMessage' || $(this).attr('id') === 'loadingRow') {
+                        return;
                     }
 
-                    setTimeout(function () {
-                        window.location.href = "{% url 'home' %}";
-                    }, 1000);
-                });
-
-                $('#inputData').on('click', 'tbody tr', function () {
                     $('#inputData tbody tr').removeClass('active-row');
                     $(this).addClass('active-row');
 
-                    const cells = $(this).find('td').map(function () {
+                    const cells = $(this).find('td').map(function() {
                         return $(this).text();
                     }).get();
 
-                    const formattedKey = $(this).data('index');
+                    const displayKey = $(this).data('index');
                     const showDataDiv = $('.show-data');
                     showDataDiv.empty();
-                    showDataDiv.attr('data-index', formattedKey);
+                    showDataDiv.attr('data-index', displayKey);
 
                     let rowHTML = '<div class="row">';
-                    let colLeft1 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colLeft2 = '<div class="col-12 col-lg-6 col-md-6 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colRight = '<div class="col-12 col-lg-12 col-md-6 col-sm-12 d-flex flex-column justify-content-center align-items-center">';
+                    let colLeft1 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colLeft2 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
+                    let colRight = '<div class="col-12 col-xl-12 col-lg-12 col-sm-12 d-flex flex-column justify-content-start align-items-center">';
 
                     let nonEditHeaders = [];
                     let editHeaders = [];
+
                     headerInfo.forEach((header, index) => {
                         if (!header.edit_value) {
                             nonEditHeaders.push({ header: header.header_name, cell: cells[index] });
                         } else {
-                            editHeaders.push({ header: header.header_name, cell: cells[index], format: header.format_value });
+                            editHeaders.push({
+                                header: header.header_name,
+                                cell: cells[index],
+                                format: header.format_value
+                            });
                         }
                     });
 
@@ -432,6 +875,7 @@
                                 </div>
                             `;
                         }
+
                         if (index < midpoint) {
                             colLeft1 += content;
                         } else {
@@ -443,12 +887,33 @@
                         const cellClass = item.format === 'date' ? 'date-picker'
                                        : item.format === 'time' ? 'time-picker'
                                        : '';
+
+                        const showClearIcon = item.format === 'time' && item.cell.trim() !== '';
+
                         let content = `
                             <div class="mb-3 d-flex align-items-center w-100">
                                 <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                                <div class="position-relative w-100">
+                        `;
+
+                        if (item.format === 'option') {
+                            content += renderOptionField(item.header, item.cell, window.editOptions);
+                        } else {
+                            content += `
                                 <input type="text" class="form-control edit-input ${cellClass} bg-white" name="${item.header}" value="${item.cell || ''}">
+                                ${item.format === 'time' ? `
+                                <span class="time-clear-icon position-absolute${showClearIcon ? '' : ' d-none'}"
+                                      style="right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;">
+                                    <i class="fas fa-times-circle"></i>
+                                </span>` : ''}
+                            `;
+                        }
+
+                        content += `
+                                </div>
                             </div>
                         `;
+
                         colRight += content;
                     });
 
@@ -457,11 +922,11 @@
                     colRight += '</div>';
 
                     rowHTML += `
-                        <div class="row col-12 col-md-6 col-lg-9">
+                        <div class="row col-12 col-lg-6 col-xl-9">
                             ${colLeft1}
                             ${colLeft2}
                         </div>
-                        <div class="row col-12 col-md-6 col-lg-3">
+                        <div class="row col-12 col-lg-6 col-xl-3">
                             ${colRight}
                         </div>
                     `;
@@ -482,57 +947,255 @@
                     });
                 });
 
-                function UpdateFormatData(Input){
-                    const dataIndex = $('.show-data').attr('data-index');
-                    const fieldName = Input.attr('name');
-                    const fieldValue = Input.val();
 
-                    const postData = {
-                        key: dataIndex,
-                        field_name: fieldName,
-                        field_value: fieldValue,
-                        csrfmiddlewaretoken: getCookie('csrftoken')
-                    };
+                $(window).on('resize', function() {
+                    if ($.fn.DataTable.isDataTable("#inputData")) {
+                        $("#inputData").DataTable().columns.adjust();
+                    }
 
-                    $.ajax({
-                        url: "{% url 'update_format_data' %}",
-                        type: "POST",
-                        data: postData,
-                        error: function (error) {
-                            createToast('error', 'データ送信中にエラーが発生しました。');
+                    maxHeight = window.innerHeight * 0.8;
+                    const currentHeight = $('.dataTables_scrollBody').height();
+                    if (currentHeight > maxHeight) {
+                        $('.dataTables_scrollBody').height(maxHeight);
+                    }
+
+                    adjustDataContainer();
+                });
+
+                $(document).on('input', '.time-picker', function() {
+                    const clearIcon = $(this).siblings('.time-clear-icon');
+                    if ($(this).val().trim() !== '') {
+                        clearIcon.removeClass('d-none');
+                    } else {
+                        clearIcon.addClass('d-none');
+                    }
+                });
+
+                $(document).on('click', '.time-clear-icon', function(e) {
+                    e.preventDefault();
+                    const input = $(this).siblings('.time-picker');
+                    input.val('');
+                    $(this).addClass('d-none');
+                    UpdateFormatData(input);
+
+                    const name = input.attr('name');
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
+                    targetRow.find(`td.${name}`).text('');
+                });
+
+                $(document).on('change', '.edit-input-select', function() {
+                    UpdateFormatData($(this));
+
+                    const name = $(this).attr('name');
+                    const selectedText = $(this).val();
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
+                    targetRow.find(`td.${name}`).text(selectedText);
+                });
+
+                $(document).on('blur change', '.edit-input', function() {
+                    if ($(this).hasClass('time-picker') && $(this).val().trim() !== '') {
+                        $(this).siblings('.time-clear-icon').removeClass('d-none');
+                    } else if ($(this).hasClass('time-picker')) {
+                        $(this).siblings('.time-clear-icon').addClass('d-none');
+                    }
+
+                    UpdateFormatData($(this));
+                });
+
+                $(document).on('change', 'input[type="radio"]', function() {
+                    const name = $(this).attr('name');
+                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
+                    $(".date-picker").val(selectedDate);
+
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
+                    targetRow.find('td.row-date').text(selectedDate);
+
+                    $(`input[name="${name}"]`).not(this).prop('checked', false);
+                    UpdateFormatData($(".date-picker"));
+                });
+
+                $(document).on('change', '.edit-input', function() {
+                    const newText = $(this).val();
+                    const name = $(this).attr('name');
+                    const displayKey = $('.show-data').attr('data-index');
+                    const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
+
+                    targetRow.find(`td.${name}`).text(newText);
+                });
+
+                $(".btn-export").on('click', function() {
+                    if (this.id === 'system-csv') {
+                        window.location.href = "{% url 'download' 'kenkoshisutemu' %}";
+                    } else {
+                        window.location.href = "{% url 'download' 'yoyaku_daikou' %}";
+                    }
+                });
+
+                $('<style>')
+                .prop('type', 'text/css')
+                .html(`
+                    .time-clear-icon {
+                        opacity: 0.7;
+                        transition: opacity 0.2s;
+                        z-index: 10;
+                    }
+                    .time-clear-icon:hover {
+                        opacity: 1;
+                    }
+                    .time-picker {
+                        padding-right: 30px;
+                    }
+                    .dataTables_scrollBody {
+                        transition: height 0.1s ease;
+                        border-bottom: 1px solid #e3e6f0;
+                    }
+                    .dataTables_scrollBody.resize-active {
+                        border-bottom: 2px solid #4e73df;
+                    }
+                    .table-resize-handle:hover {
+                        background-color: rgba(78, 115, 223, 0.3);
+                    }
+                `)
+                .appendTo('head');
+
+                loadEditOptions().then(() => {
+                    loadProcessedFiles();
+                });
+            });
+
+            $(document).ready(function() {
+                let isResizing = false;
+                let startY, startHeight;
+                const minHeight = 200;
+                let maxHeight = window.innerHeight * 0.8;
+
+                function setupResizeHandle() {
+                    $('.table-resize-handle').remove();
+
+                    if ($('.dataTables_scrollBody').length) {
+                        $('.table-responsive').css('position', 'relative');
+                        $('<div class="table-resize-handle"></div>').appendTo('.table-responsive');
+
+                        $('.table-resize-handle').css({
+                            'position': 'absolute',
+                            'bottom': '0',
+                            'left': '0',
+                            'right': '0',
+                            'height': '10px',
+                            'background-color': 'transparent',
+                            'cursor': 'ns-resize',
+                            'z-index': '100'
+                        });
+
+                        initResizeEvents();
+                    }
+                }
+
+                function initResizeEvents() {
+                    $('.table-resize-handle').on('mousedown', function(e) {
+                        isResizing = true;
+                        startY = e.clientY;
+                        startHeight = $('.dataTables_scrollBody').height();
+
+                        $('body').append('<div id="resize-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize;"></div>');
+
+                        $('.dataTables_scrollBody').addClass('resize-active');
+
+                        e.preventDefault();
+                    });
+
+                    $(document).on('mousemove', function(e) {
+                        if (!isResizing) return;
+
+                        const newHeight = startHeight + (e.clientY - startY);
+
+                        if (newHeight >= minHeight && newHeight <= maxHeight) {
+                            $('.dataTables_scrollBody').height(newHeight);
+
+                            adjustDataContainer();
+                            if ($.fn.DataTable.isDataTable("#inputData")) {
+                                $("#inputData").DataTable().columns.adjust();
+                            }
+                        }
+                    });
+
+                    $(document).on('mouseup', function() {
+                        if (isResizing) {
+                            isResizing = false;
+                            $('#resize-overlay').remove();
+                            $('.dataTables_scrollBody').removeClass('resize-active');
+
+                            const newHeight = $('.dataTables_scrollBody').height();
+                            localStorage.setItem('preferredTableHeight', newHeight);
                         }
                     });
                 }
 
-                $(document).on('blur change', '.edit-input', function () {
-                    new UpdateFormatData($(this));
+                function adjustDataContainer() {
+                    const scrollBodyHeight = $('.dataTables_scrollBody').height();
+                    const tableContainerHeight = scrollBodyHeight + 150;
+
+                    const windowHeight = window.innerHeight;
+                    const tableOffset = $('.table-responsive').offset().top;
+                    const footerHeight = 50;
+
+                    const availableSpace = windowHeight - tableOffset - footerHeight;
+                    $('.show-data').parent().css('height', `${Math.max(200, availableSpace)}px`);
+                }
+
+                function applyStoredHeight() {
+                    const storedHeight = localStorage.getItem('preferredTableHeight');
+                    if (storedHeight && $('.dataTables_scrollBody').length) {
+                        $('.dataTables_scrollBody').height(parseInt(storedHeight));
+                        adjustDataContainer();
+                    }
+                }
+
+                function handleTableSetup() {
+                    if ($('.dataTables_scrollBody').length) {
+                        setupResizeHandle();
+                        applyStoredHeight();
+                        adjustDataContainer();
+                    } else {
+                        setTimeout(handleTableSetup, 500);
+                    }
+                }
+
+                handleTableSetup();
+
+                $(window).on('resize', function() {
+                    if ($('.dataTables_scrollBody').length) {
+                        maxHeight = window.innerHeight * 0.8;
+
+                        const currentHeight = $('.dataTables_scrollBody').height();
+                        if (currentHeight > maxHeight) {
+                            $('.dataTables_scrollBody').height(maxHeight);
+                        }
+
+                        adjustDataContainer();
+                    }
                 });
 
-
-                $(document).on('change', 'input[type="radio"]', function () {
-                    const name = $(this).attr('name');
-                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
-                    $(".date-picker").val(selectedDate);
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-                    targetRow.find('td.row-date').text(selectedDate);
-
-                    $(`input[name="${name}"]`).not(this).prop('checked', false);
-                    new UpdateFormatData($(".date-picker"));
-                });
-
-                $(document).on('change', '.edit-input', function () {
-                    const newText = $(this).val();
-                    const name = $(this).attr('name');
-                    const formattedKey = $('.show-data').attr('data-index');
-                    const targetRow = $(`#inputData tbody tr[data-index="${formattedKey}"]`);
-
-                    targetRow.find(`td.${name}`).text(newText);
-                });
+                $('<style>')
+                    .prop('type', 'text/css')
+                    .html(`
+                        .dataTables_scrollBody {
+                            transition: height 0.1s ease;
+                            border-bottom: 1px solid #e3e6f0;
+                        }
+                        .dataTables_scrollBody.resize-active {
+                            border-bottom: 2px solid #4e73df;
+                        }
+                        .table-resize-handle:hover {
+                            background-color: rgba(78, 115, 223, 0.3);
+                        }
+                    `)
+                    .appendTo('head');
             });
-
         </script>
-
     {% elif tab == 'upload-file' %}
         <script src="{% static 'web/js/drag-drop-files.js' %}"></script>
     {% endif %}

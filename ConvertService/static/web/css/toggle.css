@@ -1,0 +1,92 @@
+  .toggle-display-input, .toggle-edit-input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+
+  .toggle-display-label, .toggle-edit-label {
+    width: 150px;
+    height: 40px;
+    display: block;
+    background-color: #ccc;
+    border-radius: 50px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  .toggle-display-input:checked + .toggle-display-label {
+    background-color: #4caf50;
+  }
+
+  .toggle-edit-input:checked + .toggle-edit-label {
+    background-color: #4caf50;
+  }
+
+  /* Left text (いいえ/No) */
+  .toggle-display-label:before, .toggle-edit-label:before {
+    content: "いいえ";
+    font-size: 20px;
+    position: absolute;
+    top: 50%;
+    right: 30px;
+    transform: translateY(-50%);
+    color: #fff;
+    transition: opacity 0.3s ease;
+    opacity: 1;
+    z-index: 1;
+  }
+
+  /* Right text (はい/Yes) */
+  .toggle-display-label:after, .toggle-edit-label:after {
+    content: "はい";
+    font-size: 20px;
+    position: absolute;
+    top: 50%;
+    left: 30px;
+    transform: translateY(-50%);
+    color: #fff;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    z-index: 1;
+  }
+
+  .toggle-display-input:checked + .toggle-display-label:before {
+    opacity: 0;
+  }
+
+  .toggle-display-input:checked + .toggle-display-label:after {
+    opacity: 1;
+  }
+
+  .toggle-edit-input:checked + .toggle-edit-label:before {
+    opacity: 0;
+  }
+
+  .toggle-edit-input:checked + .toggle-edit-label:after {
+    opacity: 1;
+  }
+
+  .toggle-display-button, .toggle-edit-button {
+    content: "";
+    min-height: 30px;
+    width: 45px;
+    display: block;
+    border-radius: 50px;
+    background-color: #fff;
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    transform: translateY(-50%);
+    transition: transform 0.3s ease;
+    z-index: 2;
+  }
+
+  .toggle-display-input:checked + .toggle-display-label .toggle-display-button {
+    transform: translate(95px, -50%);
+  }
+
+  .toggle-edit-input:checked + .toggle-edit-label .toggle-edit-button {
+    transform: translate(95px, -50%);
+  }

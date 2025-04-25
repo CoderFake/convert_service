@@ -10,6 +10,7 @@ from .utils import (
     DataFormatter,
     FileProcessor,
     FileFormatMapper,
+    CharacterNormalizer,  
 )
 from .redis import redis_client
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def process_multiple_files_task(session_id, headers, file_format=None, mode='dict'):
+def process_multiple_files_task(session_id, headers):
+
     try:
         client = redis_client.get_client()
-        redis_client.delete_key_batch(f'{session_id}-processed:*')
+        redis_client.delete_key_batch(client.keys(f'{session_id}-processed:*'))
 
         keys = client.keys(f'{session_id}-file:*')
         if not keys:
@@ -36,22 +38,16 @@ def process_multiple_files_task(session_id, headers, file_format=None, mode='dic
         def process_and_convert(file_path, key, file_index):
             try:
                 file_path = Path(file_path)
-                if mode == 'csv':
-                    output_csv_path = file_path.with_suffix('.csv')
-                    FileProcessor.process_file(file_path, headers, mode, file_format)
-                    client.delete(key)
-                    return {'type': 'csv', 'result': str(output_csv_path)}
-                elif mode == 'dict':
-                    result_dict = FileProcessor.process_file(file_path, headers, mode, file_format)
+                result_dict = FileProcessor.process_file(file_path, headers)
 
-                    redis_key = f"{session_id}-processed:{file_index}"
-                    client.set(redis_key, json.dumps(result_dict), ex=3600)
+                redis_key = f"{session_id}-processed:{file_index}"
+                client.set(redis_key, json.dumps(result_dict), ex=3600)
 
-                    client.delete(key)
-                    return {'type': 'dict', 'result': f"{len(result_dict)} rows processed."}
+                client.delete(key)
+                return {'type': 'dict', 'result': f"{len(result_dict)} rows processed."}
             except Exception as e:
                 logger.error(f"Error processing file {file_path}: {e}")
-                return None
+                return {'type': 'error', 'result': str(e)}
 
         max_workers = os.cpu_count() or 1
         logger.info(f"Processing files with {max_workers} workers.")
@@ -74,17 +70,18 @@ def process_multiple_files_task(session_id, headers, file_format=None, mode='dic
 
     except Exception as e:
         logger.error(f"Error in 'process_multiple_files_task': {e}")
-        return {"status": "error", "message": "An error occurred while processing files."}
+        return {"status": "error", "message": f"An error occurred while processing files: {str(e)}"}
 
 
 @shared_task
 def process_and_format_file(
-    session_id,
-    rules,
-    before_headers,
-    after_headers,
-    tenant_id,
-    type_keys="processed:*"
+        session_id,
+        rules,
+        before_headers,
+        after_headers,
+        tenant_id,
+        type_keys="processed:*",
+        data_format_id=None
 ):
     try:
         logger.info("Task 'process_and_format_file' started.")
@@ -96,63 +93,61 @@ def process_and_format_file(
             return "処理するデータが見つかりません。"
 
         logger.info(f"Found {len(keys)} keys for processing.")
-        max_workers = os.cpu_count() or 1
-        logger.info(f"Using {max_workers} workers for processing.")
+        type_key = "output" if type_keys == "display:*" else "display"
 
-        batch_size = 500
-        type_key = "output" if type_keys == "formatted:*" else "formatted"
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
 
-        def process_batch(batch_keys):
-            for key in batch_keys:
-                try:
-                    raw_data = client.get(key)
-                    if not raw_data:
-                        logger.warning(f"No valid data found for key {key}. Skipping...")
-                        continue
+        row_index_counter = 0
 
-                    data_dict = json.loads(raw_data.decode('utf-8'))
+        for key in sorted_keys:
+            try:
+                raw_data = client.get(key)
+                if not raw_data:
+                    logger.warning(f"No valid data found for key {key}. Skipping...")
+                    continue
 
-                    if isinstance(data_dict, list):
-                        formatted_data = []
-                        for idx, row in enumerate(data_dict):
-                            formatted_row = DataFormatter.format_data_with_rules(
-                                row,
-                                rules,
-                                before_headers,
-                                after_headers,
-                                tenant_id
-                            )
-                            formatted_data.append(formatted_row)
-                    else:
-                        formatted_data = []
-                        for row_key, row in data_dict.items():
-                            formatted_row = DataFormatter.format_data_with_rules(
-                                row,
-                                rules,
-                                before_headers,
-                                after_headers,
-                                tenant_id
-                            )
-                            formatted_data.append(formatted_row)
+                data_dict = json.loads(raw_data.decode('utf-8'))
 
-                    formatted_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
-                    client.set(formatted_key, json.dumps(formatted_data), ex=3600)
+                if isinstance(data_dict, list):
+                    display_data = []
+                    for idx, row in enumerate(data_dict):
+                        if isinstance(row, dict):
+                            row['row_index'] = row_index_counter + idx
 
-                except Exception as e:
-                    logger.error(f"Error processing key {key}: {e}")
+                        display_row = DataFormatter.format_data_with_rules(
+                            row,
+                            rules,
+                            before_headers,
+                            after_headers,
+                            tenant_id
+                        )
 
-            if type_key == "output":
-                redis_client.delete_key_batch(batch_keys)
+                        if isinstance(display_row, list) and len(display_row) > 0:
+                            display_data.append(display_row)
 
-        batches = [keys[i:i + batch_size] for i in range(0, len(keys), batch_size)]
+                else:
+                    display_data = []
+                    for idx, (row_key, row) in enumerate(data_dict.items()):
+                        if isinstance(row, dict):
+                            row['row_index'] = row_index_counter + idx
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_batch, batch): batch for batch in batches}
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.error(f"Error in batch processing: {e}")
+                        display_row = DataFormatter.format_data_with_rules(
+                            row,
+                            rules,
+                            before_headers,
+                            after_headers,
+                            tenant_id
+                        )
+                        display_data.append(display_row)
+
+                display_key = f"{session_id}-{type_key}:{key.decode('utf-8').split(':')[1]}"
+                client.set(display_key, json.dumps(display_data), ex=3600)
+
+                row_index_counter += len(display_data)
+
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
 
         logger.info("All keys processed successfully.")
         return "データは正常に処理され、保存されました。"
@@ -169,7 +164,7 @@ def generate_zip_task(zip_key, headers, file_format_id):
         keys = client.keys(zip_key)
 
         if not keys:
-            logger.warning("No formatted data found for ZIP generation.")
+            logger.warning("No display data found for ZIP generation.")
             return None
 
         zip_buffer = io.BytesIO()
@@ -182,44 +177,34 @@ def generate_zip_task(zip_key, headers, file_format_id):
         delimiter = format_details['delimiter']
         encoding = format_details['encoding']
 
-        def process_key(key):
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1]) if k.decode('utf-8').split(':')[1].isdigit() else 0)
+        all_data = []
+        for key in sorted_keys:
             try:
                 data = client.get(key)
-                if not data:
-                    return None, None
-
-                formatted_data = json.loads(data)
-                csv_buffer = io.StringIO()
-                csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
-
-                csv_writer.writerow(headers)
-
-                if isinstance(formatted_data, list):
-                    for row in formatted_data:
-                        if isinstance(row, dict):
-                            csv_writer.writerow(row.values())
-                        elif isinstance(row, list):
-                            csv_writer.writerow(row)
-                        else:
-                            logger.warning(f"Invalid row format: {row}")
-
+                if data:
+                    display_data = json.loads(data)
+                    all_data.extend(display_data)
                 client.delete(key)
-
-                file_name = f"{timezone.now().strftime('%Y%m%d')}_output.csv"
-                return file_name, csv_buffer.getvalue().encode(encoding)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
-                return None, None
+
+        csv_buffer = io.StringIO()
+        csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
+        csv_writer.writerow(headers)
+
+        for row in all_data:
+            if isinstance(row, dict):
+                csv_writer.writerow(row.values())
+            elif isinstance(row, list):
+                csv_writer.writerow(row)
+            else:
+                logger.warning(f"Invalid row format: {row}")
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(process_key, key): key for key in keys}
-
-                for future in as_completed(futures):
-                    file_name, csv_content = future.result()
-                    if file_name and csv_content:
-                        zip_file.writestr(file_name, csv_content)
-                        logger.info(f"Added file {file_name} to ZIP.")
+            file_name = f"{timezone.now().strftime('%Y%m%d')}_output.csv"
+            zip_file.writestr(file_name, csv_buffer.getvalue().encode(encoding))
+            logger.info(f"Added file {file_name} to ZIP.")
 
         zip_key_name = f"zip:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
         client.set(zip_key_name, zip_buffer.getvalue(), ex=3600)
@@ -232,13 +217,23 @@ def generate_zip_task(zip_key, headers, file_format_id):
 
 @shared_task
 def generate_csv_task(csv_key_pattern, headers, file_format_id):
+    """
+    Generate a CSV file from display data stored in Redis.
 
+    Args:
+        csv_key_pattern: Redis key pattern to find display data
+        headers: List of column headers
+        file_format_id: ID of the file format (encoding, delimiter)
+
+    Returns:
+        Redis key where the generated CSV is stored, or None on failure
+    """
     try:
         client = redis_client.get_client()
         keys = list(redis_client.scan_keys(csv_key_pattern))
 
         if not keys:
-            logger.warning("No formatted data found for CSV generation.")
+            logger.warning("No display data found for CSV generation.")
             return None
 
         format_details = FileFormatMapper.get_format_details(file_format_id)
@@ -249,58 +244,130 @@ def generate_csv_task(csv_key_pattern, headers, file_format_id):
         delimiter = format_details['delimiter']
         encoding = format_details['encoding']
 
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
+
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer, delimiter=delimiter)
         csv_writer.writerow(headers)
 
-        buffer_lock = threading.Lock()
-
-        max_workers = os.cpu_count() or 1
-
-        def process_rows(key):
+        all_rows = []
+        for key in sorted_keys:
             try:
                 data = client.get(key)
                 if data:
-                    formatted_data = json.loads(data)
-                    client.delete(key)
-                    return formatted_data
+                    display_data = json.loads(data)
+                    all_rows.extend(display_data)
             except Exception as e:
                 logger.error(f"Error processing key {key}: {e}")
-                return []
+                continue
 
-        def write_row(row):
+        for row in all_rows:
             try:
                 if isinstance(row, dict):
-                    return list(row.values())
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row.values()]
+                    csv_writer.writerow(values)
                 elif isinstance(row, list):
-                    return row
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row]
+                    csv_writer.writerow(values)
                 else:
-                    logger.warning(f"Invalid row format: {row}")
-                    return None
+                    logger.warning(f"Invalid row format: {type(row)}. Skipping.")
             except Exception as e:
-                logger.error(f"Error preparing row for CSV: {e}")
-                return None
-
-        all_rows = []
-        for key in keys:
-            all_rows.extend(process_rows(key))
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_row = {executor.submit(write_row, row): row for row in all_rows}
-
-            for future in as_completed(future_to_row):
-                try:
-                    processed_row = future.result()
-                    if processed_row is not None:
-                        with buffer_lock:
-                            csv_writer.writerow(processed_row)
-                except Exception as e:
-                    logger.error(f"Error writing row to CSV: {e}")
+                logger.error(f"Error writing row to CSV: {e}")
+                continue
 
         csv_key_name = f"csv:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
-        client.set(csv_key_name, csv_buffer.getvalue().encode(encoding), ex=3600)
+        client.set(csv_key_name, csv_buffer.getvalue().encode(encoding, errors='ignore'), ex=3600)
+        logger.info(f"CSV file created successfully with key {csv_key_name}")
         return csv_key_name
 
     except Exception as e:
         logger.error(f"Critical error generating CSV file: {e}")
+        return None
+
+
+@shared_task
+def generate_excel_task(excel_key_pattern, headers, sheet_name):
+    """
+    Generate an Excel file from display data stored in Redis.
+
+    Args:
+        excel_key_pattern: Redis key pattern to find display data
+        headers: List of column headers
+        sheet_name: Name for the Excel sheet
+
+    Returns:
+        Redis key where the generated Excel file is stored, or None on failure
+    """
+    try:
+        client = redis_client.get_client()
+        keys = list(redis_client.scan_keys(excel_key_pattern))
+
+        if not keys:
+            logger.warning("No display data found for Excel generation.")
+            return None
+
+        import pandas as pd
+        import io
+        from openpyxl import Workbook
+        from openpyxl.utils.dataframe import dataframe_to_rows
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = sheet_name
+
+        ws.append(headers)
+
+        sorted_keys = sorted(keys, key=lambda k: int(k.decode('utf-8').split(':')[1])
+        if k.decode('utf-8').split(':')[1].isdigit() else 0)
+
+        all_rows = []
+        for key in sorted_keys:
+            try:
+                data = client.get(key)
+                if data:
+                    display_data = json.loads(data)
+                    all_rows.extend(display_data)
+            except Exception as e:
+                logger.error(f"Error processing key {key}: {e}")
+                continue
+
+        for row in all_rows:
+            try:
+                if isinstance(row, dict):
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row.values()]
+                    ws.append(values)
+                elif isinstance(row, list):
+                    values = [CharacterNormalizer.safe_normalize(val) for val in row]
+                    ws.append(values)
+                else:
+                    logger.warning(f"Invalid row format: {type(row)}. Skipping.")
+            except Exception as e:
+                logger.error(f"Error adding row to Excel: {e}")
+                continue
+
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column_letter].width = min(adjusted_width, 50)
+
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        excel_key_name = f"excel:{base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')}"
+        client.set(excel_key_name, excel_buffer.getvalue(), ex=3600)
+
+        logger.info(f"Excel file created successfully with key {excel_key_name}")
+        return excel_key_name
+
+    except Exception as e:
+        logger.error(f"Error generating Excel file: {e}")
         return None

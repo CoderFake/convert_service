@@ -69,7 +69,8 @@ class DataConversionInfo(models.Model):
     data_convert_id = models.CharField(unique=True, max_length=50)
     data_convert_name = models.CharField(max_length=255)
     data_format_before = models.ForeignKey(DataFormat, related_name="before_conversion", on_delete=models.CASCADE)
-    data_format_after = models.ForeignKey(DataFormat, related_name="after_conversion", on_delete=models.CASCADE)
+    data_format_system_after = models.ForeignKey(DataFormat, related_name="after_system_conversion", on_delete=models.CASCADE, null=True, blank=True)
+    data_format_agency_after = models.ForeignKey(DataFormat, related_name="after_agency_conversion", on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,9 +84,10 @@ class DataConversionInfo(models.Model):
 class DataItemType(models.Model):
 
     class TypeName(models.TextChoices):
-        BEFORE = 'input', '変換前の列'
-        FORMAT = 'format', '変換中の列'
-        AFTER = 'output', '変換後の列'
+        INPUT = 'input', '変換前のデータ​'
+        DISPLAY = 'display', '画面のデータ'
+        SYSTEM_OUTPUT = 'system_output', '健診システム取り込みデータ​'
+        AGENCY_OUTPUT = 'agency_output', '予約代行業者取り込みデータ'
 
     class FormatValue(models.TextChoices):
         STRING = 'string', '文字列'
@@ -94,7 +96,7 @@ class DataItemType(models.Model):
         TIME = 'time', '時間'
         DATETIME = 'datetime', '日時'
         BOOLEAN = 'boolean', '真偽値'
-        PERIOD = 'period', '時間帯'
+        OPTION = 'option', '選択'
 
     id = models.AutoField(primary_key=True)
     data_item = models.ForeignKey('DataItem', on_delete=models.CASCADE, related_name='data_item_types')
@@ -121,8 +123,8 @@ class DetailedInfo(models.Model):
     id = models.AutoField(primary_key=True)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     data_convert = models.ForeignKey(DataConversionInfo, on_delete=models.CASCADE)
-    data_item_type_id_before = models.ForeignKey(DataItemType, related_name='before', on_delete=models.CASCADE, null=True, blank=True)
-    data_item_type_id_after = models.ForeignKey(DataItemType, related_name='after', on_delete=models.CASCADE,  null=True, blank=True)
+    data_item_type_before = models.ForeignKey(DataItemType, related_name='before', on_delete=models.CASCADE, null=True, blank=True)
+    data_item_type_after = models.ForeignKey(DataItemType, related_name='after', on_delete=models.CASCADE,  null=True, blank=True)
     convert_rule = models.ForeignKey(ConvertRule, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)

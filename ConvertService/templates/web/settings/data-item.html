@@ -45,18 +45,12 @@
             border: 1px solid #efefef !important;
         }
 
-        .filter-row .form-select, .dataTables_filter input{
-            height: 40px;
-            border-radius: 0.375rem !important;
-            border: 1px solid #efefef !important;
-        }
-
         .filter-row #fileFormatSelect{
             min-width: 160px;
         }
 
-        .filter-row #fromToTypeSelect{
-            min-width: 340px;
+        .filter-row #dataTypeSelect{
+            min-width: 248px;
         }
 
         .format-badge {
@@ -104,7 +98,7 @@
         .dataTables_wrapper .row:first-child input{
             margin: 0 !important;
             padding: 5px;
-            width: 525px !important;
+            width: 422px !important;
         }
 
         .dataTables_wrapper input:focus,
@@ -116,31 +110,29 @@
             content: '' !important;
         }
 
-        #ruleTable th:last-child,
-        #ruleTable td:last-child {
+        #dataItemTable th:last-child,
+        #dataItemTable td:last-child {
             width: 100px;
             text-align: center;
         }
-        #ruleTable td:last-child .btn {
+        #dataItemTable td:last-child .btn {
             margin-right: 5px;
         }
-        #ruleTable td:last-child .btn:last-child {
+        #dataItemTable td:last-child .btn:last-child {
             margin-right: 0;
         }
 
-        #ruleTable_filter label {
+        #dataItemTable_filter label {
             position: relative;
             z-index: 1;
         }
 
-        #ruleTable_filter label input{
-            position: absolute;
-            z-index: 99;
-            left: 0;
-        }
-
         .dataTables_info{
             display: none;
+        }
+
+        .setting-form select, .setting-form input{
+            min-width: 150px !important;
         }
 
         .custom-switch {
@@ -190,6 +182,10 @@
             transform: translateX(0.75rem);
         }
 
+        .hide-column {
+            display: none !important;
+        }
+
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -233,7 +229,7 @@
                             {% include "web/settings/includes/tab.html" %}
                             <div class="col-3">
                                 <div class="d-flex justify-content-end">
-                                    <button id="addRuleBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
+                                    <button id="addDataItemBtn" class="btn btn-primary px-5 border-0 rounded rounded-3">追加</button>
                                 </div>
                             </div>
                         </div>
@@ -249,8 +245,8 @@
                             </select>
                         </div>
                         <div>
-                            <select id="fromToTypeSelect" class="form-select form-select-sm">
-                                {% for value, name in data_item_type_choices %}
+                            <select id="dataTypeSelect" class="form-select form-select-sm">
+                                {% for value, name in data_type_names %}
                                     <option value="{{ value }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
@@ -264,17 +260,20 @@
                                 <span class="sr-only">Loading...</span>
                             </div>
                         </div>
-                        <table class="table table-bordered" id="ruleTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered" id="dataItemTable" width="100%" cellspacing="0">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>変換前のデータ項目名</th>
-                                    <th>変換後のデータ項目名</th>
-                                    <th>変換ルール</th>
+                                    <th>データ項目名</th>
+                                    <th>インデックス値</th>
+                                    <th class="display-column">表示可能</th>
+                                    <th class="edit-column">手入力可能</th>
+                                    <th class="format-column">データ型</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                <!-- Data will be loaded via AJAX -->
                             </tbody>
                         </table>
                     </div>
@@ -296,6 +295,7 @@
             </div>
             <div class="modal-body">
                 <p>このアイテムを削除しますが、よろしいでしょうか？</p>
+                <p><i class="fa fa-warning text-warning"></i>これを削除すると、「変換ルール設定」タブ内のすべての関連データも削除されます。</p>
                 <p class="text-danger font-weight-bold">この操作は元に戻せません。</p>
             </div>
             <div class="modal-footer">
@@ -306,94 +306,126 @@
     </div>
 </div>
 
-<!-- Rule Modal -->
-<div class="modal fade" id="ruleModal" tabindex="-1" role="dialog" aria-labelledby="ruleModalLabel" aria-hidden="true">
+<div class="modal fade" id="dataItemModal" tabindex="-1" role="dialog" aria-labelledby="dataItemModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <form id="ruleForm">
+            <form id="dataItemForm">
                 {% csrf_token %}
-                <input type="hidden" id="editRuleId" name="rule_id">
+                <input type="hidden" id="editItemId" name="item_id">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="ruleModalLabel">変換ルール</h5>
+                    <h5 class="modal-title" id="dataItemModalLabel">データ項目</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
 
                 <input type="hidden" id="file-format-id" name="file_format_id" value="">
-                <input type="hidden" id="from-to-type" name="from_to_type" value="">
+                <input type="hidden" id="data-type-name" name="data_type_name" value="">
 
                 <div class="modal-body">
-                    <div class="form-group row mt-3">
-                        <label for="from_item_id" class="col-sm-3 col-form-label">変換前のデータ項目名</label>
-                        <div class="col-sm-9">
-                            <select class="form-control" id="from_item_id" name="from_item_id">
-                                <option value="">選択してください</option>
-                            </select>
-                            <div class="invalid-feedback" id="from_item_id_error"></div>
-                        </div>
-                    </div>
 
-                    <div class="form-group row mt-3">
-                        <label for="to_item_id" class="col-sm-3 col-form-label">変換後のデータ項目名</label>
-                        <div class="col-sm-9">
-                            <select class="form-control" id="to_item_id" name="to_item_id">
-                                <option value="">選択してください</option>
-                            </select>
-                            <div class="invalid-feedback" id="to_item_id_error"></div>
-                        </div>
-                    </div>
-
-                    <div class="form-group row mt-3">
-                        <label for="rule_id" class="col-sm-3 col-form-label">変換ルール</label>
-                        <div class="col-sm-9">
-                            <select class="form-control" id="rule_id" name="rule_id">
-                                <option value="">選択してください</option>
-                                {% for dynamic_rule in dynamic_rules %}
-                                    <option value="{{ dynamic_rule.id }}">{{ dynamic_rule.convert_rule_name }}</option>
-                                {% endfor %}
-
-                                <option disabled>-------------------------------------------------</option>
-
-                                {% for fixed_rule in fixed_rules %}
-                                    <option value="{{ fixed_rule.id }}">{{ fixed_rule.convert_rule_name }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="invalid-feedback" id="rule_id_error"></div>
-                        </div>
-                    </div>
                 </div>
-
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary" id="saveRule">保存</button>
+                    <button type="submit" class="btn btn-primary" id="saveDataItem">保存</button>
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">キャンセル</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+
+
 {% endblock content %}
 
-
 {% block javascripts %}
-    <script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'web/vendor/datatables.net/js/jquery.dataTables.min.js' %}"></script>
 <script>
 $(document).ready(function() {
-    let ruleTable;
-    let fromItems = [];
-    let toItems = [];
 
+    input_and_output_html =`
+         <div class="form-group row mt-3">
+            <label for="data_item_name" class="col-sm-3 col-form-label">データ項目名</label>
+            <div class="col-sm-9">
+                <input type="text" class="form-control" id="data_item_name" name="data_item_name">
+                <div class="invalid-feedback" id="data_item_name_error"></div>
+            </div>
+        </div>
+
+        <div class="form-group row mt-3">
+            <label for="index-value" class="col-sm-3 col-form-label">インデックス値</label>
+            <div class="col-sm-9">
+                <input class="form-control" type="number" name="index_value" id="index-value" value="0">
+                <div class="invalid-feedback" id="index_value_error"></div>
+            </div>
+        </div>
+        <input type="hidden" value="string" name="format_value">
+        <input type="hidden" name="edit_value" value="off">
+        <input type="hidden" name="display" value="off">
+    `
+
+    format_html =`
+        <div class="form-group row mt-3 mb-5 px-5 d-flex flex-row justify-content-center">
+            <label for="data_item_name" class="col-form-label">データ項目名</label>
+            <div class="col-sm-9">
+                <input type="text" class="form-control" id="data_item_name" name="data_item_name">
+                <div class="invalid-feedback" id="data_item_name_error"></div>
+            </div>
+        </div>
+        <div class="container mt-4 d-flex flex-column">
+            <div class="row justify-content-center">
+                <div class="form-group col-6 row">
+                    <label for="index-value" class="col-sm-5 col-form-label">インデックス値</label>
+                    <div class="col-sm-6">
+                        <input class="form-control" type="number" name="index_value" id="index-value" value="0">
+                        <div class="invalid-feedback" id="index_value_error"></div>
+                    </div>
+                </div>
+                <div class="form-group col-6 row">
+                    <label class="col-sm-5 col-form-label">表示可能</label>
+                    <input type="checkbox" id="toggle-display" name="display" class="toggle-display-input">
+                    <label for="toggle-display" class="toggle-display-label">
+                        <span class="toggle-display-button"></span>
+                    </label>
+                    <div class="invalid-feedback" id="display_error"></div>
+                </div>
+            </div>
+            <div class="row justify-content-center">
+                <div class="form-group col-6 row w-100">
+                    <label for="format-value" class="col-sm-5 col-form-label">データ型</label>
+                    <div class="col-sm-6" >
+                        <select class="form-control" id="format-value" name="format_value">
+                            {% for data_type, data_val in data_type_choices %}
+                                <option value="{{ data_type }}">{{ data_val }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback" id="format_value_error"></div>
+                    </div>
+                </div>
+                <div class="form-group col-6 row w-100">
+                    <label class="col-sm-5 col-form-label">手入力可能</label>
+                    <input type="checkbox" id="toggle-edit" name="edit_value" class="toggle-edit-input">
+                    <label for="toggle-edit" class="toggle-edit-label">
+                        <span class="toggle-edit-button"></span>
+                    </label>
+                    <div class="invalid-feedback" id="edit_value_error"></div>
+                </div>
+            </div>
+        </div>
+    `
+
+    let dataItemTable;
     try {
-        ruleTable = $('#ruleTable').DataTable({
+        dataItemTable = $('#dataItemTable').DataTable({
             processing: true,
             serverSide: true,
             ordering: false,
             ajax: {
-                url: "/settings/rule-settings/",
+                url: "/settings/data-items/",
                 type: "GET",
                 data: function (d) {
                     d.file_format_id = $('#fileFormatSelect').val();
-                    d.from_to_type = $('#fromToTypeSelect').val();
+                    d.data_type_name = $('#dataTypeSelect').val();
                 },
                 beforeSend: function() {
                     $('#tableLoadingOverlay').show();
@@ -410,21 +442,46 @@ $(document).ready(function() {
                 {
                     data: "no",
                     name: "no",
-                    searchable: false
+                    searchable: false,
+
                 },
-                { data: "from_item", name: "from_item" },
-                { data: "to_item", name: "to_item" },
-                {data: "rule_name", name: "rule_name" },
+                { data: "data_item_name", name: "data_item_name" },
                 {
+                    data: "index_value",
+                    name: "index_value",
+                    orderable: false,
+                },
+                {
+                    data: "display",
+                    name: "display",
+                    className: "display-column",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                {
+                    data: "edit_value",
+                    name: "edit_value",
+                    className: "edit-column",
+                    render: function (data, type, row) {
+                        return data ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+                    }
+                },
+                {
+                    data: "format_value_label",
+                    name: "format_value_label",
+                    className: "format-column",
+                },
+                 {
                     data: "id",
                     orderable: false,
                     searchable: false,
                     render: function (data, type, row) {
                         return `
-                            <button class="btn btn-info btn-sm edit-rule" data-id="${data}">
+                            <button class="btn btn-info btn-sm edit-item" data-id="${data}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="btn btn-danger btn-sm delete-rule" data-id="${data}">
+                            <button class="btn btn-danger btn-sm delete-item" data-id="${data}" data-name="${row.data_item_name}">
                                 <i class="fas fa-trash"></i>
                             </button>
                         `;
@@ -440,162 +497,159 @@ $(document).ready(function() {
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, '全て']],
             pageLength: false,
             drawCallback: function() {
-                $('#ruleTable thead tr').find('th').first().text('No');
+                $('#dataItemTable thead tr').find('th').first().text('No');
+                updateColumnVisibility();
             },
             initComplete: function() {
                 $('#dataItemTable thead tr').find('th').first().text('No');
-                $('#ruleTable_filter').hide();
-                $('#ruleTable_wrapper .row').addClass('mb-4');
-                $('#ruleTable_wrapper .row:first-child .col-md-6:first-child').html('')
+                $('#dataItemTable_filter').hide();
+                $('#dataItemTable_wrapper .row').addClass('mb-4');
+                $('#dataItemTable_wrapper .row:first-child .col-md-6:first-child').html('')
                 .append(`
                     <input class="search-input" type="search" name="search_input" placeholder="キーワード入力" aria-controls="dataItemTable">
-                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">※ 検索条件： 変換前のデータ項目名・変換後のデータ項目名・変換ルール</span>
+                    <span class='content position-absolute' style="font-size: 0.7rem; bottom: -22px; left: 1px">※ 検索条件： データ項目名・インデックス値</span>
                 `);
-            }
 
+                updateModal();
+            }
         });
     } catch (e) {
         createToast('error', 'テーブルの初期化中にエラーが発生しました。');
     }
 
-    $('#fileFormatSelect, #fromToTypeSelect').on('change', function() {
-        if (ruleTable) {
-            ruleTable.ajax.reload();
+    $('#fileFormatSelect, #dataTypeSelect').on('change', function() {
+        if (dataItemTable) {
+            dataItemTable.ajax.reload();
         }
-        updateModalHiddenFields();
-        loadItemOptions();
+        updateColumnVisibility();
+        updateModal();
     });
-
-    function updateModalHiddenFields() {
-        $('#file-format-id').val($('#fileFormatSelect').val());
-        $('#from-to-type').val($('#fromToTypeSelect').val());
-    }
 
     $(document).on('keypress', '.search-input', function(e) {
         if (e.which === 13) {
             e.preventDefault();
             const searchValue = $(this).val();
-            ruleTable.search(searchValue).draw();
+            dataItemTable.search(searchValue).draw();
         }
     });
 
-    function loadItemOptions() {
-        const fileFormatId = $('#fileFormatSelect').val();
-        const fromToType = $('#fromToTypeSelect').val();
-        const fromType = fromToType.split('-')[0];
-        const toType = fromToType.split('-')[1];
+    function updateModal(){
+        const appendForm = $('#dataItemModal .modal-body');
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
 
-        $.ajax({
-            url: "/settings/get-items/",
-            type: "GET",
-            data: {
-                file_format_id: fileFormatId,
-                type_name: fromType
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    fromItems = response.items || [];
-                    const fromSelect = $('#from_item_id');
-                    fromSelect.empty();
-                    fromSelect.append('<option value="">選択してください</option>');
-
-                    fromItems.forEach(function(item) {
-                        fromSelect.append(`<option value="${item.id}">${item.data_item_name}</option>`);
-                    });
-                }
-            },
-            error: function() {
-                createToast('error', '変換元項目の読み込みに失敗しました。');
+        appendForm.html('')
+        if(dataTypeValue === 'input' || dataTypeValue === 'system_output' || dataTypeValue === 'agency_output')
+            appendForm.append(input_and_output_html);
+        else {
+            appendForm.append(format_html);
+            if(!$('#toggle-display').val() || !$('#toggle-edit').val()){
+                $('#toggle-display').val('off');
+                $('#toggle-edit').val('off');
             }
-        });
+        }
 
-        $.ajax({
-            url: "/settings/get-items/",
-            type: "GET",
-            data: {
-                file_format_id: fileFormatId,
-                type_name: toType
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    toItems = response.items || [];
-                    const toSelect = $('#to_item_id');
-                    toSelect.empty();
-                    toSelect.append('<option value="">選択してください</option>');
-
-                    toItems.forEach(function(item) {
-                        toSelect.append(`<option value="${item.id}">${item.data_item_name}</option>`);
-                    });
-                }
-            },
-            error: function() {
-                createToast('error', '変換先項目の読み込みに失敗しました。');
-            }
-        });
+        $('#dataItemModal #file-format-id').val(fileFormatValue);
+        $('#dataItemModal #data-type-name').val(dataTypeValue);
     }
 
-    const ruleModal = $('#ruleModal');
-    const ruleForm = $('#ruleForm');
+    function updateColumnVisibility() {
+        const dataType = $('#dataTypeSelect').val();
+
+        $('#dataItemModal #file-format-id').val($('#fileFormatSelect').val());
+        $('#dataItemModal #data-type-name').val(dataType);
+
+        if (dataType === 'input' || dataType === 'system_output' || dataType === 'agency_output') {
+            $('.display-column, .edit-column, .format-column').addClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').hide();
+        } else {
+            $('.display-column, .edit-column, .format-column').removeClass('hide-column');
+            $('.display-setting, .edit-setting, .format-setting').show();
+        }
+        if (dataItemTable) {
+            dataItemTable.columns.adjust();
+        }
+    }
+
+    updateColumnVisibility();
+
+    const dataItemModal = $('#dataItemModal');
+    const dataItemForm = $('#dataItemForm');
 
     function resetForm() {
-        ruleForm[0].reset();
-        $('#editRuleId').val('');
-        ruleModal.find('.modal-title').text('追加');
+        dataItemForm[0].reset();
+        $('#editItemId').val('');
+        dataItemModal.find('.modal-title').text('追加');
         resetFormErrors();
+
+        updateTypeSettingsVisibility();
     }
 
     function resetFormErrors() {
         $('.invalid-feedback').empty();
         $('.is-invalid').removeClass('is-invalid');
-        ruleForm.removeClass('was-validated');
+        dataItemForm.removeClass('was-validated');
+    }
+
+    function updateTypeSettingsVisibility() {
+        $('.type-settings-group').each(function() {
+            const groupType = $(this).data('type');
+
+            $(this).find('.index-setting').show();
+
+            if (groupType === 'input' || groupType === 'system_output' || groupType === 'agency_output') {
+                $(this).find('.display-setting, .edit-setting, .format-setting').hide();
+                $(this).find('input[id^="display_"]').prop('checked', false);
+                $(this).find('input[id^="edit_"]').prop('checked', false);
+                $(this).find('select[id^="format_"]').val('string');
+            } else {
+                $(this).find('.display-setting, .edit-setting, .format-setting').show();
+            }
+        });
     }
 
     function displayFormErrors(errors) {
         resetFormErrors();
 
         for (const field in errors) {
-            let errorMessage = errors[field];
+            let errorMessages = errors[field];
             const errorContainer = $(`#${field}_error`);
-            errorContainer.closest('.form-group').find('select, input').addClass('is-invalid');
-            errorContainer.html(errorMessage);
+            errorContainer.closest('.form-group').find('input').addClass('is-invalid');
+            errorContainer.html(errorMessages);
         }
     }
 
-    $('#addRuleBtn').on('click', function() {
+    $('#addDataItemBtn').on('click', function() {
         resetForm();
-        updateModalHiddenFields();
-        loadItemOptions();
-        ruleModal.modal('show');
+        dataItemModal.modal('show');
     });
 
-    $('#ruleTable tbody').on('click', '.edit-rule', function() {
-        const ruleId = $(this).data('id');
+    $('#dataItemTable tbody').on('click', '.edit-item', function() {
+        const itemId = $(this).data('id');
         resetForm();
-        let fileFormatValue = $('#fileFormatSelect').val();
-        let fromToTypeValue = $('#fromToTypeSelect').val();
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
 
-        ruleModal.find('.modal-title').text('編集');
-        $('#editRuleId').val(ruleId);
-        updateModalHiddenFields();
+        dataItemModal.find('.modal-title').text('編集');
+        $('#editItemId').val(itemId);
 
         $.ajax({
-            url: `/settings/rule-detail/${ruleId}/${fileFormatValue}/${fromToTypeValue}/`,
+            url: `/settings/data-item-detail/${itemId}/${fileFormatValue}/${dataTypeValue}/`,
             type: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
                 if (response.status === 'success') {
-                    const rule = response.data;
-
-                    loadItemOptions();
-
-                    setTimeout(function() {
-                        $('#from_item_id').val(rule.from_item_id);
-                        $('#to_item_id').val(rule.to_item_id);
-                        $('#rule_id').val(rule.rule_id);
-                    }, 500);
-                }
+                    const item = response.data_item;
+                    $('#data_item_id').val(item.data_item_id || '');
+                    $('#data_item_name').val(item.data_item_name || '');
+                    $('#data_format_id').val(item.data_format_id || '');
+                    $('#index-value').val(item.index_value || 0);
+                    $('#toggle-edit').prop('checked', !!item.edit_value);
+                    $('#toggle-display').prop('checked', !!item.display);
+                    $('#format-value').val(item.format_value || '文字列');
+               }
             },
             error: function(xhr) {
                 let errorMsg = 'データ読み込み中にエラーが発生しました。';
@@ -606,17 +660,17 @@ $(document).ready(function() {
             }
         });
 
-        ruleModal.modal('show');
+        dataItemModal.modal('show');
     });
 
-    ruleForm.on('submit', function(e) {
+    dataItemForm.on('submit', function(e) {
         e.preventDefault();
         resetFormErrors();
 
-        const ruleId = $('#editRuleId').val();
-        const url = ruleId ? `/settings/rule-edit/${ruleId}/` : '/settings/rule-create/';
+        const itemId = $('#editItemId').val();
+        const url = itemId ? `/settings/data-item-edit/${itemId}/` : '/settings/data-item-create/';
 
-        const saveBtn = $('#saveRule');
+        const saveBtn = $('#saveDataItem');
         const saveBtnText = saveBtn.html();
         saveBtn.html('<span class="spinner-border spinner-border-sm" role="status" style="width:20px; height:20px;" aria-hidden="true"></span> 保存中...');
         saveBtn.prop('disabled', true);
@@ -631,21 +685,19 @@ $(document).ready(function() {
             },
             success: function(response) {
                 if (response.status === 'success') {
-                    ruleModal.modal('hide');
+                    dataItemModal.modal('hide');
                     createToast('success', response.message || '操作が成功しました!');
-                    if (ruleTable) {
-                        ruleTable.ajax.reload();
+                    if (dataItemTable) {
+                        dataItemTable.ajax.reload();
                     }
                 } else {
                     if (response.errors) {
                         displayFormErrors(response.errors);
-                    } else if (response.message) {
-                        createToast('error', response.message);
                     }
                 }
             },
-            error: function(xhr, status, error) {
-                createToast('error', error || 'エラーが発生しました。');
+            error: function(xhr, status, response) {
+                createToast('error', response.message);
             },
             complete: function() {
                 saveBtn.html(saveBtnText);
@@ -654,19 +706,23 @@ $(document).ready(function() {
         });
     });
 
-    $('#ruleTable tbody').on('click', '.delete-rule', function() {
-        const ruleId = $(this).data('id');
+    $('#dataItemTable tbody').on('click', '.delete-item', function() {
+        const itemId = $(this).data('id');
+        const itemName = $(this).data('name') || '選択した項目';
+        let fileFormatValue = $('#fileFormatSelect').val()
+        let dataTypeValue = $('#dataTypeSelect').val();
 
+        $('#itemName').text(itemName);
         $('#deleteModal').modal('show');
 
         $('#confirmDelete').off('click').on('click', function() {
             const deleteBtn = $(this);
             const deleteBtnText = deleteBtn.html();
-            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 削除中...');
+            deleteBtn.html('<span class="spinner-border spinner-border-sm" role="status" style="height: 20px; width: 20px;" aria-hidden="true"></span> 削除中...');
             deleteBtn.prop('disabled', true);
 
             $.ajax({
-                url: `/settings/rule-delete/${ruleId}/`,
+                url: `/settings/data-item-delete/${itemId}/${fileFormatValue}/${dataTypeValue}/`,
                 type: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -676,9 +732,9 @@ $(document).ready(function() {
                     $('#deleteModal').modal('hide');
 
                     if (response.status === 'success') {
-                        createToast('success', response.message || 'ルールが削除されました');
-                        if (ruleTable) {
-                            ruleTable.ajax.reload();
+                        createToast('success', '項目が削除されました');
+                        if (dataItemTable) {
+                            dataItemTable.ajax.reload();
                         }
                     } else {
                         createToast('error', response.message || '削除中にエラーが発生しました');
@@ -690,7 +746,6 @@ $(document).ready(function() {
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMsg = xhr.responseJSON.message;
                     }
-
                     createToast('error', errorMsg);
                 },
                 complete: function() {
@@ -715,9 +770,6 @@ $(document).ready(function() {
         }
         return cookieValue;
     }
-
-    updateModalHiddenFields();
-    loadItemOptions();
 });
 </script>
 {% endblock javascripts %}
