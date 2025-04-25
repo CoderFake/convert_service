@@ -24,8 +24,12 @@
             text-overflow: ellipsis;
             min-width: 100px;
             max-width: 250px;
-            display: inline-block;
+            display: block;
             vertical-align: middle;
+            padding-top: 0;
+            padding-bottom: 0;
+            line-height: 30px;
+            height: 30px;
         }
 
         table.dataTable tbody tr td {
@@ -213,6 +217,7 @@
         .table-resize-handle:hover {
             background-color: rgba(78, 115, 223, 0.3);
         }
+
     </style>
 {% endblock stylesheets %}
 
@@ -437,6 +442,34 @@
                             }
                         });
                     });
+                }
+
+                function syncHeadersAndCells() {
+                    setTimeout(function() {
+                        const headers = document.querySelectorAll('#inputData thead th');
+                        const headerWidths = Array.from(headers).map(header => header.offsetWidth);
+
+                        const rows = document.querySelectorAll('#inputData tbody tr');
+                        rows.forEach(row => {
+                            const cells = row.querySelectorAll('td');
+                            cells.forEach((cell, index) => {
+                                if (index < headerWidths.length) {
+                                    cell.style.width = `${headerWidths[index]}px`;
+                                    cell.style.maxWidth = `${headerWidths[index]}px`;
+
+                                    const truncateText = cell.querySelector('.truncate-text');
+                                    if (truncateText) {
+                                        truncateText.style.width = `${headerWidths[index] - 16}px`;
+                                        truncateText.style.maxWidth = `${headerWidths[index] - 16}px`;
+                                    }
+                                }
+                            });
+                        });
+
+                        if ($.fn.DataTable.isDataTable('#inputData')) {
+                            $('#inputData').DataTable().columns.adjust();
+                        }
+                    }, 100);
                 }
 
                 function renderOptionField(headerName, currentValue, options) {
@@ -669,6 +702,11 @@
 
                             setupResizeHandle();
                             setupScrollEvents();
+
+                            syncHeadersAndCells();
+                        },
+                        drawCallback: function() {
+                            syncHeadersAndCells();
                         }
                     });
 
@@ -1006,14 +1044,21 @@
 
                 $(document).on('change', 'input[type="radio"]', function() {
                     const name = $(this).attr('name');
-                    const selectedDate = $(this).closest('div').find('input[type="text"]').val();
-                    $(".date-picker").val(selectedDate);
+                    const originalDateValue = $(this).closest('div').find('input[type="text"]').val();
+
+                    let cleanDateValue = originalDateValue;
+                    if (originalDateValue) {
+                        cleanDateValue = originalDateValue.replace(/\([月火水木金土日]\)$/, '');
+                    }
+
+                    $(".date-picker").val(cleanDateValue);
 
                     const displayKey = $('.show-data').attr('data-index');
                     const targetRow = $(`#inputData tbody tr[data-index="${displayKey}"]`);
-                    targetRow.find('td.row-date').text(selectedDate);
+                    targetRow.find('td.row-date').text(cleanDateValue);
 
                     $(`input[name="${name}"]`).not(this).prop('checked', false);
+
                     UpdateFormatData($(".date-picker"));
                 });
 
