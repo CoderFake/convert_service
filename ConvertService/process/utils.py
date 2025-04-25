@@ -284,7 +284,9 @@ class FileProcessor:
                                         datetime_obj = xlrd.xldate_as_datetime(cell_value, workbook.datemode)
                                         cell_value = datetime_obj.strftime("%Y/%m/%d")
                                     elif sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_NUMBER:
-                                        cell_value = CharacterNormalizer.format_numeric_value(cell_value)
+                                        if cell_value == int(cell_value):
+                                            cell_value = int(cell_value)
+
                                     row_data[header] = str(cell_value) if cell_value is not None else ""
                                 else:
                                     row_data[header] = ""
@@ -319,7 +321,8 @@ class FileProcessor:
                                 if isinstance(cell_value, datetime.datetime) or isinstance(cell_value, datetime.date):
                                     cell_value = cell_value.strftime("%Y/%m/%d")
                                 elif isinstance(cell_value, (int, float)):
-                                    cell_value = CharacterNormalizer.format_numeric_value(cell_value)
+                                    if cell_value == int(cell_value):
+                                        cell_value = int(cell_value)
 
                                 row_data[header] = str(cell_value) if cell_value is not None else ""
                             else:
@@ -986,119 +989,26 @@ class CharacterNormalizer:
     A utility class for normalizing text to ensure compatibility with various file formats.
     """
 
-    COMMON_REPLACEMENTS = {
-        # Circled numbers
-        '\u2460': '(1)',  # ① -> (1)
-        '\u2461': '(2)',  # ② -> (2)
-        '\u2462': '(3)',  # ③ -> (3)
-        '\u2463': '(4)',  # ④ -> (4)
-        '\u2464': '(5)',  # ⑤ -> (5)
-        '\u2465': '(6)',  # ⑥ -> (6)
-        '\u2466': '(7)',  # ⑦ -> (7)
-        '\u2467': '(8)',  # ⑧ -> (8)
-        '\u2468': '(9)',  # ⑨ -> (9)
-        '\u2469': '(10)',  # ⑩ -> (10)
-        '\u246A': '(11)',  # ⑪ -> (11)
-        '\u246B': '(12)',  # ⑫ -> (12)
-        '\u246C': '(13)',  # ⑬ -> (13)
-        '\u246D': '(14)',  # ⑭ -> (14)
-        '\u246E': '(15)',  # ⑮ -> (15)
-        '\u246F': '(16)',  # ⑯ -> (16)
-        '\u2470': '(17)',  # ⑰ -> (17)
-        '\u2471': '(18)',  # ⑱ -> (18)
-        '\u2472': '(19)',  # ⑲ -> (19)
-        '\u2473': '(20)',  # ⑳ -> (20)
-
-        # Music symbols
-        '\u266A': '*',  # ♪ -> *
-        '\u266B': '*',  # ♫ -> *
-
-        # Special symbols
-        '\u2605': '*',  # ★ -> *
-        '\u2606': '*',  # ☆ -> *
-        '\u2665': '<3',  # ♥ -> <3
-        '\u2660': '*',  # ♠ -> *
-        '\u2663': '*',  # ♣ -> *
-        '\u2666': '*',  # ♦ -> *
-
-        # Arrows
-        '\u2190': '<-',  # ← -> <-
-        '\u2191': '^',  # ↑ -> ^
-        '\u2192': '->',  # → -> ->
-        '\u2193': 'v',  # ↓ -> v
-        '\u2194': '<->',  # ↔ -> <->
-        '\u21D2': '=>',  # ⇒ -> =>
-        '\u21D4': '<=>',  # ⇔ -> <=>
-
-        # Bullets and marks
-        '\u2022': '*',  # • -> *
-        '\u2026': '...',  # … -> ...
-        '\u2018': "'",  # ' -> '
-        '\u2019': "'",  # ' -> '
-        '\u201C': '"',  # " -> "
-        '\u201D': '"',  # " -> "
-
-        # Math symbols
-        '\u00B1': '+/-',  # ± -> +/-
-        '\u00D7': 'x',  # × -> x
-        '\u00F7': '/',  # ÷ -> /
-        '\u221E': 'inf',  # ∞ -> inf
-        '\u2260': '!=',  # ≠ -> !=
-        '\u2264': '<=',  # ≤ -> <=
-        '\u2265': '>=',  # ≥ -> >=
-        '\u221A': 'sqrt',  # √ -> sqrt
-
-        # Currency
-        '\u20AC': 'EUR',  # € -> EUR
-        '\u00A3': 'GBP',  # £ -> GBP
-        '\u00A5': 'JPY',  # ¥ -> JPY
-    }
-
     @classmethod
     def normalize_text(cls, text):
-        """
-        Normalize text by replacing problematic characters with safe alternatives.
-        If a character cannot be converted, it will be preserved as is.
-
-        Args:
-            text: The text to normalize
-
-        Returns:
-            Normalized text
-        """
-        if not isinstance(text, str):
-            return text
 
         if not isinstance(text, str):
             return text
 
         try:
-            replaced_text = text
-            for char, replacement in cls.COMMON_REPLACEMENTS.items():
-                replaced_text = replaced_text.replace(char, replacement)
-
-            return replaced_text
+            return text
         except Exception as e:
             logger.warning(f"Character normalization error: {e}. Keeping original text.")
             return text
 
     @classmethod
     def format_numeric_value(cls, value):
-        """
-        Format numeric values consistently for export.
 
-        Args:
-            value: The value to format
-
-        Returns:
-            Formatted value
-        """
-        if not isinstance(value, str):
+        if not isinstance(value, (int, float, str)):
             return value
 
         try:
-            if re.match(r'^-?\d+(\.\d+)?$', value):
-
+            if isinstance(value, str) and re.match(r'^-?\d+(\.\d+)?$', value):
                 if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
                     return int(value)
                 return float(value)
@@ -1109,20 +1019,16 @@ class CharacterNormalizer:
 
     @classmethod
     def safe_normalize(cls, value):
-        """
-        Safely normalize any value type for export.
 
-        Args:
-            value: Any value that needs to be normalized
-
-        Returns:
-            Normalized value
-        """
         try:
-            if isinstance(value, str):
-                normalized = cls.normalize_text(value)
-                return cls.format_numeric_value(normalized)
-            return value
+            if isinstance(value, (int, float)):
+                if isinstance(value, float) and value.is_integer():
+                    return int(value)
+                return value
+            elif isinstance(value, str):
+                return value
+            else:
+                return value
         except Exception as e:
             logger.warning(f"Safe normalization error: {e}. Keeping original value.")
             return value
