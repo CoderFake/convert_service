@@ -532,8 +532,13 @@ $(document).ready(function() {
     });
 
     $(document).on('click', '.remove-row-btn', function() {
-        $(this).closest('.add-fixed-value-row').remove();
-        updateFixedValueRowNumbers();
+        const $rowToRemove = $(this).closest('.add-fixed-value-row');
+        const removedBeforeValue = $rowToRemove.find('.before-value').val();
+
+        $rowToRemove.remove();
+
+        checkAndClearDuplicateErrors();
+        updateRowNumbersWithoutClearingErrors();
     });
 
     $(document).on('click', '#expandValuesBtn', function() {
@@ -735,15 +740,56 @@ $(document).ready(function() {
         }
     }
 
-    function updateFixedValueRowNumbers() {
-        resetFormErrors();
+    function checkAndClearDuplicateErrors() {
+        const beforeValues = {};
+        const uniqueBeforeValues = [];
 
+        $('.add-fixed-value-row .before-value').each(function() {
+            const value = $(this).val();
+            const emptyValue = value === '';
+            const key = emptyValue ? '__EMPTY__' : value;
+
+            if (!beforeValues[key]) {
+                beforeValues[key] = 1;
+                uniqueBeforeValues.push(key);
+            } else {
+                beforeValues[key]++;
+            }
+        });
+
+        for (const key of uniqueBeforeValues) {
+            if (beforeValues[key] === 1) {
+                if (key === '__EMPTY__') {
+                    $('.add-fixed-value-row .before-value').each(function() {
+                        if ($(this).val() === '') {
+                            $(this).removeClass('is-invalid');
+                            $(this).closest('.form-group').find('.invalid-feedback').empty();
+                        }
+                    });
+                } else {
+                    $('.add-fixed-value-row .before-value').each(function() {
+                        if ($(this).val() === key) {
+                            $(this).removeClass('is-invalid');
+                            $(this).closest('.form-group').find('.invalid-feedback').empty();
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    function updateRowNumbersWithoutClearingErrors() {
         $('.add-fixed-value-row').each(function(index) {
             const rowIndex = index;
             const displayIndex = index + 1;
 
-            $(this).attr('data-row-index', rowIndex);
+            const beforeValueHasError = $(this).find('.before-value').hasClass('is-invalid');
+            const beforeValueError = $(this).find('[id^="before-value-"][id$="_error"]').html();
 
+            const afterValueHasError = $(this).find('.after-value').hasClass('is-invalid');
+            const afterValueError = $(this).find('[id^="after-value-"][id$="_error"]').html();
+
+            $(this).attr('data-row-index', rowIndex);
             $(this).find('label:contains("変換前データ値")').text('変換前データ値 ' + displayIndex);
             $(this).find('label:contains("変換後データ値")').text('変換後データ値 ' + displayIndex);
 
@@ -760,14 +806,24 @@ $(document).ready(function() {
                 .attr('id', 'after-value-' + rowIndex)
                 .attr('name', 'fixed_values[' + rowIndex + '][after]');
 
-            $(this).find('.invalid-feedback:first')
-                .attr('id', 'before-value-' + rowIndex + '_error');
+            const beforeErrorElement = $(this).find('.invalid-feedback:first');
+            beforeErrorElement.attr('id', 'before-value-' + rowIndex + '_error');
 
-            $(this).find('.invalid-feedback:last')
-                .attr('id', 'after-value-' + rowIndex + '_error');
+            const afterErrorElement = $(this).find('.invalid-feedback:last');
+            afterErrorElement.attr('id', 'after-value-' + rowIndex + '_error');
 
             beforeValueInput.val(beforeValue);
             afterValueInput.val(afterValue);
+
+            if (beforeValueHasError) {
+                beforeValueInput.addClass('is-invalid');
+                beforeErrorElement.html(beforeValueError);
+            }
+
+            if (afterValueHasError) {
+                afterValueInput.addClass('is-invalid');
+                afterErrorElement.html(afterValueError);
+            }
         });
     }
 
