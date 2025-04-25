@@ -99,9 +99,9 @@ class RuleSettingsView(LoginRequiredMixin, View):
             records_filtered = base_queryset.count()
 
             if int(length) == -1:
-                paginated_items = base_queryset.order_by('-updated_at')
+                paginated_items = base_queryset.order_by('data_item_type_after__index_value')
             else:
-                paginated_items = base_queryset.order_by('-updated_at')[start:start + length]
+                paginated_items = base_queryset.order_by('data_item_type_after__index_value')[start:start + length]
 
             data = []
             for index, item in enumerate(paginated_items, start=start + 1):
