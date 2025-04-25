@@ -380,7 +380,11 @@ class DataItemEditView(LoginRequiredMixin, View):
                     ).first()
                     if not existing_data_item:
                         last_data_item = DataItem.objects.order_by('-id').first()
-                        data_item_id = f"D000{int(last_data_item.data_item_id.split('D000')[1]) + 1}"
+                        if last_data_item:
+                            new_id_number = int(last_data_item.data_item_id.split('D000')[1]) + 1
+                        else:
+                            new_id_number = 1
+                        data_item_id = f"D000{new_id_number}"
 
                         new_data_item = DataItem.objects.create(
                             tenant=tenant,
@@ -389,7 +393,7 @@ class DataItemEditView(LoginRequiredMixin, View):
                             data_item_name=data_item_name
                         )
 
-                        DataItemType.objects.create(
+                        new_data_item_type = DataItemType.objects.create(
                             data_item=new_data_item,
                             type_name=data_type_name,
                             index_value=index_value,
@@ -397,6 +401,20 @@ class DataItemEditView(LoginRequiredMixin, View):
                             edit_value=edit_val,
                             format_value=format_value
                         )
+                        before_rule_existing = DetailedInfo.objects.filter(
+                            data_item_type_before=item_type
+                        )
+
+                        if before_rule_existing:
+                            before_rule_existing.update(data_item_type_before=new_data_item_type)
+
+                        after_rule_existing = DetailedInfo.objects.filter(
+                            data_item_type_after=item_type
+                        )
+
+                        if after_rule_existing:
+                            after_rule_existing.data_item_before = new_data_item_type
+                            after_rule_existing.update(data_item_type_after=new_data_item_type)
 
                         item_type.delete()
 
