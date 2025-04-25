@@ -649,11 +649,16 @@ class DataFormatter:
             if not value:
                 return ""
 
-            value = jaconv.hira2kata(value)
-
             if kana_type == 'full_to_half':
-                result = jaconv.z2h(value, kana=True)
-                result = result.replace('\u3000', ' ')
+                result = ""
+                for char in value:
+                    if '\u30A0' <= char <= '\u30FF' or char == '\u3000':
+                        if char == '\u3000':
+                            result += ' '
+                        else:
+                            result += jaconv.z2h(char, kana=True)
+                    else:
+                        result += char
                 return result
             elif kana_type == 'half_to_full':
                 result = jaconv.h2z(value, kana=True)
