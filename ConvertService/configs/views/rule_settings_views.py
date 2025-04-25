@@ -3,7 +3,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
-from django.db.models import Q
+from django.db.models import Q, F
 
 from configs.data_type import Mess
 from configs.models import ConvertRule, ConvertRuleCategory
@@ -213,7 +213,9 @@ class GetItemsView(LoginRequiredMixin, View):
                 tenant=tenant,
                 data_format__file_format__file_format_id__contains=file_format_id,
                 data_item_types__type_name=type_name
-            ).values('id', 'data_item_name').order_by('data_item_types__index_value')
+            ).annotate(
+                index_value=F('data_item_types__index_value')
+            ).values('id', 'data_item_name', 'index_value').order_by('index_value')
 
             return JsonResponse({
                 'status': 'success',
