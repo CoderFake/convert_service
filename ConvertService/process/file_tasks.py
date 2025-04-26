@@ -80,8 +80,7 @@ def process_and_format_file(
         before_headers,
         after_headers,
         tenant_id,
-        type_keys="processed:*",
-        data_format_id=None
+        type_keys="processed:*"
 ):
     try:
         logger.info("Task 'process_and_format_file' started.")
