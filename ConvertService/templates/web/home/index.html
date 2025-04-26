@@ -964,7 +964,9 @@
 
                         let content = `
                             <div class="row mb-3 w-100">
-                                <div class="p-2 text-left text-truncate d-flex justify-content-start align-items-center m-0 col-4 bg-success h-100 px-2" style="border-radius: 0.25rem;" title="${item.header}">${item.header}</div>
+                                <div class="p-2 text-left d-flex justify-content-start align-items-center m-0 col-4 bg-success h-100 px-2" style="border-radius: 0.25rem;" title="${item.header}">
+                                    <span class="text-truncate" style="max-width: 90%;">${item.header}</span>
+                                </div>
                                 <div class="position-relative w-100 col-8 pr-0">
                         `;
 
