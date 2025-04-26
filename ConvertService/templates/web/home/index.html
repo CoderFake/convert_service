@@ -87,8 +87,9 @@
         }
 
         input[type="radio"] {
-            left: 35%;
+            left: 37%;
             top: 50%;
+            z-index: 99;
             transform: translateY(-50%);
         }
 
@@ -217,6 +218,30 @@
         .table-resize-handle:hover {
             background-color: rgba(78, 115, 223, 0.3);
         }
+        .show-data label.text-truncate {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        .show-data label.text-left {
+            text-align: left !important;
+            justify-content: flex-start !important;
+        }
+
+        .show-data label[title]:hover {
+            cursor: help;
+        }
+
+        .show-data label.p-2 {
+            padding-left: 8px !important;
+        }
+
+        .show-data label.mr-2 {
+            margin-right: 0.5rem !important;
+        }
+
 
     </style>
 {% endblock stylesheets %}
@@ -707,6 +732,7 @@
                         },
                         drawCallback: function() {
                             syncHeadersAndCells();
+                            $(".dataTables_scrollBody").css({"height": "220px", "min-height": "220px"});
                         }
                     });
 
@@ -873,10 +899,10 @@
                     showDataDiv.empty();
                     showDataDiv.attr('data-index', displayKey);
 
-                    let rowHTML = '<div class="row">';
-                    let colLeft1 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colLeft2 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 d-flex flex-column justify-content-start">';
-                    let colRight = '<div class="col-12 col-xl-12 col-lg-12 col-sm-12 d-flex flex-column justify-content-start align-items-center">';
+                    let rowHTML = '<div class="row w-100 mx-auto">';
+                    let colLeft1 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 pr-xl-4">';
+                    let colLeft2 = '<div class="col-12 col-xl-6 col-lg-12 col-sm-12 pl-xl-4">';
+                    let colRight = '<div class="col-12 col-xl-12 col-lg-12 col-sm-12 pl-xl-1">';
 
                     let nonEditHeaders = [];
                     let editHeaders = [];
@@ -899,17 +925,25 @@
                         const regex = /第\d+希望日付/;
                         if (regex.test(item.header) && item.cell) {
                             content = `
-                                <div class="mb-3 d-flex align-items-center w-100 position-relative">
-                                    <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
+                                <div class="row mb-3 position-relative">
+                                    <div class="p-2 text-left d-flex justify-content-start align-items-center m-0 bg-info col-4" style="border-radius: 0.25rem;" title="${item.header}">
+                                        <span class="text-truncate" style="max-width: 90%;"> ${item.header}</span>
+                                    </div>
                                     <input type="radio" name="preferred-date" class="position-absolute">
-                                    <input type="text" class="form-control bg-white pl-4" value="${item.cell || ''}" readonly>
+                                    <div class="col-8 pr-0">
+                                        <input type="text" class="form-control bg-white pl-4 w-100" value="${item.cell || ''}" readonly>
+                                    </div>
                                 </div>
                             `;
                         } else {
                             content = `
-                                <div class="mb-3 d-flex align-items-center w-100">
-                                    <label class="text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-info h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                    <input type="text" id="${item.header}" class="form-control bg-white" value="${item.cell || ''}" readonly>
+                                <div class="row mb-3">
+                                    <div class="text-left d-flex justify-content-start align-items-center m-0 col-4 bg-info px-2" style="border-radius: 0.25rem;" title="${item.header}">
+                                       <span class="text-truncate" style="max-width: 90%;"> ${item.header}</span>
+                                    </div>
+                                    <div class="col-8 pr-0">
+                                        <input type="text" id="${item.header}" class="form-control bg-white w-100" value="${item.cell || ''}" readonly>
+                                    </div>
                                 </div>
                             `;
                         }
@@ -929,9 +963,9 @@
                         const showClearIcon = item.format === 'time' && item.cell.trim() !== '';
 
                         let content = `
-                            <div class="mb-3 d-flex align-items-center w-100">
-                                <label class="p-2 text-center text-truncate d-flex justify-content-center align-items-center m-0 mr-2 w-50 bg-success h-100" style="border-radius: 0.25rem;">${item.header}</label>
-                                <div class="position-relative w-100">
+                            <div class="row mb-3 w-100">
+                                <div class="p-2 text-left text-truncate d-flex justify-content-start align-items-center m-0 col-4 bg-success h-100 px-2" style="border-radius: 0.25rem;" title="${item.header}">${item.header}</div>
+                                <div class="position-relative w-100 col-8 pr-0">
                         `;
 
                         if (item.format === 'option') {
@@ -960,12 +994,16 @@
                     colRight += '</div>';
 
                     rowHTML += `
-                        <div class="row col-12 col-lg-6 col-xl-9">
-                            ${colLeft1}
-                            ${colLeft2}
+                        <div class="col-12 col-lg-6 col-xl-8">
+                            <div class="row w-100">
+                                ${colLeft1}
+                                ${colLeft2}
+                            </div>
                         </div>
-                        <div class="row col-12 col-lg-6 col-xl-3">
-                            ${colRight}
+                        <div class="col-12 col-lg-6 col-xl-4">
+                            <div class="row w-100">
+                                ${colRight}
+                            </div>
                         </div>
                     `;
 
