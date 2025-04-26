@@ -283,9 +283,19 @@ class FileProcessor:
                                     if sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_DATE:
                                         datetime_obj = xlrd.xldate_as_datetime(cell_value, workbook.datemode)
                                         cell_value = datetime_obj.strftime("%Y/%m/%d")
-                                    elif sheet.cell_type(row_idx, header_indices[header]) == xlrd.XL_CELL_NUMBER:
-                                        cell_value = CharacterNormalizer.format_numeric_value(cell_value)
-                                    row_data[header] = str(cell_value) if cell_value is not None else ""
+                                    else:
+                                        try:
+                                            num_value = float(cell_value)
+                                            if num_value == 0:
+                                                cell_value = "0"
+                                            elif num_value == int(num_value):
+                                                cell_value = str(int(num_value))
+                                            else:
+                                                cell_value = str(num_value)
+                                        except (ValueError, TypeError):
+                                            cell_value = str(cell_value) if cell_value is not None else ""
+
+                                    row_data[header] = cell_value
                                 else:
                                     row_data[header] = ""
                             data.append(row_data)
@@ -315,13 +325,21 @@ class FileProcessor:
                         for header in headers:
                             if header in header_indices and header_indices[header] < len(row):
                                 cell_value = row[header_indices[header]].value
-
-                                if isinstance(cell_value, datetime.datetime) or isinstance(cell_value, datetime.date):
+                                if isinstance(cell_value, (datetime.datetime, datetime.date)):
                                     cell_value = cell_value.strftime("%Y/%m/%d")
-                                elif isinstance(cell_value, (int, float)):
-                                    cell_value = CharacterNormalizer.format_numeric_value(cell_value)
+                                else:
+                                    try:
+                                        num_value = float(cell_value)
+                                        if num_value == 0:
+                                            cell_value = "0"
+                                        elif num_value == int(num_value):
+                                            cell_value = str(int(num_value))
+                                        else:
+                                            cell_value = str(num_value)
+                                    except (ValueError, TypeError):
+                                        cell_value = str(cell_value) if cell_value is not None else ""
 
-                                row_data[header] = str(cell_value) if cell_value is not None else ""
+                                row_data[header] = cell_value
                             else:
                                 row_data[header] = ""
                         data.append(row_data)
@@ -449,54 +467,42 @@ class DataFormatter:
     def format_data_with_rules(row, rules, before_headers, after_headers, tenant_id):
         try:
             mapped_row = [""] * len(after_headers)
+            after_header_map = {h['index_value']: {'pos': i, 'header_name': h['header_name']}
+                                for i, h in enumerate(after_headers)}
 
             if isinstance(row, dict):
-                index_to_header = {h['index_value']: h['header_name'] for h in before_headers}
+                index_to_before_header = {h['index_value']: h['header_name'] for h in before_headers}
 
                 for rule_id, idx_before, idx_after in rules:
                     try:
-                        if idx_after < len(mapped_row):
-                            header_name = index_to_header.get(idx_before)
-                            if header_name and header_name in row:
-                                value = row[header_name]
-                                mapped_row[idx_after] = value
-                            else:
-                                logger.info(f"Header name {header_name} not found in row or is None")
+                        after_info = after_header_map.get(idx_after)
+                        header_name = index_to_before_header.get(idx_before)
+
+                        if after_info and header_name and header_name in row:
+                            value = row[header_name]
+                            mapped_row[after_info['pos']] = value
+                        else:
+                            logger.info(f"Header name {header_name} not found in row or idx_after {idx_after} invalid")
                     except Exception as e:
                         logger.error(f"Error in rule mapping: {e}")
-
-            elif isinstance(row, list):
-                before_indices = [h['index_value'] for h in before_headers]
-                for rule_id, idx_before, idx_after in rules:
-                    try:
-                        if idx_after < len(mapped_row):
-                            if idx_before < len(row):
-                                value = row[idx_before]
-                                if idx_before in before_indices:
-                                    mapped_row[idx_after] = value
-                                else:
-                                    logger.info(f"Index {idx_before} not in before_indices")
-                            else:
-                                logger.info(f"Index {idx_before} out of range for row")
-                    except Exception as e:
-                        logger.error(f"Error in rule mapping: {e}")
-
             else:
                 logger.error(f"Unsupported row type: {type(row)}")
                 return [""] * len(after_headers)
 
             for rule_id, idx_before, idx_after in rules:
                 try:
-                    if idx_after < len(mapped_row):
-                        before_value = mapped_row[idx_after]
-                        if DataFormatter.is_fixed_rule(rule_id):
-                            mapped_row[idx_after] = DataFormatter.convert_fixed_value(
-                                before_value, rule_id, tenant_id
-                            )
-                        else:
-                            mapped_row[idx_after] = DataFormatter.apply_rule(
-                                before_value, rule_id
-                            )
+                    after_info = after_header_map.get(idx_after)
+                    pos = after_info['pos']
+
+                    before_value = mapped_row[pos]
+                    if DataFormatter.is_fixed_rule(rule_id):
+                        mapped_row[pos] = DataFormatter.convert_fixed_value(
+                            before_value, rule_id, tenant_id
+                        )
+                    else:
+                        mapped_row[pos] = DataFormatter.apply_rule(
+                            before_value, rule_id
+                        )
 
                 except Exception as e:
                     logger.error(f"Error applying rule: {e}")
@@ -522,91 +528,123 @@ class DataFormatter:
     def convert_date(value, target_format='%Y/%m/%d'):
         """
         Convert a date string to the desired format.
-        Supported formats:
-        - Japanese Era formats
-        - ISO formats (YYYY/MM/DD, YYYY-MM-DD)
-        - Kanji dates (YYYY年MM月DD日)
-        - US-style formats (MM/DD/YYYY, MM-DD-YYYY)
-        - Custom formats like DD/MM/YYYY, YYYY\DD\MM
+        Supports a wide variety of input formats:
 
-        :param value: The date value to be converted
-        :param target_format: The desired output format
+        - European formats: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+        - US formats: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
+        - ISO formats: YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
+        - Japanese Era formats: S/H/R YY.MM.DD, 昭和/平成/令和 YY.MM.DD
+        - Kanji dates: YYYY年MM月DD日
+        - Formats with time components: DD/MM/YYYY HH:MM, MM/DD/YYYY HH:MM:SS, etc.
+        - Other delimiters and variations
+
         :return: Formatted date string or original value if conversion fails
         """
         try:
+            def is_valid_date(year, month, day):
+                try:
+                    datetime.datetime(year, month, day)
+                    return True
+                except ValueError:
+                    return False
+
             if not value or not isinstance(value, str):
                 return ""
 
             value = value.strip()
             date_result = None
 
-            # 1. Handle Japanese Era formats
+            time_part = ""
+            time_match = re.search(r'(\s+\d{1,2}[:\.]\d{1,2}([:\.]\d{1,2})?\s*(AM|PM|am|pm)?)', value)
+            if time_match:
+                time_part = time_match.group(1)
+                value = value.replace(time_part, '')
+                value = value.strip()
+
+            # 1. Japanese Era formats
             era_map = {"S": 1925, "H": 1988, "R": 2018}
-            era_match = re.match(r'([S|H|R])\s*(\d{1,2})[.\-年](\d{1,2})[.\-月](\d{1,2})日?', value)
+            era_match = re.match(r'([SHR])\s*(\d{1,2})[.\-年/](\d{1,2})[.\-月/](\d{1,2})日?', value)
             if era_match:
                 era, year, month, day = era_match.groups()
                 base_year = era_map.get(era[0], 0)
                 year = int(year) + base_year
                 date_result = datetime.datetime(year, int(month), int(day))
 
-            kanji_era_match = re.match(r'(昭和|平成|令和)\s*(\d{1,2})[.\-年](\d{1,2})[.\-月](\d{1,2})日?', value)
-            if kanji_era_match:
+            kanji_era_match = re.match(r'(昭和|平成|令和)\s*(\d{1,2})[.\-年/](\d{1,2})[.\-月/](\d{1,2})日?', value)
+            if not date_result and kanji_era_match:
                 kanji_era, year, month, day = kanji_era_match.groups()
                 era = {"昭和": 1925, "平成": 1988, "令和": 2018}[kanji_era]
                 year = int(year) + era
                 date_result = datetime.datetime(year, int(month), int(day))
 
-            # 2. Handle ISO-like formats
+            # 2. ISO format (YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD)
             if not date_result:
-                iso_match = re.match(r'(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})', value)
+                iso_match = re.match(r'(\d{4})([.\-/])(\d{1,2})\2(\d{1,2})', value)
                 if iso_match:
-                    year, month, day = map(int, iso_match.groups())
-                    date_result = datetime.datetime(year, month, day)
+                    year, separator, month, day = iso_match.groups()
+                    date_result = datetime.datetime(int(year), int(month), int(day))
 
-            # 3. Handle Kanji dates
+            # 3. Kanji dates (YYYY年MM月DD日)
             if not date_result:
-                kanji_match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', value)
+                kanji_match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日?', value)
                 if kanji_match:
                     year, month, day = map(int, kanji_match.groups())
                     date_result = datetime.datetime(year, month, day)
 
-            # 4. Handle US-style formats with time
+            # 4. European format (DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY)
             if not date_result:
-                us_match_with_time = re.match(
-                    r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s(\d{1,2}):(\d{1,2}):(\d{1,2})\s(AM|PM)', value)
-                if us_match_with_time:
-                    month, day, year, hour, minute, second, period = us_match_with_time.groups()
-                    hour = int(hour)
-                    if period == 'PM' and hour != 12:
-                        hour += 12
-                    elif period == 'AM' and hour == 12:
-                        hour = 0
-                    date_result = datetime.datetime(int(year), int(month), int(day), hour, int(minute), int(second))
+                euro_match = re.match(r'(\d{1,2})([.\-/])(\d{1,2})\2(\d{4})', value)
+                if euro_match:
+                    day, separator, month, year = euro_match.groups()
+                    day_val = int(day)
+                    month_val = int(month)
 
-            # 5. Handle US-style formats without time (e.g., MM/DD/YYYY or MM-DD-YYYY)
+                    if day_val > 12 or (month_val <= 12 and is_valid_date(int(year), month_val, day_val)):
+                        date_result = datetime.datetime(int(year), month_val, day_val)
+                    elif month_val > 12 or not is_valid_date(int(year), month_val, day_val):
+                        if is_valid_date(int(year), day_val, month_val):
+                            date_result = datetime.datetime(int(year), day_val, month_val)
+
+            # 5. US format (MM-DD-YYYY, MM/DD/YYYY, MM.DD.YYYY)
             if not date_result:
-                us_match = re.match(r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})', value)
+                us_match = re.match(r'(\d{1,2})([.\-/])(\d{1,2})\2(\d{4})', value)
                 if us_match:
-                    month, day, year = map(int, us_match.groups())
-                    date_result = datetime.datetime(year, month, day)
+                    month, separator, day, year = us_match.groups()
+                    month_val = int(month)
+                    day_val = int(day)
 
-            # 6. Handle DD/MM/YYYY or YYYY\DD\MM
-            if not date_result:
-                custom_match = re.match(r'(\d{1,2})[\/\-\\](\d{1,2})[\/\-\\](\d{4})', value)
-                if custom_match:
-                    day, month, year = map(int, custom_match.groups())
-                    date_result = datetime.datetime(year, month, day)
+                    if month_val <= 12 and is_valid_date(int(year), month_val, day_val):
+                        date_result = datetime.datetime(int(year), month_val, day_val)
+                    elif day_val <= 12 and is_valid_date(int(year), day_val, month_val):
+                        date_result = datetime.datetime(int(year), day_val, month_val)
 
+            # 6. Two-digit year formats (DD-MM-YY, MM-DD-YY)
             if not date_result:
-                reverse_match = re.match(r'(\d{4})[\/\-\\](\d{1,2})[\/\-\\](\d{1,2})', value)
+                short_year_match = re.match(r'(\d{1,2})([.\-/])(\d{1,2})\2(\d{2})', value)
+                if short_year_match:
+                    first, separator, second, year = short_year_match.groups()
+                    full_year = int(year) + (2000 if int(year) < 50 else 1900)
+
+                    first_val = int(first)
+                    second_val = int(second)
+
+                    if first_val <= 12 and second_val <= 31 and is_valid_date(full_year, first_val, second_val):
+                        date_result = datetime.datetime(full_year, first_val, second_val)
+                    elif second_val <= 12 and first_val <= 31 and is_valid_date(full_year, second_val, first_val):
+                        date_result = datetime.datetime(full_year, second_val, first_val)
+
+            # 7. Reverse formats (YYYY.DD.MM)
+            if not date_result:
+                reverse_match = re.match(r'(\d{4})([.\-/])(\d{1,2})\2(\d{1,2})', value)
                 if reverse_match:
-                    year, day, month = map(int, reverse_match.groups())
-                    date_result = datetime.datetime(year, month, day)
+                    year, separator, first, second = reverse_match.groups()
+                    if is_valid_date(int(year), int(first), int(second)):
+                        date_result = datetime.datetime(int(year), int(first), int(second))
+                    elif is_valid_date(int(year), int(second), int(first)):
+                        date_result = datetime.datetime(int(year), int(second), int(first))
 
-            # 7. Convert to the desired format
+            # 8. Convert to the desired format
             if date_result:
-                if target_format == '%d/%m/%Y':
-                    return date_result.strftime('%d/%m/%Y')
                 return date_result.strftime(target_format)
 
             return value
@@ -986,119 +1024,26 @@ class CharacterNormalizer:
     A utility class for normalizing text to ensure compatibility with various file formats.
     """
 
-    COMMON_REPLACEMENTS = {
-        # Circled numbers
-        '\u2460': '(1)',  # ① -> (1)
-        '\u2461': '(2)',  # ② -> (2)
-        '\u2462': '(3)',  # ③ -> (3)
-        '\u2463': '(4)',  # ④ -> (4)
-        '\u2464': '(5)',  # ⑤ -> (5)
-        '\u2465': '(6)',  # ⑥ -> (6)
-        '\u2466': '(7)',  # ⑦ -> (7)
-        '\u2467': '(8)',  # ⑧ -> (8)
-        '\u2468': '(9)',  # ⑨ -> (9)
-        '\u2469': '(10)',  # ⑩ -> (10)
-        '\u246A': '(11)',  # ⑪ -> (11)
-        '\u246B': '(12)',  # ⑫ -> (12)
-        '\u246C': '(13)',  # ⑬ -> (13)
-        '\u246D': '(14)',  # ⑭ -> (14)
-        '\u246E': '(15)',  # ⑮ -> (15)
-        '\u246F': '(16)',  # ⑯ -> (16)
-        '\u2470': '(17)',  # ⑰ -> (17)
-        '\u2471': '(18)',  # ⑱ -> (18)
-        '\u2472': '(19)',  # ⑲ -> (19)
-        '\u2473': '(20)',  # ⑳ -> (20)
-
-        # Music symbols
-        '\u266A': '*',  # ♪ -> *
-        '\u266B': '*',  # ♫ -> *
-
-        # Special symbols
-        '\u2605': '*',  # ★ -> *
-        '\u2606': '*',  # ☆ -> *
-        '\u2665': '<3',  # ♥ -> <3
-        '\u2660': '*',  # ♠ -> *
-        '\u2663': '*',  # ♣ -> *
-        '\u2666': '*',  # ♦ -> *
-
-        # Arrows
-        '\u2190': '<-',  # ← -> <-
-        '\u2191': '^',  # ↑ -> ^
-        '\u2192': '->',  # → -> ->
-        '\u2193': 'v',  # ↓ -> v
-        '\u2194': '<->',  # ↔ -> <->
-        '\u21D2': '=>',  # ⇒ -> =>
-        '\u21D4': '<=>',  # ⇔ -> <=>
-
-        # Bullets and marks
-        '\u2022': '*',  # • -> *
-        '\u2026': '...',  # … -> ...
-        '\u2018': "'",  # ' -> '
-        '\u2019': "'",  # ' -> '
-        '\u201C': '"',  # " -> "
-        '\u201D': '"',  # " -> "
-
-        # Math symbols
-        '\u00B1': '+/-',  # ± -> +/-
-        '\u00D7': 'x',  # × -> x
-        '\u00F7': '/',  # ÷ -> /
-        '\u221E': 'inf',  # ∞ -> inf
-        '\u2260': '!=',  # ≠ -> !=
-        '\u2264': '<=',  # ≤ -> <=
-        '\u2265': '>=',  # ≥ -> >=
-        '\u221A': 'sqrt',  # √ -> sqrt
-
-        # Currency
-        '\u20AC': 'EUR',  # € -> EUR
-        '\u00A3': 'GBP',  # £ -> GBP
-        '\u00A5': 'JPY',  # ¥ -> JPY
-    }
-
     @classmethod
     def normalize_text(cls, text):
-        """
-        Normalize text by replacing problematic characters with safe alternatives.
-        If a character cannot be converted, it will be preserved as is.
-
-        Args:
-            text: The text to normalize
-
-        Returns:
-            Normalized text
-        """
-        if not isinstance(text, str):
-            return text
 
         if not isinstance(text, str):
             return text
 
         try:
-            replaced_text = text
-            for char, replacement in cls.COMMON_REPLACEMENTS.items():
-                replaced_text = replaced_text.replace(char, replacement)
-
-            return replaced_text
+            return text
         except Exception as e:
             logger.warning(f"Character normalization error: {e}. Keeping original text.")
             return text
 
     @classmethod
     def format_numeric_value(cls, value):
-        """
-        Format numeric values consistently for export.
 
-        Args:
-            value: The value to format
-
-        Returns:
-            Formatted value
-        """
-        if not isinstance(value, str):
+        if not isinstance(value, (int, float, str)):
             return value
 
         try:
-            if re.match(r'^-?\d+(\.\d+)?$', value):
-
+            if isinstance(value, str) and re.match(r'^-?\d+(\.\d+)?$', value):
                 if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
                     return int(value)
                 return float(value)
@@ -1109,20 +1054,16 @@ class CharacterNormalizer:
 
     @classmethod
     def safe_normalize(cls, value):
-        """
-        Safely normalize any value type for export.
 
-        Args:
-            value: Any value that needs to be normalized
-
-        Returns:
-            Normalized value
-        """
         try:
-            if isinstance(value, str):
-                normalized = cls.normalize_text(value)
-                return cls.format_numeric_value(normalized)
-            return value
+            if isinstance(value, (int, float)):
+                if isinstance(value, float) and value.is_integer():
+                    return int(value)
+                return value
+            elif isinstance(value, str):
+                return value
+            else:
+                return value
         except Exception as e:
             logger.warning(f"Safe normalization error: {e}. Keeping original value.")
             return value

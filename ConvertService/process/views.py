@@ -128,11 +128,11 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
                 data_format_id=data_format_id
             )
 
-            format_headers = HeaderFetcher.get_headers(
+            after_headers = HeaderFetcher.get_headers(
                 user,
                 HeaderType.DISPLAY.value,
                 DisplayType.ALL.value,
-                False,
+                True,
                 data_format_id=data_format_id
             )
 
@@ -147,7 +147,7 @@ class FormatDataProcessingView(LoginRequiredMixin, View):
                 request.session.session_key,
                 rules,
                 before_headers,
-                format_headers,
+                after_headers,
                 user.tenant.id
             )
 
@@ -203,7 +203,7 @@ class DownloadView(LoginRequiredMixin, View):
             if download_type == DownloadType.SYSTEM.value:
                 sheet_name= DownloadType.SYSTEM.value
 
-                format_headers = HeaderFetcher.get_headers(
+                display_headers = HeaderFetcher.get_headers(
                     user,
                     HeaderType.DISPLAY.value,
                     DisplayType.SHOW.value,
@@ -214,6 +214,7 @@ class DownloadView(LoginRequiredMixin, View):
                     user,
                     HeaderType.SYSTEM_OUTPUT.value,
                     DisplayType.ALL.value,
+                    get_edit_header=True,
                     data_format_id=data_format_id
                 )
 
